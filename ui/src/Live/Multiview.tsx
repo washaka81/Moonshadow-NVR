@@ -24,6 +24,8 @@ const LAYOUTS: Layout[] = [
   { className: "dual", cameras: 2, name: "2" },
   { className: "main-plus-five", cameras: 6, name: "Main + 5" },
   { className: "two-by-two", cameras: 4, name: "2x2" },
+  { className: "two-by-three", cameras: 6, name: "2x3" },
+  { className: "three-by-two", cameras: 6, name: "3x2" },
   { className: "three-by-three", cameras: 9, name: "3x3" },
 ];
 const MAX_CAMERAS = 9;
@@ -252,6 +254,14 @@ const Multiview = (props: MultiviewProps) => {
             },
             "&.two-by-two": {
               gridTemplateColumns: "repeat(2, calc(100% / 2))",
+              gridTemplateRows: "repeat(2, calc(100% / 2))",
+            },
+            "&.two-by-three": {
+              gridTemplateColumns: "repeat(2, calc(100% / 2))",
+              gridTemplateRows: "repeat(3, calc(100% / 3))",
+            },
+            "&.three-by-two": {
+              gridTemplateColumns: "repeat(3, calc(100% / 3))",
               gridTemplateRows: "repeat(2, calc(100% / 2))",
             },
             "&.main-plus-five, &.three-by-three": {
