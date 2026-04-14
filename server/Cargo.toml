@@ -1,5 +1,5 @@
 [package]
-name = "moonfire-nvr"
+name = "moonshadow-nvr"
 version = "0.0.0"
 authors = ["Scott Lamb <slamb@slamb.org>"]
 edition = "2021"
@@ -9,7 +9,7 @@ rust-version = "1.91"
 publish = false
 
 [features]
-# The nightly feature is used within moonfire-nvr itself to gate the
+# The nightly feature is used within moonshadow-nvr itself to gate the
 # benchmarks. Also pass it along to crates that can benefit from it.
 nightly = ["db/nightly"]
 
@@ -56,7 +56,7 @@ protobuf-codegen = { git = "https://github.com/scottlamb/rust-protobuf", rev = "
 [dependencies]
 
 async-trait = "0.1.86"
-base = { package = "moonfire-base", path = "base" }
+base = { package = "moonshadow-base", path = "base" }
 base64 = { workspace = true }
 blake3 = "1.0.0"
 bpaf = { version = "0.9.15", features = [
@@ -70,7 +70,7 @@ cursive = { version = "0.21.1", default-features = false, features = [
     "termion-backend",
 ] }
 data-encoding = "2.7.0"
-db = { package = "moonfire-db", path = "db" }
+db = { package = "moonshadow-db", path = "db" }
 futures = "0.3"
 h264-reader = { workspace = true }
 http = "1.1.0"
@@ -109,6 +109,10 @@ http-body = "1.0.1"
 http-body-util = "0.1.2"
 pin-project = "1.1.10"
 subtle = "2.6.1"
+image = "0.25.10"
+tract-onnx = "0.22.1"
+dialoguer = "0.12.0"
+console = "0.16.3"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libsystemd = "0.7.0"
@@ -122,7 +126,7 @@ blake3 = "1.0.0"
 walkdir = "2.3.3"
 
 [dev-dependencies]
-mp4 = { git = "https://github.com/scottlamb/mp4-rust", branch = "moonfire" }
+mp4 = { git = "https://github.com/scottlamb/mp4-rust", branch = "moonshadow" }
 num-rational = { version = "0.4.0", default-features = false, features = [
     "std",
 ] }
@@ -175,3 +179,4 @@ tracing = { git = "https://github.com/scottlamb/tracing", rev = "861b443d7b2da40
 tracing-core = { git = "https://github.com/scottlamb/tracing", rev = "861b443d7b2da400ca7b09111957f33c80135908" }
 tracing-log = { git = "https://github.com/scottlamb/tracing", rev = "861b443d7b2da400ca7b09111957f33c80135908" }
 tracing-subscriber = { git = "https://github.com/scottlamb/tracing", rev = "861b443d7b2da400ca7b09111957f33c80135908" }
+retina = { path = "retina-patch" }
