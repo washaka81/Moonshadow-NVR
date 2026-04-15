@@ -2,465 +2,621 @@
 // Copyright (C) 2020-2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Modern interactive camera configuration panel using cursive TUI.
+//! Interactive CLI camera management with pagination for 1000+ cameras.
 
+use crate::cmds::open_conn;
+use crate::cmds::OpenMode;
+use base::clock;
+use base::err;
 use base::Error;
-use console::style;
-use db::StreamType;
+use bpaf::Bpaf;
+use console::{pad_str, Alignment};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use std::path::PathBuf;
 use std::sync::Arc;
-use url::Url;
 
-use cursive::{
-    Cursive,
-    views::{
-        Dialog, EditView, LinearLayout, Panel, ResizedView, SelectView, TextView,
-        TextArea, Checkbox, RadioButton,
-    },
-    traits::*,
-    direction::Orientation,
-    event::Key,
-    view::Nameable,
-};
+const ITEMS_PER_PAGE: usize = 20;
 
-/// Builds the main camera configuration panel.
-pub fn build_camera_panel(db: Arc<db::Database>) -> impl cursive::view::View {
-    let panel = Panel::new(build_camera_list_view(db.clone()))
-        .title("📷 Camera Configuration");
+const PC_PURPLE: &str = "\x1b[38;2;191;219;216m";
+const PC_PINK: &str = "\x1b[38;2;205;127;151m";
+const PC_GREEN: &str = "\x1b[38;2;166;227;161m";
+const PC_YELLOW: &str = "\x1b[38;2;249;226;175m";
+const PC_BLUE: &str = "\x1b[38;2;137;180;250m";
+const PC_RESET: &str = "\x1b[0m";
 
-    panel.with_name("cameras_panel")
+fn pc(s: &str) -> String {
+    format!("{}{}", PC_PURPLE, s)
 }
 
-/// Builds the camera list view with search functionality.
-fn build_camera_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
-    let mut layout = LinearLayout::new(Orientation::Vertical);
+fn gr(s: &str) -> String {
+    format!("{}{}", PC_GREEN, s)
+}
 
-    // Search bar
-    let search_edit = EditView::new()
-        .on_submit(move |s, query| {
-            filter_camera_list(s, query, db.clone());
-        })
-        .with_name("camera_search")
-        .fixed_width(40);
+fn pk(s: &str) -> String {
+    format!("{}{}", PC_PINK, s)
+}
 
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(TextView::new("🔍 Search: "))
-            .child(search_edit),
-    );
+fn yl(s: &str) -> String {
+    format!("{}{}", PC_YELLOW, s)
+}
 
-    // Camera list
-    layout.add_child(
-        SelectView::new()
-            .with_name("camera_list")
-            .on_submit(move |s, camera_id: &i32| {
-                show_camera_detail(s, *camera_id, db.clone());
-            })
-            .scrollable()
-            .with_name("camera_select")
-            .full_screen(),
-    );
+fn bl(s: &str) -> String {
+    format!("{}{}", PC_BLUE, s)
+}
 
-    // Action buttons
-    let buttons = LinearLayout::new(Orientation::Horizontal)
-        .child(
-            cursive::views::Button::new("➕ Add", move |s| {
-                show_add_camera_dialog(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("✏️ Edit", move |s| {
-                edit_selected_camera(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("🗑️ Delete", move |s| {
-                delete_selected_camera(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("🔄 Refresh", move |s| {
-                refresh_camera_list(s, db.clone());
-            }),
+#[derive(Clone, Debug)]
+pub struct CameraCard {
+    pub id: i32,
+    pub uuid: String,
+    pub short_name: String,
+    pub description: String,
+    pub status: CameraStatus,
+    pub stream_count: usize,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum CameraStatus {
+    Online,
+    Offline,
+    Disabled,
+}
+
+impl CameraStatus {
+    fn from_enabled_and_recording(enabled: bool, has_recordings: bool) -> Self {
+        if !enabled {
+            CameraStatus::Disabled
+        } else if has_recordings {
+            CameraStatus::Online
+        } else {
+            CameraStatus::Offline
+        }
+    }
+}
+
+#[derive(Bpaf, Debug)]
+#[bpaf(command("cameras"))]
+pub struct Args {
+    #[bpaf(external(crate::parse_db_dir))]
+    db_dir: PathBuf,
+}
+
+pub fn run(args: Args) -> Result<i32, Error> {
+    let (_db_dir, mut conn) = open_conn(&args.db_dir, OpenMode::ReadWrite)?;
+
+    let cur_ver = db::get_schema_version(&conn)?;
+    if cur_ver.is_none() {
+        println!("{}Initializing database...", pc("🗄️  "));
+        conn.execute_batch(
+            r#"
+            pragma journal_mode = delete;
+            pragma page_size = 16384;
+            vacuum;
+            pragma journal_mode = wal;
+            "#,
+        )?;
+        db::init(&mut conn)?;
+    }
+
+    let db = Arc::new(db::Database::new(clock::RealClocks {}, conn, true)?);
+
+    println!("{}Moonshadow NVR - Camera Management", pc("📷 "));
+    run_camera_ui(&db)?;
+
+    Ok(0)
+}
+
+pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+    let mut search_query = String::new();
+    let mut current_page = 0;
+
+    loop {
+        print!("\x1B[2J\x1B[1;1H");
+
+        let all_cameras = load_cameras(db);
+
+        let filtered: Vec<CameraCard> = if search_query.is_empty() {
+            all_cameras.clone()
+        } else {
+            let query_lower = search_query.to_lowercase();
+            all_cameras
+                .into_iter()
+                .filter(|c| {
+                    c.short_name.to_lowercase().contains(&query_lower)
+                        || c.description.to_lowercase().contains(&query_lower)
+                        || c.uuid.to_lowercase().contains(&query_lower)
+                })
+                .collect()
+        };
+
+        let total_pages = (filtered.len() as usize + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE;
+        if total_pages == 0 {
+            print_header();
+            print_empty_state();
+        } else {
+            if current_page >= total_pages {
+                current_page = total_pages.saturating_sub(1);
+            }
+
+            print_header();
+            print_pagination(current_page, total_pages, filtered.len());
+
+            let start = current_page * ITEMS_PER_PAGE;
+            let end = (start + ITEMS_PER_PAGE).min(filtered.len());
+            let page_items = &filtered[start..end];
+
+            print_table(page_items);
+        }
+
+        println!();
+        if !search_query.is_empty() {
+            println!("{}Search: {}{}", bl("🔍 "), yl(&search_query), PC_RESET);
+        }
+        println!("{}Controls: {}q{}=quit | {}a{}=add | {}r{}=refresh | {}s{}=search | {}c{}=clear | {}n{}=next | {}p{}=prev | {}g{}=goto | [num]=view",
+            bl("► "), pk("q"), PC_RESET,
+            pk("a"), PC_RESET,
+            pk("r"), PC_RESET,
+            pk("s"), PC_RESET,
+            pk("c"), PC_RESET,
+            pk("n"), PC_RESET,
+            pk("p"), PC_RESET,
+            pk("g"), PC_RESET
         );
+        println!();
 
-    layout.add_child(buttons);
+        print!("Enter command: ");
+        let input: String = Input::with_theme(&theme)
+            .allow_empty(true)
+            .interact_text()
+            .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
 
-    // Load initial data
-    refresh_camera_list_impl(&mut layout, db);
+        let input = input.trim();
 
-    LinearLayout::new(Orientation::Vertical)
-        .child(layout)
-        .full_screen()
+        if input.is_empty() {
+            continue;
+        }
+
+        match input {
+            "q" | "quit" | "Q" => {
+                break;
+            }
+            "a" | "add" | "A" => {
+                add_camera_interactive(db)?;
+                current_page = 0;
+                search_query.clear();
+            }
+            "r" | "refresh" | "R" => {
+                current_page = 0;
+                search_query.clear();
+            }
+            "s" | "search" | "S" => {
+                print!("Enter search query: ");
+                let query: String = Input::with_theme(&theme)
+                    .allow_empty(true)
+                    .interact_text()
+                    .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+                search_query = query;
+                current_page = 0;
+            }
+            "c" | "clear" | "C" => {
+                search_query.clear();
+                current_page = 0;
+            }
+            "n" | "next" | "N" => {
+                if current_page < total_pages.saturating_sub(1) {
+                    current_page += 1;
+                }
+            }
+            "p" | "prev" | "P" => {
+                if current_page > 0 {
+                    current_page -= 1;
+                }
+            }
+            "g" | "goto" | "G" => {
+                print!("Enter page number (1-{}): ", total_pages.max(1));
+                let page_input: String = Input::with_theme(&theme)
+                    .allow_empty(true)
+                    .interact_text()
+                    .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+                if let Ok(page_num) = page_input.trim().parse::<usize>() {
+                    if page_num > 0 && page_num <= total_pages {
+                        current_page = page_num - 1;
+                    }
+                }
+            }
+            _ => {
+                if let Ok(num) = input.parse::<usize>() {
+                    let idx = num.saturating_sub(1);
+                    let start = current_page * ITEMS_PER_PAGE;
+                    let actual_idx = start + idx;
+
+                    if actual_idx < filtered.len() {
+                        show_camera_detail(db, filtered[actual_idx].id)?;
+                    }
+                }
+            }
+        }
+    }
+
+    println!("{}Goodbye!", gr("👋 "));
+    Ok(())
 }
 
-/// Refreshes the camera list from database.
-fn refresh_camera_list(s: &mut Cursive, db: Arc<db::Database>) {
-    let panel = s.find_name::<Panel>("cameras_panel").unwrap();
-    refresh_camera_list_impl(&mut panel, db);
-}
-
-fn refresh_camera_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
+fn load_cameras(db: &Arc<db::Database>) -> Vec<CameraCard> {
     let l = db.lock();
     let cameras = l.cameras_by_id();
 
-    let mut select = SelectView::<i32>::new()
-        .on_submit(move |s, camera_id: &i32| {
-            show_camera_detail(s.clone(), *camera_id, db.clone());
-        });
+    let mut result: Vec<CameraCard> = Vec::new();
 
     for (id, cam) in cameras {
         let stream_count = cam.streams.iter().filter(|s| s.is_some()).count();
-        let label = format!(
-            "📷 {} (ID: {}) - {} streams",
-            cam.short_name,
-            cam.id,
-            stream_count
-        );
-        select.add_item(label, *id, *id);
+
+        let enabled = !cam.config.description.is_empty() || stream_count > 0;
+        let has_recordings = stream_count > 0;
+
+        let status = CameraStatus::from_enabled_and_recording(enabled, has_recordings);
+
+        result.push(CameraCard {
+            id: *id,
+            uuid: cam.uuid.to_string(),
+            short_name: cam.short_name.clone(),
+            description: cam.config.description.clone(),
+            status,
+            stream_count,
+        });
     }
 
-    if let Some(mut select_view) = layout.find_name::<SelectView<i32>>("camera_select") {
-        *select_view = select;
-    }
-    drop(l);
+    result.sort_by(|a, b| a.short_name.cmp(&b.short_name));
+    result
 }
 
-/// Filters the camera list by search query.
-fn filter_camera_list(s: &mut Cursive, query: &str, db: Arc<db::Database>) {
-    let l = db.lock();
-    let cameras = l.cameras_by_id();
-    let query_lower = query.to_lowercase();
+fn print_header() {
+    println!(
+        "{}╔══════════════════════════════════════════════════════════════════════════════╗",
+        PC_PURPLE
+    );
+    println!(
+        "║{} 🗄️  Moonshadow NVR - Camera Manager                                         {} ║",
+        PC_BLUE, PC_RESET
+    );
+    println!(
+        "{}╚══════════════════════════════════════════════════════════════════════════════╝",
+        PC_PURPLE
+    );
+    println!();
+}
 
-    let mut select = SelectView::<i32>::new()
-        .on_submit(move |s, camera_id: &i32| {
-            show_camera_detail(s.clone(), *camera_id, db.clone());
-        });
+fn print_empty_state() {
+    print!("{}", PC_PINK);
+    println!("  ┌─────────────────────────────────────────────────────────────────────────────┐");
+    println!("  │  📷  No cameras configured                                             │");
+    print!("{}", PC_RESET);
+    println!(
+        "  │  Press {}a{} to add your first camera                                      │",
+        pk("a"),
+        PC_RESET
+    );
+    println!(
+        "  │  or press {}q{} to return to the main menu                                   │",
+        pk("q"),
+        PC_RESET
+    );
+    print!("{}", PC_PINK);
+    println!("  └─────────────────────────────────────────────────────────────────────────────┘");
+    print!("{}", PC_RESET);
+    println!();
+}
 
-    for (id, cam) in cameras {
-        let matches = query.is_empty()
-            || cam.short_name.to_lowercase().contains(&query_lower)
-            || cam.description.to_lowercase().contains(&query_lower)
-            || cam.uuid.to_string().contains(&query_lower);
+fn print_table(cameras: &[CameraCard]) {
+    print!("{}", PC_BLUE);
+    println!("  ┌─────┬──────────────────────┬────────────────────────────────────────────┬──────────┬─────────┐");
+    println!(
+        "  │ {:^3} │ {:^20} │ {:^40} │ {:^8} │ {:^6} │",
+        pc("#"),
+        pc("Camera Name"),
+        pc("Description"),
+        pc("Status"),
+        pc("Streams")
+    );
+    println!("  ├─────┼──────────────────────┼────────────────────────────────────────────┼──────────┼─────────┤");
 
-        if matches {
-            let stream_count = cam.streams.iter().filter(|s| s.is_some()).count();
-            let label = format!(
-                "📷 {} (ID: {})",
-                cam.short_name,
-                cam.id,
-            );
-            select.add_item(label, *id, *id);
+    for (idx, cam) in cameras.iter().enumerate() {
+        let status_str = match cam.status {
+            CameraStatus::Online => gr("● Online"),
+            CameraStatus::Offline => yl("○ Offline"),
+            CameraStatus::Disabled => pc("○ Disabled"),
+        };
+
+        let name = pad_str(&cam.short_name, 20, Alignment::Left, None);
+        let desc = pad_str(&cam.description, 40, Alignment::Left, None);
+        let id_str = format!("{}", idx + 1);
+
+        println!(
+            "  │ {:^3} │ {:20} │ {:40} │ {:^8} │ {:^6} │",
+            bl(&id_str),
+            bl(&name.to_string()),
+            bl(&desc.to_string()),
+            status_str,
+            gr(&format!("{}", cam.stream_count))
+        );
+    }
+
+    println!("  └─────┴──────────────────────┴────────────────────────────────────────────┴──────────┴─────────┘");
+    println!("{}", PC_RESET);
+    println!();
+}
+
+fn print_pagination(current_page: usize, total_pages: usize, total_items: usize) {
+    println!(
+        "  {}Showing page {}{}/{} of {} cameras{}",
+        bl("📄 "),
+        yl(format!("{}", current_page + 1).as_str()),
+        PC_RESET,
+        gr(format!("{}", total_pages).as_str()),
+        gr(format!("{}", total_items).as_str()),
+        PC_RESET
+    );
+    println!();
+}
+
+pub fn run_classic(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    loop {
+        println!();
+        println!("{}Camera Management (Classic)", pc("📷 "));
+
+        let cameras = load_cameras(db);
+
+        if cameras.is_empty() {
+            println!("{}No cameras configured. Add one first.", yl("⚠️  "));
+            let should_add = Confirm::with_theme(&theme)
+                .with_prompt("Add a new camera?")
+                .default(true)
+                .interact()
+                .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+            if should_add {
+                add_camera_interactive(db)?;
+            }
+            break;
+        }
+
+        let mut options: Vec<String> = cameras
+            .iter()
+            .map(|c| format!("📷 {} ({})", c.short_name, c.id))
+            .collect();
+
+        options.push("➕ Add new camera".to_string());
+        options.push("↩️  Back to main menu".to_string());
+
+        let selection = Select::with_theme(&theme)
+            .with_prompt("Select a camera")
+            .items(&options)
+            .default(0)
+            .interact()
+            .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+        if selection == options.len() - 1 {
+            break;
+        }
+
+        if selection == options.len() - 2 {
+            add_camera_interactive(db)?;
+            continue;
+        }
+
+        let camera_id = cameras[selection].id;
+        show_camera_detail(db, camera_id)?;
+    }
+
+    Ok(())
+}
+
+fn show_camera_detail(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    let (short_name, uuid, description, stream_count) = {
+        let l = db.lock();
+        let camera = match l.cameras_by_id().get(&camera_id) {
+            Some(cam) => cam,
+            None => {
+                println!("{}Camera not found!", yl("⚠️  "));
+                return Ok(());
+            }
+        };
+        let sc = camera.streams.iter().filter(|s| s.is_some()).count();
+        (
+            camera.short_name.clone(),
+            camera.uuid.to_string(),
+            camera.config.description.clone(),
+            sc,
+        )
+    };
+
+    loop {
+        println!();
+        println!("{}Camera Details: {}", pc("📷 "), bl(&short_name));
+        println!("{}UUID: {}", pc("🆔 "), bl(&uuid));
+        println!("{}Description: {}", pc("📝 "), bl(&description));
+        println!("{}Streams: {}", pc("📡 "), gr(&format!("{}", stream_count)));
+
+        println!();
+        let options = vec!["✏️  Edit camera", "🗑️  Delete camera", "↩️  Back"];
+
+        let selection = Select::with_theme(&theme)
+            .with_prompt("Choose action")
+            .items(&options)
+            .default(0)
+            .interact()
+            .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+        match selection {
+            0 => {
+                edit_camera(db, camera_id)?;
+            }
+            1 => {
+                delete_camera(db, camera_id)?;
+                break;
+            }
+            2 => {
+                break;
+            }
+            _ => {}
         }
     }
 
-    if let Some(mut select_view) = s.find_name::<SelectView<i32>>("camera_select") {
-        *select_view = select;
-    }
-    drop(l);
+    Ok(())
 }
 
-/// Gets the currently selected camera ID.
-fn get_selected_camera_id(s: &mut Cursive) -> Option<i32> {
-    s.find_name::<SelectView<i32>>("camera_select")
-        .and_then(|select| select.selection().cloned())
-}
+fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
 
-/// Shows the add camera dialog.
-fn show_add_camera_dialog(s: &mut Cursive, db: Arc<db::Database>) {
-    let mut change = db::CameraChange::default();
-
-    let dialog = Dialog::new()
-        .title("➕ Add New Camera")
-        .content(build_camera_form(&mut change, &db))
-        .button("Save", move |s| {
-            if save_camera(s, &change, &db) {
-                s.pop_layer();
-                refresh_camera_list(s, db.clone());
-            }
-        })
-        .button("Cancel", |s| {
-            s.pop_layer();
-        });
-
-    s.add_layer(dialog);
-}
-
-/// Shows the camera detail/edit dialog.
-fn show_camera_detail(s: &mut Cursive, camera_id: i32, db: Arc<db::Database>) {
-    let l = db.lock();
-    let camera = match l.cameras_by_id().get(&camera_id) {
-        Some(cam) => cam.clone(),
-        None => return,
+    let (short_name_default, description_default) = {
+        let l = db.lock();
+        let camera = match l.cameras_by_id().get(&camera_id) {
+            Some(cam) => cam,
+            None => return Ok(()),
+        };
+        (camera.short_name.clone(), camera.config.description.clone())
     };
-    drop(l);
 
-    let mut change = l.null_camera_change(camera_id).unwrap();
+    let short_name: String = Input::with_theme(&theme)
+        .with_prompt(&format!("Short name [{}]: ", short_name_default))
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+    let short_name = if short_name.is_empty() {
+        short_name_default
+    } else {
+        short_name
+    };
 
-    let stream_info = format!(
-        "Main: {} | Sub: {} | Ext: {}",
-        if change.streams[StreamType::Main.index()].config.mode.is_empty() { "❌" } else { "✅" },
-        if change.streams[StreamType::Sub.index()].config.mode.is_empty() { "❌" } else { "✅" },
-        if change.streams[StreamType::Ext.index()].config.mode.is_empty() { "❌" } else { "✅" },
-    );
-
-    let mut layout = LinearLayout::new(Orientation::Vertical);
-
-    layout.add_child(TextView::new(format!("📷 Camera: {}", camera.short_name)));
-    layout.add_child(TextView::new(format!("🆔 UUID: {}", camera.uuid)));
-    layout.add_child(TextView::new(format!("📝 Description: {}", camera.config.description)));
-    layout.add_child(TextView::new(format!("📡 Streams: {}", stream_info)));
-    layout.add_child(TextView::new("\n--- Edit Mode ---"));
-
-    let dialog = Dialog::new()
-        .title("Camera Details")
-        .content(build_camera_form(&mut change, &db))
-        .button("💾 Save", move |s| {
-            if save_camera(s, &change, &db) {
-                s.pop_layer();
-                refresh_camera_list(s, db.clone());
+    let desc_input: String = Input::with_theme(&theme)
+        .with_prompt(&format!(
+            "Description [{}]: ",
+            if description_default.is_empty() {
+                "(empty)"
+            } else {
+                &description_default
             }
-        })
-        .button("🗑️ Delete", move |s| {
-            if confirm_delete_camera(s, camera_id, &db) {
-                s.pop_layer();
-                refresh_camera_list(s, db.clone());
-            }
-        })
-        .button("↩️ Cancel", |s| {
-            s.pop_layer();
-        });
+        ))
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+    let description = if desc_input.is_empty() {
+        description_default
+    } else {
+        desc_input
+    };
 
-    s.add_layer(dialog);
-}
-
-/// Edits the currently selected camera.
-fn edit_selected_camera(s: &mut Cursive, db: Arc<db::Database>) {
-    if let Some(camera_id) = get_selected_camera_id(s) {
-        show_camera_detail(s, camera_id, db);
-    }
-}
-
-/// Deletes the currently selected camera.
-fn delete_selected_camera(s: &mut Cursive, db: Arc<db::Database>) {
-    if let Some(camera_id) = get_selected_camera_id(s) {
-        confirm_delete_camera(s, camera_id, &db);
-    }
-}
-
-/// Shows confirmation dialog before deleting a camera.
-fn confirm_delete_camera(s: &mut Cursive, camera_id: i32, db: &Arc<db::Database>) -> bool {
-    let dialog = Dialog::new()
-        .title("⚠️ Confirm Delete")
-        .content(TextView::new("Are you sure you want to delete this camera?\nThis action cannot be undone!"))
-        .button("🗑️ Delete", move |s| {
-            let db_clone = db.clone();
-            match db_clone.lock().delete_camera(camera_id) {
-                Ok(_) => {
-                    s.pop_layer();
-                    refresh_camera_list(s, db_clone.clone());
-                    println!("{}", style("Camera deleted successfully.").green());
-                }
-                Err(e) => {
-                    println!("{}", style(format!("Delete failed: {}", e)).red());
-                }
-            }
-        })
-        .button("Cancel", |s| {
-            s.pop_layer();
-        });
-
-    s.add_layer(dialog);
-    false
-}
-
-/// Builds the camera configuration form.
-fn build_camera_form(change: &mut db::CameraChange, db: &Arc<db::Database>) -> impl cursive::view::View {
-    let mut layout = LinearLayout::new(Orientation::Vertical);
-
-    // General section
-    layout.add_child(TextView::new("=== General Information ==="));
-
-    let short_name_edit = EditView::new()
-        .content(&change.short_name)
-        .on_submit(move |_, text| {
-            change.short_name = text.to_string();
-        })
-        .with_name("short_name");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(TextView::new("Short Name: ").fixed_width(15))
-            .child(short_name_edit.full_width()),
-    );
-
-    let desc_edit = EditView::new()
-        .content(&change.config.description)
-        .on_submit(move |_, text| {
-            change.config.description = text.to_string();
-        })
-        .with_name("description");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(TextView::new("Description: ").fixed_width(15))
-            .child(desc_edit.full_width()),
-    );
-
-    let username_edit = EditView::new()
-        .content(&change.config.username)
-        .on_submit(move |_, text| {
-            change.config.username = text.to_string();
-        })
-        .with_name("username");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(TextView::new("Username: ").fixed_width(15))
-            .child(username_edit.full_width()),
-    );
-
-    let password_edit = EditView::new()
-        .content(&change.config.password)
-        .secret()
-        .on_submit(move |_, text| {
-            change.config.password = text.to_string();
-        })
-        .with_name("password");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(TextView::new("Password: ").fixed_width(15))
-            .child(password_edit.full_width()),
-    );
-
-    // Streams section
-    layout.add_child(TextView::new("\n=== Stream Configuration ==="));
-
-    for st in &[StreamType::Main, StreamType::Sub, StreamType::Ext] {
-        let idx = st.index();
-        let stream = &mut change.streams[idx];
-
-        let enabled = !stream.config.mode.is_empty();
-
-        layout.add_child(TextView::new(format!("\n--- {} Stream ---", st.as_str())));
-
-        let checkbox = Checkbox::new()
-            .checked(enabled)
-            .on_change(move |_, checked| {
-                if checked {
-                    change.streams[idx].config.mode = "record".to_string();
-                } else {
-                    change.streams[idx].config.mode = "".to_string();
-                }
-            });
-
-        layout.add_child(
-            LinearLayout::new(Orientation::Horizontal)
-                .child(TextView::new("Enabled: ").fixed_width(15))
-                .child(checkbox),
-        );
-
-        let url_str = stream.config.url.as_ref()
-            .map(|u| u.to_string())
-            .unwrap_or_default();
-
-        let url_edit = EditView::new()
-            .content(&url_str)
-            .on_submit(move |_, text| {
-                if !text.is_empty() {
-                    if let Ok(url) = Url::parse(text) {
-                        change.streams[idx].config.url = Some(url);
-                    }
-                } else {
-                    change.streams[idx].config.url = None;
-                }
-            })
-            .with_name(format!("url_{}", st.as_str()));
-
-        layout.add_child(
-            LinearLayout::new(Orientation::Horizontal)
-                .child(TextView::new("RTSP URL: ").fixed_width(15))
-                .child(url_edit.full_width()),
-        );
-
-        // Transport selection
-        let transport = if stream.config.rtsp_transport == "tcp" { 1 } else { 0 };
-
-        let radio_group = cursive::views::RadioGroup::new()
-            .child("UDP", 0)
-            .child("TCP", 1)
-            .selected(transport)
-            .on_change(move |_, val| {
-                change.streams[idx].config.rtsp_transport = if val == 1 { "tcp".to_string() } else { "udp".to_string() };
-            });
-
-        layout.add_child(
-            LinearLayout::new(Orientation::Horizontal)
-                .child(TextView::new("Transport: ").fixed_width(15))
-                .child(radio_group),
-        );
-    }
-
-    layout
-}
-
-/// Saves the camera configuration.
-fn save_camera(s: &mut Cursive, change: &db::CameraChange, db: &Arc<db::Database>) -> bool {
-    if change.short_name.is_empty() {
-        let dialog = Dialog::new()
-            .title("⚠️ Validation Error")
-            .content(TextView::new("Short Name cannot be empty!"))
-            .button("OK", |s| {
-                s.pop_layer();
-            });
-        s.add_layer(dialog);
-        return false;
-    }
-
-    // Check if this is a new camera or update
-    let is_new = change.id.is_none();
+    let mut change = db.lock().null_camera_change(camera_id).unwrap();
+    change.short_name = short_name;
+    change.config.description = description;
 
     let mut l = db.lock();
-    let result = if is_new {
-        l.add_camera(change.clone())
-    } else {
-        let camera_id = change.id.unwrap();
-        l.update_camera(camera_id, change.clone())
-    };
-    drop(l);
-
-    match result {
+    match l.update_camera(camera_id, change) {
         Ok(_) => {
-            println!("{}", style(if is_new { "Camera added successfully!" } else { "Camera updated successfully!" }).green().bold());
-            true
+            println!("{}Camera updated successfully!", gr("✅ "));
         }
         Err(e) => {
-            let dialog = Dialog::new()
-                .title("❌ Error")
-                .content(TextView::new(format!("Failed to save camera: {}", e)))
-                .button("OK", |s| {
-                    s.pop_layer();
-                });
-            s.add_layer(dialog);
-            false
+            println!("{}Failed to update camera: {}", yl("❌ "), e);
         }
     }
+    drop(l);
+
+    Ok(())
 }
 
-/// Legacy wizard function for backward compatibility.
-pub fn run_wizard(db: &Arc<db::Database>) -> Result<(), Error> {
-    println!("{}", style("Starting interactive TUI configuration...").cyan());
-    run_interactive(db)
+fn add_camera_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    println!();
+    println!("{}Add New Camera", pc("➕ "));
+
+    let short_name: String = Input::with_theme(&theme)
+        .with_prompt("Short name (required)")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let description: String = Input::with_theme(&theme)
+        .with_prompt("Description")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let username: String = Input::with_theme(&theme)
+        .with_prompt("Username (optional)")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let password: String = Input::with_theme(&theme)
+        .with_prompt("Password (optional)")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let confirm = Confirm::with_theme(&theme)
+        .with_prompt("Save camera?")
+        .default(true)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    if !confirm {
+        println!("{}Cancelled.", yl("⚠️  "));
+        return Ok(());
+    }
+
+    let mut change = db::CameraChange::default();
+    change.short_name = short_name;
+    change.config.description = description.clone();
+    change.config.username = username;
+    change.config.password = password;
+
+    let mut l = db.lock();
+    match l.add_camera(change) {
+        Ok(_) => {
+            println!("{}Camera added successfully!", gr("✅ "));
+        }
+        Err(e) => {
+            println!("{}Failed to add camera: {}", yl("❌ "), e);
+        }
+    }
+    drop(l);
+
+    Ok(())
 }
 
-fn run_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
-    let mut siv = cursive::default();
-    siv.set_user_data(db.clone());
+fn delete_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
 
-    let panel = build_camera_panel(db.clone());
-    siv.add_fullscreen_layer(panel);
+    let confirm = Confirm::with_theme(&theme)
+        .with_prompt(format!(
+            "Delete camera {}? This cannot be undone!",
+            camera_id
+        ))
+        .default(false)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
 
-    siv.run();
+    if !confirm {
+        println!("{}Cancelled.", yl("⚠️  "));
+        return Ok(());
+    }
+
+    let mut l = db.lock();
+    match l.delete_camera(camera_id) {
+        Ok(_) => {
+            println!("{}Camera deleted successfully!", gr("✅ "));
+        }
+        Err(e) => {
+            println!("{}Failed to delete camera: {}", yl("❌ "), e);
+        }
+    }
+    drop(l);
 
     Ok(())
 }

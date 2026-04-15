@@ -17,7 +17,7 @@ pub mod ts;
 pub mod upgrade;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-enum OpenMode {
+pub enum OpenMode {
     ReadOnly,
     ReadWrite,
     Create,
@@ -62,7 +62,7 @@ fn open_dir(db_dir: &Path, mode: OpenMode) -> Result<db::fs::Dir, Error> {
 
 /// Locks and opens the database.
 /// The returned `dir::Fd` holds the lock and should be kept open as long as the `Connection` is.
-fn open_conn(db_dir: &Path, mode: OpenMode) -> Result<(db::fs::Dir, rusqlite::Connection), Error> {
+pub fn open_conn(db_dir: &Path, mode: OpenMode) -> Result<(db::fs::Dir, rusqlite::Connection), Error> {
     let dir = open_dir(db_dir, mode)?;
     let db_path = db_dir.join("db");
     info!(
