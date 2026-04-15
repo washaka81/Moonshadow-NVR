@@ -2,31 +2,18 @@
 // Copyright (C) 2017-2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Modern interactive TUI configuration interface.
-
-use base::clock;
-use base::Error;
-use bpaf::Bpaf;
-use std::path::PathBuf;
-use std::sync::Arc;
-use cursive::{
-    Cursive,
-    views::{
-        Dialog, EditView, LinearLayout, Panel, ScrollView, SelectView, TextView,
-        NamedView, ResizedView, OnEventView, Button,
-    },
-    traits::*,
-    direction::Orientation,
-    theme::BaseColor,
-    event::Key,
-};
-use cursive::view::Nameable;
-use console::style;
+//! Interactive CLI configuration interface.
 
 pub mod cameras;
-pub mod dirs;
-pub mod users;
-mod tab_complete;
+
+use base::clock;
+use base::err;
+use base::Error;
+use bpaf::Bpaf;
+use console::style;
+use dialoguer::{theme::ColorfulTheme, Input, Select};
+use std::path::PathBuf;
+use std::sync::Arc;
 
 /// Interactively edits configuration.
 #[derive(Bpaf, Debug)]
@@ -39,10 +26,9 @@ pub struct Args {
 pub fn run(args: Args) -> Result<i32, Error> {
     let (_db_dir, mut conn) = super::open_conn(&args.db_dir, super::OpenMode::Create)?;
 
-    // Auto-initialize if empty
     let cur_ver = db::get_schema_version(&conn)?;
     if cur_ver.is_none() {
-        println!("{}", style("Initializing database...").cyan());
+        println!("{}", style("🗄️  Initializing database...").cyan());
         conn.execute_batch(
             r#"
             pragma journal_mode = delete;
@@ -56,114 +42,65 @@ pub fn run(args: Args) -> Result<i32, Error> {
 
     let db = Arc::new(db::Database::new(clock::RealClocks {}, conn, true)?);
 
-    let mut siv = cursive::default();
-    siv.set_theme(cursive_theme());
+    println!(
+        "{}",
+        style("🎬 Moonshadow NVR Configuration CLI").cyan().bold()
+    );
+    println!(
+        "{}",
+        style("Interactive object-based camera configuration").dim()
+    );
+    println!();
 
-    // Main layout: tabs for different config sections
-    let mut tabbed = cursive::views::TabbedView::new();
-
-    // Dashboard tab
-    tabbed.add_tab("📊 Dashboard", build_dashboard(db.clone()));
-
-    // Cameras tab
-    tabbed.add_tab("📷 Cameras", cameras::build_camera_panel(db.clone()));
-
-    // Directories tab
-    tabbed.add_tab("📁 Directories", dirs::build_dir_panel(db.clone()));
-
-    // Users tab
-    tabbed.add_tab("👥 Users", users::build_user_panel(db.clone()));
-
-    siv.add_fullscreen_layer(tabbed);
-
-    siv.add_global_callback(Key::Esc, |s| s.quit());
-    siv.add_global_callback(Key::Ctrl('q'), |s| s.quit());
-    siv.set_user_data(db);
-
-    println!("{}", style("Moonshadow NVR Configuration TUI").cyan().bold());
-    println!("{}", style("Use Tab to navigate between sections, Esc or Ctrl+Q to exit.").dim());
-
-    siv.run();
+    run_interactive_cli(db)?;
 
     Ok(0)
 }
 
-fn cursive_theme() -> cursive::theme::Theme {
-    use cursive::theme::{Theme, ColorStyle, Palette, Effect};
-    let mut theme = Theme::default();
-    theme.shadow = true;
-    theme
+fn run_interactive_cli(db: Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    loop {
+        println!();
+        println!("{}", style("📋 Main Menu").bold());
+
+        let options = vec![
+            "📷 Manage Cameras (new UI)",
+            "📷 Manage Cameras (classic)",
+            "📁 Manage Directories",
+            "👥 Manage Users",
+            "📊 Show Statistics",
+            "🚪 Exit",
+        ];
+
+        let selection = Select::with_theme(&theme)
+            .with_prompt("Choose an option")
+            .items(&options)
+            .default(0)
+            .interact()
+            .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+        match selection {
+            0 => cameras::run_camera_ui(&db)?,
+            1 => cameras::run_classic(&db)?,
+            2 => manage_directories(&db)?,
+            3 => manage_users(&db)?,
+            4 => show_statistics(&db)?,
+            5 => break,
+            _ => unreachable!(),
+        }
+    }
+
+    println!("{}", style("👋 Goodbye!").green());
+    Ok(())
 }
 
-fn build_dashboard(db: Arc<db::Database>) -> impl cursive::view::View {
-    let mut layout = LinearLayout::new(Orientation::Vertical);
+fn show_statistics(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
 
-    // Title
-    layout.add_child(
-        TextView::new("🎬 Moonshadow NVR Configuration Dashboard")
-            .center()
-            .with_name("dash_title"),
-    );
+    println!();
+    println!("{}", style("📊 System Statistics").bold());
 
-    layout.add_child(TextView::new(""));
-
-    // Stats section
-    let stats_layout = build_stats_panel(db.clone());
-    layout.add_child(stats_layout);
-
-    layout.add_child(TextView::new(""));
-
-    // Quick actions
-    layout.add_child(TextView::new("=== Quick Actions ===").center());
-
-    let quick_actions = LinearLayout::new(Orientation::Horizontal)
-        .child(
-            Button::new("📷 Manage Cameras", move |s| {
-                // Navigate to cameras tab
-                if let Some(mut tabbed) = s.find_name::<cursive::views::TabbedView>("main_tabs") {
-                    // Select cameras tab (index 1)
-                }
-            }),
-        )
-        .child(
-            Button::new("📁 Manage Directories", |s| {
-                // Navigate to directories tab
-            }),
-        )
-        .child(
-            Button::new("👥 Manage Users", |s| {
-                // Navigate to users tab
-            }),
-        );
-
-    layout.add_child(quick_actions.center());
-
-    layout.add_child(TextView::new(""));
-
-    // Help section
-    let help_text = r#"=== Keyboard Shortcuts ===
-  Tab         - Switch between tabs
-  ↑/↓         - Navigate lists
-  Enter       - Select/Edit item
-  Esc/Ctrl+Q  - Exit
-"#;
-
-    layout.add_child(
-        TextView::new(help_text)
-            .center()
-            .with_name("dash_help"),
-    );
-
-    // Refresh stats periodically
-    refresh_stats(&mut layout, db);
-
-    Panel::new(layout)
-        .title("📊 Moonshadow NVR - Overview")
-        .with_name("dashboard_panel")
-}
-
-/// Builds the statistics panel.
-fn build_stats_panel(db: Arc<db::Database>) -> impl cursive::view::View {
     let l = db.lock();
     let cam_count = l.cameras_by_id().len();
 
@@ -175,37 +112,58 @@ fn build_stats_panel(db: Arc<db::Database>) -> impl cursive::view::View {
     let dir_count = l.sample_file_dirs_by_id().len();
     let user_count = l.users_by_id().len();
 
-    let mut stream_stats = String::new();
-    for (id, stream) in l.streams_by_id() {
-        let s_lock = stream.inner.lock();
-        let cam_name = l.cameras_by_id()
-            .get(&s_lock.camera_id)
-            .map(|c| c.short_name.clone())
-            .unwrap_or_else(|| "Unknown".to_string());
-        stream_stats.push_str(&format!("  • {} - {}: {} frames\n", cam_name, s_lock.type_.as_str(), s_lock.video_sample_count));
-    }
     drop(l);
 
-    let mut layout = LinearLayout::new(Orientation::Vertical);
+    println!("📷 Cameras: {}", style(cam_count).bold());
+    println!("📡 Streams: {}", style(stream_count).bold());
+    println!("📁 Directories: {}", style(dir_count).bold());
+    println!("👥 Users: {}", style(user_count).bold());
 
-    layout.add_child(TextView::new("=== System Statistics ===").center());
-    layout.add_child(TextView::new(""));
-    layout.add_child(TextView::new(format!("📷 Cameras:      {}", cam_count)).center());
-    layout.add_child(TextView::new(format!("📡 Streams:      {}", stream_count)).center());
-    layout.add_child(TextView::new(format!("📁 Directories:  {}", dir_count)).center());
-    layout.add_child(TextView::new(format!("👥 Users:        {}", user_count)).center());
+    let _: String = Input::with_theme(&theme)
+        .with_prompt("Press Enter to continue")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
 
-    if !stream_stats.is_empty() {
-        layout.add_child(TextView::new(""));
-        layout.add_child(TextView::new("=== Stream Details ===").center());
-        layout.add_child(TextView::new(&stream_stats));
-    }
-
-    layout.with_name("stats_panel")
+    Ok(())
 }
 
-/// Refreshes the dashboard statistics.
-fn refresh_stats(layout: &mut LinearLayout, db: Arc<db::Database>) {
-    // This would ideally update the existing panel
-    // For now, the stats are built initially and can be refreshed by switching tabs
+fn manage_directories(_db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    println!();
+    println!("{}", style("📁 Directory Management").bold());
+    println!(
+        "{}",
+        style("⚠️  Directory management not yet implemented").yellow()
+    );
+    println!("Use the web interface for directory configuration");
+
+    let _: String = Input::with_theme(&theme)
+        .with_prompt("Press Enter to continue")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    Ok(())
+}
+
+fn manage_users(_db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    println!();
+    println!("{}", style("👥 User Management").bold());
+    println!(
+        "{}",
+        style("⚠️  User management not yet implemented").yellow()
+    );
+    println!("Use the web interface for user configuration");
+
+    let _: String = Input::with_theme(&theme)
+        .with_prompt("Press Enter to continue")
+        .allow_empty(true)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    Ok(())
 }

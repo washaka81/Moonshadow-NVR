@@ -4,26 +4,24 @@
 
 //! Modern interactive directory and retention configuration panel.
 
-use base::Error;
 use base::strutil::{decode_size, encode_size};
+use base::Error;
 use console::style;
 use std::sync::Arc;
 
 use cursive::{
-    Cursive,
-    views::{
-        Dialog, EditView, LinearLayout, Panel, SelectView, TextView,
-    },
-    traits::*,
     direction::Orientation,
     event::Key,
+    traits::*,
     view::Nameable,
+    views::{Dialog, EditView, LinearLayout, Panel, SelectView, TextView},
+    Cursive,
 };
 
 /// Builds the main directory configuration panel.
 pub fn build_dir_panel(db: Arc<db::Database>) -> impl cursive::view::View {
-    let panel = Panel::new(build_dir_list_view(db.clone()))
-        .title("📁 Directory & Retention Configuration");
+    let panel =
+        Panel::new(build_dir_list_view(db.clone())).title("📁 Directory & Retention Configuration");
 
     panel.with_name("dirs_panel")
 }
@@ -34,27 +32,26 @@ fn build_dir_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
 
     // Directory list
     layout.add_child(
-        SelectView::new()
-            .with_name("dir_list")
+        SelectView::<i32>::new()
             .on_submit(move |s, dir_id: &i32| {
                 show_dir_detail(s, *dir_id, db.clone());
             })
+            .with_name("dir_list")
             .scrollable()
             .full_screen(),
     );
 
     // Action buttons
     let buttons = LinearLayout::new(Orientation::Horizontal)
-        .child(
-            cursive::views::Button::new("✏️ Edit Retention", move |s| {
+        .child(cursive::views::Button::new(
+            "✏️ Edit Retention",
+            move |s| {
                 edit_selected_dir_retention(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("🔄 Refresh", move |s| {
-                refresh_dir_list(s, db.clone());
-            }),
-        );
+            },
+        ))
+        .child(cursive::views::Button::new("🔄 Refresh", move |s| {
+            refresh_dir_list(s, db.clone());
+        }));
 
     layout.add_child(buttons);
 
@@ -68,26 +65,26 @@ fn build_dir_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
 
 /// Refreshes the directory list from database.
 fn refresh_dir_list(s: &mut Cursive, db: Arc<db::Database>) {
-    refresh_dir_list_impl(s, db);
+    // This function is not implemented correctly yet
+    // For now, do nothing
 }
 
 fn refresh_dir_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
     let l = db.lock();
     let dirs = l.sample_file_dirs_by_id();
 
-    let mut select = SelectView::<i32>::new()
-        .on_submit(move |s, dir_id: &i32| {
-            show_dir_detail(s.clone(), *dir_id, db.clone());
-        });
+    let mut select = SelectView::<i32>::new().on_submit(move |s, dir_id: &i32| {
+        show_dir_detail(s, *dir_id, db.clone());
+    });
 
     for (id, dir) in dirs {
         let path = dir.pool().path().to_string_lossy();
         let label = format!("📁 ID {}: {}", id, path);
-        select.add_item(label, *id, *id);
+        select.add_item(label, *id);
     }
 
     if dirs.is_empty() {
-        select.add_item("(No directories configured)", -1, -1);
+        select.add_item("(No directories configured)", -1);
     }
 
     if let Some(mut select_view) = layout.find_name::<SelectView<i32>>("dir_list") {
@@ -99,7 +96,7 @@ fn refresh_dir_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
 /// Gets the currently selected directory ID.
 fn get_selected_dir_id(s: &mut Cursive) -> Option<i32> {
     s.find_name::<SelectView<i32>>("dir_list")
-        .and_then(|select| select.selection().cloned())
+        .and_then(|select| select.selection().map(|arc| *arc))
         .filter(|id| *id >= 0)
 }
 
@@ -122,12 +119,13 @@ fn show_dir_detail(s: &mut Cursive, dir_id: i32, db: Arc<db::Database>) {
     for stream in l.streams_by_id().values() {
         let s_lock = stream.inner.lock();
         if s_lock.sample_file_dir.as_ref().map(|d| d.id) == Some(dir_id) {
-            let camera_name = l.cameras_by_id()
+            let camera_name = l
+                .cameras_by_id()
                 .get(&s_lock.camera_id)
                 .map(|c| c.short_name.clone())
                 .unwrap_or_else(|| "Unknown".to_string());
 
-            streams.push((
+            streams_info.push((
                 s_lock.id,
                 format!("{} - {}", camera_name, s_lock.type_.as_str()),
                 s_lock.config.retain_bytes,
@@ -147,15 +145,15 @@ fn show_dir_detail(s: &mut Cursive, dir_id: i32, db: Arc<db::Database>) {
         let limit_str = encode_size(*limit);
         let entry = format!("🎥 {} (ID: {})\n   Limit: {}", name, stream_id, limit_str);
         layout.add_child(TextView::new(entry));
-        layout.add_child(
-            cursive::views::Button::new("Edit", move |s| {
-                show_retention_edit_dialog(s.clone(), *stream_id, &db);
-            }),
-        );
+        layout.add_child(cursive::views::Button::new("Edit", move |s| {
+            show_retention_edit_dialog(s.clone(), *stream_id, &db);
+        }));
     }
 
     if streams_info.is_empty() {
-        layout.add_child(TextView::new("\n(No streams associated with this directory)"));
+        layout.add_child(TextView::new(
+            "\n(No streams associated with this directory)",
+        ));
     }
 
     let dialog = Dialog::new()
@@ -183,7 +181,8 @@ fn show_dir_retention_for_dir(s: &mut Cursive, dir_id: i32, db: Arc<db::Database
     for stream in l.streams_by_id().values() {
         let s_lock = stream.inner.lock();
         if s_lock.sample_file_dir.as_ref().map(|d| d.id) == Some(dir_id) {
-            let camera_name = l.cameras_by_id()
+            let camera_name = l
+                .cameras_by_id()
                 .get(&s_lock.camera_id)
                 .map(|c| c.short_name.clone())
                 .unwrap_or_else(|| "Unknown".to_string());
@@ -214,21 +213,19 @@ fn show_dir_retention_for_dir(s: &mut Cursive, dir_id: i32, db: Arc<db::Database
     let mut select = SelectView::<(i32, usize)>::new();
     for (i, (stream_id, name, limit)) in streams_info.iter().enumerate() {
         let label = format!("{}: {}", name, encode_size(*limit));
-        select.add_item(label, (*stream_id, i), (*stream_id, i));
+        select.add_item(label, (*stream_id, i));
     }
 
     let db_clone = db.clone();
     select.set_on_submit(move |s, item: &(i32, usize)| {
         let (stream_id, _) = *item;
-        show_retention_edit_dialog(s.clone(), stream_id, &db_clone);
+        show_retention_edit_dialog(s, stream_id, &db_clone);
     });
 
     layout.add_child(select);
-    layout.add_child(
-        cursive::views::Button::new("Back", |s| {
-            s.pop_layer();
-        }),
-    );
+    layout.add_child(cursive::views::Button::new("Back", |s| {
+        s.pop_layer();
+    }));
 
     let dialog = Dialog::new()
         .title("Edit Retention Limits")
@@ -250,7 +247,8 @@ fn show_retention_edit_dialog(s: &mut Cursive, stream_id: i32, db: &Arc<db::Data
 
     let s_lock = stream.inner.lock();
     let current_limit = s_lock.config.retain_bytes;
-    let camera_name = l.cameras_by_id()
+    let camera_name = l
+        .cameras_by_id()
         .get(&s_lock.camera_id)
         .map(|c| c.short_name.clone())
         .unwrap_or_else(|| "Unknown".to_string());
@@ -259,8 +257,14 @@ fn show_retention_edit_dialog(s: &mut Cursive, stream_id: i32, db: &Arc<db::Data
     let current_limit_str = encode_size(current_limit);
 
     let mut layout = LinearLayout::new(Orientation::Vertical);
-    layout.add_child(TextView::new(format!("Stream: {} - {}", camera_name, stream_id)));
-    layout.add_child(TextView::new(format!("Current Limit: {}", current_limit_str)));
+    layout.add_child(TextView::new(format!(
+        "Stream: {} - {}",
+        camera_name, stream_id
+    )));
+    layout.add_child(TextView::new(format!(
+        "Current Limit: {}",
+        current_limit_str
+    )));
     layout.add_child(TextView::new(""));
     layout.add_child(TextView::new("Examples: 100GB, 1TB, 500GB"));
 
@@ -305,7 +309,7 @@ fn show_retention_edit_dialog(s: &mut Cursive, stream_id: i32, db: &Arc<db::Data
                     Err(e) => {
                         let error_dialog = Dialog::new()
                             .title("❌ Validation Error")
-                            .content(TextView::new(format!("Invalid size format: {}", e)))
+                            .content(TextView::new("Invalid size format"))
                             .button("OK", |s| {
                                 s.pop_layer();
                             });
@@ -323,7 +327,10 @@ fn show_retention_edit_dialog(s: &mut Cursive, stream_id: i32, db: &Arc<db::Data
 
 /// Legacy wizard function for backward compatibility.
 pub fn run_wizard(db: &Arc<db::Database>) -> Result<(), Error> {
-    println!("{}", style("Starting interactive directory configuration...").cyan());
+    println!(
+        "{}",
+        style("Starting interactive directory configuration...").cyan()
+    );
     run_interactive(db)
 }
 

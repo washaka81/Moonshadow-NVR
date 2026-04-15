@@ -101,9 +101,10 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter", "json"] }
 tracing-core = "0.1.30"
 tracing-futures = { version = "0.2.5", features = ["futures-03", "std-future"] }
 tracing-log = { workspace = true }
-url = "2.1.1"
-uuid = { workspace = true }
-flate2 = { version = "1.1.5", features = ["zlib-rs"] }
+ url = "2.1.1"
+ uuid = { workspace = true }
+ flate2 = { version = "1.1.5", features = ["zlib-rs"] }
+ reqwest = { version = "0.12.0", default-features = false, features = ["json", "rustls-tls", "blocking"] }
 hyper-util = { version = "0.1.7", features = ["server-graceful", "tokio"] }
 http-body = "1.0.1"
 http-body-util = "0.1.2"
@@ -127,12 +128,11 @@ blake3 = "1.0.0"
 walkdir = "2.3.3"
 
 [dev-dependencies]
-mp4 = { git = "https://github.com/scottlamb/mp4-rust", branch = "moonshadow" }
-num-rational = { version = "0.4.0", default-features = false, features = [
-    "std",
-] }
-reqwest = { version = "0.12.0", default-features = false, features = ["json"] }
-tempfile = "3.2.0"
+ mp4 = { git = "https://github.com/scottlamb/mp4-rust", branch = "moonshadow" }
+ num-rational = { version = "0.4.0", default-features = false, features = [
+     "std",
+ ] }
+ tempfile = "3.2.0"
 tracing-test = "0.2.4"
 
 [profile.dev.package.blake3]

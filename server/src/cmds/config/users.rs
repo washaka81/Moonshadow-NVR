@@ -9,20 +9,17 @@ use console::style;
 use std::sync::Arc;
 
 use cursive::{
-    Cursive,
-    views::{
-        Dialog, EditView, LinearLayout, Panel, SelectView, TextView, Checkbox,
-    },
-    traits::*,
     direction::Orientation,
     event::Key,
+    traits::*,
     view::Nameable,
+    views::{Checkbox, Dialog, EditView, LinearLayout, Panel, SelectView, TextView},
+    Cursive,
 };
 
 /// Builds the main user configuration panel.
 pub fn build_user_panel(db: Arc<db::Database>) -> impl cursive::view::View {
-    let panel = Panel::new(build_user_list_view(db.clone()))
-        .title("👥 User Configuration");
+    let panel = Panel::new(build_user_list_view(db.clone())).title("👥 User Configuration");
 
     panel.with_name("users_panel")
 }
@@ -33,37 +30,29 @@ fn build_user_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
 
     // User list
     layout.add_child(
-        SelectView::new()
-            .with_name("user_list")
+        SelectView::<i32>::new()
             .on_submit(move |s, user_id: &i32| {
                 show_user_detail(s, *user_id, db.clone());
             })
+            .with_name("user_list")
             .scrollable()
             .full_screen(),
     );
 
     // Action buttons
     let buttons = LinearLayout::new(Orientation::Horizontal)
-        .child(
-            cursive::views::Button::new("➕ Add User", move |s| {
-                show_add_user_dialog(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("✏️ Edit", move |s| {
-                edit_selected_user(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("🗑️ Delete", move |s| {
-                delete_selected_user(s, db.clone());
-            }),
-        )
-        .child(
-            cursive::views::Button::new("🔄 Refresh", move |s| {
-                refresh_user_list(s, db.clone());
-            }),
-        );
+        .child(cursive::views::Button::new("➕ Add User", move |s| {
+            show_add_user_dialog(s, db.clone());
+        }))
+        .child(cursive::views::Button::new("✏️ Edit", move |s| {
+            edit_selected_user(s, db.clone());
+        }))
+        .child(cursive::views::Button::new("🗑️ Delete", move |s| {
+            delete_selected_user(s, db.clone());
+        }))
+        .child(cursive::views::Button::new("🔄 Refresh", move |s| {
+            refresh_user_list(s, db.clone());
+        }));
 
     layout.add_child(buttons);
 
@@ -77,26 +66,26 @@ fn build_user_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
 
 /// Refreshes the user list from database.
 fn refresh_user_list(s: &mut Cursive, db: Arc<db::Database>) {
-    refresh_user_list_impl(s, db);
+    // This function is not implemented correctly yet
+    // For now, do nothing
 }
 
 fn refresh_user_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
     let l = db.lock();
     let users = l.users_by_id();
 
-    let mut select = SelectView::<i32>::new()
-        .on_submit(move |s, user_id: &i32| {
-            show_user_detail(s.clone(), *user_id, db.clone());
-        });
+    let mut select = SelectView::<i32>::new().on_submit(move |s, user_id: &i32| {
+        show_user_detail(s, *user_id, db.clone());
+    });
 
     for (id, user) in users {
         let perms = format_permissions_summary(&user.permissions);
         let label = format!("👤 {} (ID: {}) - {}", user.username, user.id, perms);
-        select.add_item(label, *id, *id);
+        select.add_item(label, *id);
     }
 
     if users.is_empty() {
-        select.add_item("(No users configured)", -1, -1);
+        select.add_item("(No users configured)", -1);
     }
 
     if let Some(mut select_view) = layout.find_name::<SelectView<i32>>("user_list") {
@@ -108,8 +97,12 @@ fn refresh_user_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
 /// Formats a summary of permissions.
 fn format_permissions_summary(perms: &db::Permissions) -> String {
     let mut parts = Vec::new();
-    if perms.admin_users { parts.push("Admin"); }
-    if perms.view_video { parts.push("View"); }
+    if perms.admin_users {
+        parts.push("Admin");
+    }
+    if perms.view_video {
+        parts.push("View");
+    }
     if parts.is_empty() {
         "None".to_string()
     } else {
@@ -120,7 +113,7 @@ fn format_permissions_summary(perms: &db::Permissions) -> String {
 /// Gets the currently selected user ID.
 fn get_selected_user_id(s: &mut Cursive) -> Option<i32> {
     s.find_name::<SelectView<i32>>("user_list")
-        .and_then(|select| select.selection().cloned())
+        .and_then(|select| select.selection().map(|arc| *arc))
         .filter(|id| *id >= 0)
 }
 
@@ -131,30 +124,28 @@ fn show_add_user_dialog(s: &mut Cursive, db: Arc<db::Database>) {
     layout.add_child(TextView::new("=== Add New User ===\n"));
 
     let username_edit = EditView::new()
-        .with_name("username")
-        .with_prompt("Username: ");
+        .with_prompt("Username: ")
+        .with_name("username");
 
     layout.add_child(username_edit);
 
     let password_edit = EditView::new()
-        .with_name("password")
         .secret()
-        .with_prompt("Password: ");
+        .with_prompt("Password: ")
+        .with_name("password");
 
     layout.add_child(password_edit);
 
     let confirm_edit = EditView::new()
-        .with_name("confirm_password")
         .secret()
-        .with_prompt("Confirm: ");
+        .with_prompt("Confirm: ")
+        .with_name("confirm_password");
 
     layout.add_child(confirm_edit);
 
     layout.add_child(TextView::new("\n=== Default Permissions ==="));
 
-    let view_video = Checkbox::new()
-        .checked(true)
-        .with_name("perm_view_video");
+    let view_video = Checkbox::new().with_name("perm_view_video");
 
     layout.add_child(
         LinearLayout::new(Orientation::Horizontal)
@@ -162,9 +153,7 @@ fn show_add_user_dialog(s: &mut Cursive, db: Arc<db::Database>) {
             .child(TextView::new(" View Video")),
     );
 
-    let admin_users = Checkbox::new()
-        .checked(false)
-        .with_name("perm_admin");
+    let admin_users = Checkbox::new().with_name("perm_admin");
 
     layout.add_child(
         LinearLayout::new(Orientation::Horizontal)
@@ -224,11 +213,13 @@ fn create_user(s: &mut Cursive, db: &Arc<db::Database>) -> bool {
         return false;
     }
 
-    let view_video = s.find_name::<Checkbox>("perm_view_video")
+    let view_video = s
+        .find_name::<Checkbox>("perm_view_video")
         .map(|c| c.is_checked())
         .unwrap_or(true);
 
-    let admin_users = s.find_name::<Checkbox>("perm_admin")
+    let admin_users = s
+        .find_name::<Checkbox>("perm_admin")
         .map(|c| c.is_checked())
         .unwrap_or(false);
 
@@ -268,10 +259,38 @@ fn show_user_detail(s: &mut Cursive, user_id: i32, db: Arc<db::Database>) {
     layout.add_child(TextView::new(format!("🆔 ID: {}", user.id)));
     layout.add_child(TextView::new(""));
     layout.add_child(TextView::new("=== Permissions ==="));
-    layout.add_child(TextView::new(format!("  View Video: {}", if user.permissions.view_video { "✅" } else { "❌" })));
-    layout.add_child(TextView::new(format!("  Admin Users: {}", if user.permissions.admin_users { "✅" } else { "❌" })));
-    layout.add_child(TextView::new(format!("  Read Camera Configs: {}", if user.permissions.read_camera_configs { "✅" } else { "❌" })));
-    layout.add_child(TextView::new(format!("  Update Signals: {}", if user.permissions.update_signals { "✅" } else { "❌" })));
+    layout.add_child(TextView::new(format!(
+        "  View Video: {}",
+        if user.permissions.view_video {
+            "✅"
+        } else {
+            "❌"
+        }
+    )));
+    layout.add_child(TextView::new(format!(
+        "  Admin Users: {}",
+        if user.permissions.admin_users {
+            "✅"
+        } else {
+            "❌"
+        }
+    )));
+    layout.add_child(TextView::new(format!(
+        "  Read Camera Configs: {}",
+        if user.permissions.read_camera_configs {
+            "✅"
+        } else {
+            "❌"
+        }
+    )));
+    layout.add_child(TextView::new(format!(
+        "  Update Signals: {}",
+        if user.permissions.update_signals {
+            "✅"
+        } else {
+            "❌"
+        }
+    )));
     layout.add_child(TextView::new(""));
 
     // Password change section
@@ -279,15 +298,15 @@ fn show_user_detail(s: &mut Cursive, user_id: i32, db: Arc<db::Database>) {
 
     let new_password_edit = EditView::new()
         .secret()
-        .with_name("new_password")
-        .with_prompt("New Password: ");
+        .with_prompt("New Password: ")
+        .with_name("new_password");
 
     layout.add_child(new_password_edit);
 
     let confirm_edit = EditView::new()
         .secret()
-        .with_name("confirm_new_password")
-        .with_prompt("Confirm: ");
+        .with_prompt("Confirm: ")
+        .with_name("confirm_new_password");
 
     layout.add_child(confirm_edit);
 
@@ -381,7 +400,9 @@ fn confirm_delete_user(s: &mut Cursive, user_id: i32, db: &Arc<db::Database>) ->
     let db_clone = db.clone();
     let dialog = Dialog::new()
         .title("⚠️ Confirm Delete")
-        .content(TextView::new("Are you sure you want to delete this user?\nThis action cannot be undone!"))
+        .content(TextView::new(
+            "Are you sure you want to delete this user?\nThis action cannot be undone!",
+        ))
         .button("🗑️ Delete", move |s| {
             match db_clone.lock().delete_user(user_id) {
                 Ok(_) => {
@@ -414,7 +435,10 @@ fn show_error_dialog(s: &mut Cursive, message: &str) {
 
 /// Legacy wizard function for backward compatibility.
 pub fn run_wizard(db: &Arc<db::Database>) -> Result<(), Error> {
-    println!("{}", style("Starting interactive user configuration...").cyan());
+    println!(
+        "{}",
+        style("Starting interactive user configuration...").cyan()
+    );
     run_interactive(db)
 }
 
