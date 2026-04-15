@@ -1,12 +1,13 @@
 [package]
-name = "moonfire-db"
+name = "moonshadow-db"
 version = "0.0.0"
-authors = ["Scott Lamb <slamb@slamb.org>"]
+authors = ["Washaka81 <washaka81@example.com>", "Fork: Moonshadow NVR"]
 readme = "../README.md"
 edition = "2021"
 license-file = "../../LICENSE.txt"
 rust-version = "1.91"
 publish = false
+description = "Moonshadow NVR database layer (fork of Moonshadow NVR)"
 
 [features]
 nightly = []
@@ -16,7 +17,7 @@ path = "lib.rs"
 
 [dependencies]
 arrayvec = "0.7.6"
-base = { package = "moonfire-base", path = "../base" }
+base = { package = "moonshadow-base", path = "../base" }
 base64 = { workspace = true }
 bitflags = "2.9.0"
 blake3 = "1.0.0"

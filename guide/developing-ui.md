@@ -40,7 +40,7 @@ pnpm run dev
 This will pack and prepare a development setup. By default the development
 server that serves up the web page(s) will listen on
 [http://localhost:5173/](http://localhost:5173/) so you can direct your browser
-there. It assumes the Moonfire NVR server is running at
+there. It assumes the Moonshadow NVR server is running at
 [http://localhost:8080/](http://localhost:8080/) and will proxy API requests
 there.
 
@@ -58,16 +58,16 @@ Currently there's only one supported environment variable override defined in
 
 | variable       | description                                 | default                  |
 | :------------- | :------------------------------------------ | :----------------------- |
-| `PROXY_TARGET` | base URL of the backing Moonfire NVR server | `http://localhost:8080/` |
+| `PROXY_TARGET` | base URL of the backing Moonshadow NVR server | `http://localhost:8080/` |
 
-Thus one could connect to a remote Moonfire NVR by specifying its URL as
+Thus one could connect to a remote Moonshadow NVR by specifying its URL as
 follows:
 
 ```bash
 PROXY_TARGET=https://nvr.example.com/ npm run dev
 ```
 
-This allows you to test a new UI against your stable, production Moonfire NVR
+This allows you to test a new UI against your stable, production Moonshadow NVR
 installation with real data.
 
 You can also set environment variables in `.env` files, as described in
@@ -76,7 +76,7 @@ You can also set environment variables in `.env` files, as described in
 ## A note on `https`
 
 Commonly production setups require credentials and run over `https`, as
-described in [secure.md](secure.md). Furthermore, Moonfire NVR will set the
+described in [secure.md](secure.md). Furthermore, Moonshadow NVR will set the
 `secure` attribute on cookies it receives over `https`, so that the browser
 will only send them over a `https` connection.
 
@@ -97,7 +97,7 @@ Fundamentally, there are three ways to make it work:
 Currently the configuration only implements method 2. It's easy to configure
 but has a couple caveats:
 
-   * if you alternate between proxying to a test Moonfire NVR
+   * if you alternate between proxying to a test Moonshadow NVR
      installation and a real one, your browser won't know the difference. It
      will supply whichever credentials were sent to it last.
    * if you connect via a host other than localhost, your browser will have a

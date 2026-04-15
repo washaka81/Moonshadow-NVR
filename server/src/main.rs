@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 #![cfg_attr(all(feature = "nightly", test), feature(test))]
@@ -12,6 +13,7 @@ use tracing::{debug, error};
 
 mod body;
 mod cmds;
+mod detector;
 mod json;
 mod mp4;
 mod slices;
@@ -22,12 +24,12 @@ mod web;
 #[cfg(feature = "bundled-ui")]
 mod bundled_ui;
 
-const DEFAULT_DB_DIR: &str = "/var/lib/moonfire-nvr/db";
+const DEFAULT_DB_DIR: &str = "/var/lib/moonshadow-nvr/db";
 
 // This is either in the environment when `cargo` is invoked or set from within `build.rs`.
 const VERSION: &str = env!("VERSION");
 
-/// Moonfire NVR: security camera network video recorder.
+/// Moonshadow NVR: intelligent surveillance system with AI capabilities.
 #[derive(Bpaf, Debug)]
 #[bpaf(options, version(VERSION))]
 enum Args {

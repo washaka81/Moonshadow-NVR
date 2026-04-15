@@ -1,8 +1,9 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! JSON/TOML-compatible serde types for use in the web API and `moonfire-nvr.toml`.
+//! JSON/TOML-compatible serde types for use in the web API and `moonshadow-nvr.toml`.
 
 use base::time::{Duration, Time};
 use base::{err, Error};
@@ -659,4 +660,80 @@ pub struct PutUsersResponse {
 pub enum LiveM4sMessage {
     Error { message: String },
     Dropped { frames: u64 },
+}
+
+/// AI event for ReID or LPR detections.
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct AutodetectRequest<'a> {
+    #[serde(borrow)]
+    pub csrf: Option<&'a str>,
+    pub ip: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AutodetectResponse {
+    pub main_url: Option<String>,
+    pub sub_url: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PostCamera<'a> {
+    #[serde(borrow)]
+    pub csrf: Option<&'a str>,
+    pub camera: CameraSubset,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct PatchCamera<'a> {
+    #[serde(borrow)]
+    pub csrf: Option<&'a str>,
+    pub update: CameraSubset,
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct CameraSubset {
+    pub short_name: String,
+    pub description: String,
+    pub onvif_base_url: Option<String>,
+    pub username: String,
+    pub password: String,
+    pub streams: [StreamSubset; db::stream::NUM_STREAM_TYPES],
+}
+
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, Eq)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct StreamSubset {
+    pub enabled: bool,
+    pub url: Option<String>,
+    pub rtsp_transport: String,
+    pub retain_bytes: i64,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiEvent {
+    pub time_90k: i64,
+    pub camera_id: i32,
+    #[serde(rename = "type")]
+    pub type_: String,
+    pub value: String,
+}
+
+/// Response to `GET /api/ai/events`.
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct AiEventsResponse {
+    pub events: Vec<AiEvent>,
 }

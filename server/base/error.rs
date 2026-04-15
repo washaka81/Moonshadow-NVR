@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2018 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2018 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use std::backtrace::Backtrace;
@@ -42,12 +43,12 @@ impl ToErrKind for rusqlite::ErrorCode {
             ErrorCode::OperationAborted => ErrorKind::Aborted,
 
             // Conflict with another database connection in a process which is accessing
-            // the database, apparently without using Moonfire NVR's scheme of acquiring
+            // the database, apparently without using Moonshadow NVR's scheme of acquiring
             // a lock on the db directory.
             // https://www.sqlite.org/wal.html#sometimes_queries_return_sqlite_busy_in_wal_mode
             ErrorCode::DatabaseBusy => ErrorKind::Unavailable,
 
-            // Conflict within the same database connection. Shouldn't happen for Moonfire.
+            // Conflict within the same database connection. Shouldn't happen for Moonshadow.
             ErrorCode::DatabaseLocked => ErrorKind::Internal,
             ErrorCode::OutOfMemory => ErrorKind::ResourceExhausted,
             ErrorCode::ReadOnly => ErrorKind::FailedPrecondition,
@@ -61,7 +62,7 @@ impl ToErrKind for rusqlite::ErrorCode {
             // Similar to DatabaseBusy in this implies a conflict with another conn.
             ErrorCode::FileLockingProtocolFailed => ErrorKind::Unavailable,
 
-            // Likewise: Moonfire NVR should never change the schema
+            // Likewise: Moonshadow NVR should never change the schema
             // mid-statement, so the most plausible explanation for
             // SchemaChange is another process.
             ErrorCode::SchemaChanged => ErrorKind::Unavailable,
@@ -372,7 +373,7 @@ pub trait ResultExt<T, E> {
     /// Annotates an error with the given kind.
     /// Example:
     /// ```
-    /// use moonfire_base::{ErrorKind, ResultExt};
+    /// use moonshadow_base::{ErrorKind, ResultExt};
     /// use std::io::Read;
     /// let mut buf = [0u8; 1];
     /// let r = std::io::Cursor::new("").read_exact(&mut buf[..]).err_kind(ErrorKind::Internal);
@@ -394,22 +395,22 @@ where
 ///
 /// Example with positional arguments:
 /// ```
-/// use moonfire_base::bail;
-/// let e = || -> Result<(), moonfire_base::Error> {
+/// use moonshadow_base::bail;
+/// let e = || -> Result<(), moonshadow_base::Error> {
 ///     bail!(Unauthenticated, msg("unknown user: {}", "slamb"));
 /// }().unwrap_err();
-/// assert_eq!(e.kind(), moonfire_base::ErrorKind::Unauthenticated);
+/// assert_eq!(e.kind(), moonshadow_base::ErrorKind::Unauthenticated);
 /// assert_eq!(e.to_string(), "UNAUTHENTICATED: unknown user: slamb");
 /// ```
 ///
 /// Example with named arguments:
 /// ```
-/// use moonfire_base::bail;
-/// let e = || -> Result<(), moonfire_base::Error> {
+/// use moonshadow_base::bail;
+/// let e = || -> Result<(), moonshadow_base::Error> {
 ///     let user = "slamb";
 ///     bail!(Unauthenticated, msg("unknown user: {user}"));
 /// }().unwrap_err();
-/// assert_eq!(e.kind(), moonfire_base::ErrorKind::Unauthenticated);
+/// assert_eq!(e.kind(), moonshadow_base::ErrorKind::Unauthenticated);
 /// assert_eq!(e.to_string(), "UNAUTHENTICATED: unknown user: slamb");
 /// ```
 #[macro_export]

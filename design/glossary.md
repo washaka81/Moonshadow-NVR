@@ -1,4 +1,4 @@
-# Moonfire NVR Glossary
+# Moonshadow NVR Glossary
 
 *GOP:* Group of Pictures, as
 [described](https://en.wikipedia.org/wiki/Group_of_pictures) on wikipedia.
@@ -55,20 +55,20 @@ this would correspond to three segments: recording 2 from 20 seconds in to
 the end, all of recording 3, and all of recording 4. See
 [../ref/api.md](../ref/api.md).
 
-*session:* a set of authenticated Moonfire NVR requests defined by the use of a
+*session:* a set of authenticated Moonshadow NVR requests defined by the use of a
 given credential (`s` cookie). Each user may have many credentials and thus
-many sessions. Note that in Moonfire NVR's the term "session" by itself has
+many sessions. Note that in Moonshadow NVR's the term "session" by itself has
 nothing to do with RTSP sessions; those more closely match a *run*.
 
 *signal:* a timeseries with an enum value. Signals might represent a camera's
 motion detection or day/night status. They could also represent an external
 input such as a burglar alarm system's zone status. See
 [../ref/api.md](../ref/api.md). Note signals are still under development and
-not yet exposed in Moonfire NVR's UI. See
-[#28](https://github.com/scottlamb/moonfire-nvr/issues/28) for more
+not yet exposed in Moonshadow NVR's UI. See
+[#28](https://github.com/scottlamb/moonshadow-nvr/issues/28) for more
 information.
 
-*stream:* the "main" or "sub" stream from a given camera. Moonfire NVR expects
+*stream:* the "main" or "sub" stream from a given camera. Moonshadow NVR expects
 cameras support configuring and simultaneously viewing two streams encoded from
 the same underlying video and audio source. The difference between the two is
 that the "main" stream's video is typically higher quality in terms of frame
@@ -79,7 +79,7 @@ RTSP URL that yields a difference RTSP "presentation".
 *track:* one of the video, audio, or subtitles associated with a single
 *stream*. This is consistent with the definition in ISO/IEC 14496-12 section
 3.1.19. Note that RTSP RFC 2326 uses the word "stream" in the same way
-Moonfire NVR uses the word "track".
+Moonshadow NVR uses the word "track".
 
 *wall duration:* the total duration of a recording for the purpose of matching
 with the NVR's wall clock time. This may not match the same recording's media

@@ -1,8 +1,8 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2018 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2018 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.';
 
-// Protobuf portion of the Moonfire NVR schema. In general Moonfire's schema
+// Protobuf portion of the Moonshadow NVR schema. In general Moonshadow's schema
 // uses a SQLite3 database with some fields in JSON representation. The protobuf
 // stuff is just high-cardinality things that must be compact, e.g. permissions
 // that can be stuffed into every user session.

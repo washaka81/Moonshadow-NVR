@@ -1,8 +1,8 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Database access logic for the Moonfire NVR SQLite schema.
+//! Database access logic for the Moonshadow NVR SQLite schema.
 //!
 //! The SQLite schema includes everything except the actual video samples (see the `dir` module
 //! for management of those). See `schema.sql` for a more detailed description.
@@ -68,7 +68,7 @@ use tracing::{error, info, trace};
 use uuid::Uuid;
 
 /// Expected schema version. See `guide/schema.md` for more information.
-pub const EXPECTED_SCHEMA_VERSION: i32 = 7;
+pub const EXPECTED_SCHEMA_VERSION: i32 = 8;
 
 /// Length of the video index cache.
 /// The actual data structure is one bigger than this because we insert before we remove.
@@ -97,7 +97,7 @@ const DIR_POOL_WORKERS: NonZeroUsize = const { NonZeroUsize::new(2).unwrap() };
 /// The size of a filesystem block, to use in disk space accounting.
 /// This should really be obtained by a stat call on the sample file directory in question,
 /// but that requires some refactoring. See
-/// [#89](https://github.com/scottlamb/moonfire-nvr/issues/89). We might be able to get away with
+/// [#89](https://github.com/scottlamb/moonshadow-nvr/issues/89). We might be able to get away with
 /// this hardcoded value for a while.
 const ASSUMED_BLOCK_SIZE_BYTES: i64 = 4096;
 
@@ -685,6 +685,14 @@ pub struct RetentionChange {
     pub stream_id: i32,
     pub new_record: bool,
     pub new_limit: i64,
+}
+
+/// A row of AI metadata returned by query_ai_metadata.
+pub struct AiMetadataRow {
+    pub time_90k: i64,
+    pub camera_id: i32,
+    pub type_: String,
+    pub value: String,
 }
 
 impl LockedDatabase {
@@ -1813,11 +1821,81 @@ impl LockedDatabase {
     ) -> Result<(), base::Error> {
         self.signal.update_signals(when, signals, states)
     }
+
+    /// Inserts AI metadata for ReID or LPR detections.
+    pub fn insert_ai_metadata(
+        &self,
+        time_90k: i64,
+        camera_id: i32,
+        type_: &str,
+        value: &str,
+        embedding: Option<&[u8]>,
+    ) -> Result<(), Error> {
+        self.conn.borrow().execute(
+            r#"
+            insert or replace into ai_metadata (time_90k, camera_id, type, value, embedding)
+            values (?, ?, ?, ?, ?)
+            "#,
+            params![time_90k, camera_id, type_, value, embedding],
+        )?;
+        Ok(())
+    }
+
+    /// Queries AI metadata events, optionally filtered by type, camera, and time range.
+    pub fn query_ai_metadata(
+        &self,
+        type_filter: Option<&str>,
+        camera_id_filter: Option<i32>,
+        start_time_90k: Option<i64>,
+        end_time_90k: Option<i64>,
+        limit: i64,
+    ) -> Result<Vec<AiMetadataRow>, Error> {
+        let conn = self.conn.borrow();
+        let mut sql = String::from(
+            "SELECT time_90k, camera_id, type, value FROM ai_metadata WHERE 1=1"
+        );
+        let mut params: Vec<rusqlite::types::Value> = Vec::new();
+
+        if let Some(t) = type_filter {
+            sql.push_str(" AND type = ?");
+            params.push(rusqlite::types::Value::Text(t.to_string()));
+        }
+        if let Some(cid) = camera_id_filter {
+            sql.push_str(" AND camera_id = ?");
+            params.push(rusqlite::types::Value::Integer(cid as i64));
+        }
+        if let Some(st) = start_time_90k {
+            sql.push_str(" AND time_90k >= ?");
+            params.push(rusqlite::types::Value::Integer(st));
+        }
+        if let Some(et) = end_time_90k {
+            sql.push_str(" AND time_90k <= ?");
+            params.push(rusqlite::types::Value::Integer(et));
+        }
+        sql.push_str(" ORDER BY time_90k DESC LIMIT ?");
+        params.push(rusqlite::types::Value::Integer(limit));
+
+        let mut stmt = conn.prepare(&sql)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(params.iter()), |row| {
+            Ok(AiMetadataRow {
+                time_90k: row.get(0)?,
+                camera_id: row.get(1)?,
+                type_: row.get(2)?,
+                value: row.get(3)?,
+            })
+        })?;
+
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
 }
 
 /// Pragmas for full database integrity.
 ///
-/// These are `pub` so that the `moonfire-nvr sql` command can pass to the SQLite3 binary with
+/// These are `pub` so that the `moonshadow-nvr sql` command can pass to the SQLite3 binary with
 /// `-cmd`.
 pub static INTEGRITY_PRAGMAS: [&str; 3] = [
     // Enforce foreign keys. This is on by default with --features=bundled (as rusqlite
@@ -1910,11 +1988,11 @@ pub(crate) fn check_schema_version(conn: &rusqlite::Connection) -> Result<(), Er
         bail!(
             FailedPrecondition,
             msg("no such table: version.\n\n\
-                If you have created an empty database by hand, delete it and use `nvr init` \
+                If you have created an empty database by hand, delete it and use `moonshadow-nvr init` \
                 instead, as noted in the installation instructions: \
-                <https://github.com/scottlamb/moonfire-nvr/blob/master/guide/install.md>\n\n\
+                <https://github.com/scottlamb/moonshadow-nvr/blob/master/guide/install.md>\n\n\
                 If you are starting from a database that predates schema versioning, see \
-                <https://github.com/scottlamb/moonfire-nvr/blob/master/guide/schema.md>."),
+                <https://github.com/scottlamb/moonshadow-nvr/blob/master/guide/schema.md>."),
         )
     };
     match ver.cmp(&EXPECTED_SCHEMA_VERSION) {
@@ -2233,7 +2311,7 @@ impl<C: Clocks + Clone> Database<C> {
     /// Deletes a sample file directory—marks the directory's metadata as deleted and removes the entry from the database.
     ///
     /// XXX: This may not be not robust against concurrent access or failure. It's good enough for the current use from
-    /// the separate `moonfire-nvr config` command but needs some additional thought to handle online
+    /// the separate `moonshadow-nvr config` command but needs some additional thought to handle online
     /// reconfiguration.
     pub async fn delete_sample_file_dir(&self, dir_id: i32) -> Result<(), Error> {
         let path;
@@ -2506,7 +2584,7 @@ mod tests {
         let conn = setup_conn();
         let db = Arc::new(Database::new(clock::RealClocks {}, conn, true).unwrap());
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-nvr-test")
+            .prefix("moonshadow-nvr-test")
             .tempdir()
             .unwrap();
         let path = tmpdir.path().to_owned();

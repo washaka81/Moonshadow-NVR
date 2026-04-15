@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! In-memory indexes by calendar day.
@@ -508,7 +508,7 @@ mod tests {
     /// adjusts the start downward after receiving the first frame. This should be fixed, but in the
     /// meantime, handle this gracefully. In particular, we must not call
     /// `jiff::Timestamp::from_second(Time::MAX.unix_seconds()).expect("...")`.
-    /// <https://github.com/scottlamb/moonfire-nvr/issues/346>
+    /// <https://github.com/scottlamb/moonshadow-nvr/issues/346>
     #[test]
     fn adjust_with_max_to_max() {
         testutil::init();

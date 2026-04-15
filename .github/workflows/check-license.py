@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
-# This file is part of Moonfire NVR, a security camera network video recorder.
-# Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+# This file is part of Moonshadow NVR, a security camera network video recorder.
+# Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 # SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 """Checks that expected header lines are present.
 
@@ -24,8 +24,8 @@ FILENAME_MATCHER = re.compile(r'.*\.([jt]sx?|html|css|py|rs|sh|sql)$')
 MAX_LINE_COUNT = 10
 
 EXPECTED_LINES = [
-  re.compile(r'This file is part of Moonfire NVR, a security camera network video recorder\.'),
-  re.compile(r'Copyright \(C\) 20\d{2} The Moonfire NVR Authors; see AUTHORS and LICENSE\.txt\.'),
+  re.compile(r'This file is part of Moonshadow NVR, a security camera network video recorder\.'),
+  re.compile(r'Copyright \(C\) 20\d{2} The Moonshadow NVR Authors; see AUTHORS and LICENSE\.txt\.'),
   re.compile(r'SPDX-License-Identifier: GPL-v3\.0-or-later WITH GPL-3\.0-linking-exception\.?'),
 ]
 

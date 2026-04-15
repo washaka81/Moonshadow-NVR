@@ -3,3 +3,61 @@
 /release-*
 /server/target
 .idea
+.aider*
+
+# Log files
+*.log
+*.err
+*.out
+*debug.log
+*test.log
+*run.log
+
+# PID files
+*.pid
+
+# Runtime configuration files
+test-*.toml
+web-test.toml
+mediamtx.yml
+
+# Database files
+/test_db/
+/server/test_db/
+*.db
+*-wal
+*-shm
+
+# ONNX models (large binary files)
+*.onnx
+
+# Build artifacts
+/target/
+/server/target/
+build.log
+/server/build.log
+
+# Downloaded binaries
+/mediamtx
+/mediamtx*.tar.gz
+
+# Runtime directories
+/bin/
+/models/
+/logs/
+/config/
+
+# User notes (optional)
+avances.txt
+avances.txt.backup
+avances_implementacion.md
+resultados_prueba.md
+
+# Screenshots (optional)
+/screenshots/*
+server/src/detector.rs.backup
+.vscode/
+models/venv/
+models/tfenv/
+ui/package-lock.json
+avances*

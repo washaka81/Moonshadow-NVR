@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import Avatar from "@mui/material/Avatar";
@@ -25,7 +25,7 @@ interface Props {
  * Limitations: as described in the React docs, error boundaries don't catch
  * errors in async code / rejected Promises.
  */
-class MoonfireErrorBoundary extends React.Component<Props, State> {
+class MoonshadowErrorBoundary extends React.Component<Props, State> {
   constructor(props: Props) {
     super(props);
     this.state = { error: null };
@@ -71,7 +71,7 @@ class MoonfireErrorBoundary extends React.Component<Props, State> {
           <h1>Error</h1>
 
           <p>
-            Sorry! You've found a bug in Moonfire NVR. We need a good bug report
+            Sorry! You've found a bug in Moonshadow NVR. We need a good bug report
             to get it fixed. Can you help?
           </p>
 
@@ -79,8 +79,8 @@ class MoonfireErrorBoundary extends React.Component<Props, State> {
 
           <p>
             Please open{" "}
-            <a href="https://github.com/scottlamb/moonfire-nvr/issues">
-              Moonfire NVR's issue tracker
+            <a href="https://github.com/scottlamb/moonshadow-nvr/issues">
+              Moonshadow NVR's issue tracker
             </a>{" "}
             and see if this problem has already been reported.
           </p>
@@ -90,14 +90,14 @@ class MoonfireErrorBoundary extends React.Component<Props, State> {
           <p>Open a new issue with as much detail as you can:</p>
 
           <ul>
-            <li>the version of Moonfire NVR you're using</li>
+            <li>the version of Moonshadow NVR you're using</li>
             <li>
               your environment, including:
               <ul>
                 <li>web browser: Chrome, Firefox, Safari, etc.</li>
                 <li>platform: macOS, Windows, Linux, Android, iOS, etc.</li>
                 <li>browser extensions</li>
-                <li>anything special about your Moonfire NVR setup</li>
+                <li>anything special about your Moonshadow NVR setup</li>
               </ul>
             </li>
             <li>all the errors you see in your browser's Javascript console</li>
@@ -121,4 +121,4 @@ class MoonfireErrorBoundary extends React.Component<Props, State> {
   }
 }
 
-export default MoonfireErrorBoundary;
+export default MoonshadowErrorBoundary;

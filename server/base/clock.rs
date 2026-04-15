@@ -1,11 +1,11 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2018 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2018 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Clock interface and implementations for testability.
 //!
 //! Note these types are in a more standard nanosecond-based format, where
-//! [`crate::time`] uses Moonfire's 90 kHz time base.
+//! [`crate::time`] uses Moonshadow's 90 kHz time base.
 
 use crate::Mutex;
 use nix::sys::time::{TimeSpec, TimeValLike as _};

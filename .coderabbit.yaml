@@ -30,12 +30,14 @@ reviews:
         Focus on Rust best practices: memory safety, error handling, async patterns, performance.
         Pay special attention to security aspects in an NVR system: input validation, authentication, data protection.
         Ensure proper use of tokio for async operations and clippy warnings.
+        For AI-related code (e.g., detector.rs), ensure efficient model loading and inference.
     - path: "ui/**"
       instructions: |
         Focus on React and TypeScript best practices: component lifecycle, hooks usage, type safety.
         Ensure accessibility (a11y) with Material-UI components.
         Check for security: XSS prevention, secure handling of user inputs.
         Verify testing coverage and proper error boundaries.
+        For AI events UI, ensure smooth rendering of detection results and efficient state management.
   auto_review:
     enabled: true
     drafts: false

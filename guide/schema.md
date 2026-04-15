@@ -1,4 +1,4 @@
-# Moonfire NVR Schema Guide <!-- omit in toc -->
+# Moonshadow NVR Schema Guide <!-- omit in toc -->
 
 * [Upgrading](#upgrading)
     * [Procedure](#procedure)
@@ -9,7 +9,7 @@
     * [Version 6](#version-6)
     * [Version 7](#version-7)
 
-This document has notes about the Moonfire NVR storage schema. As described in
+This document has notes about the Moonshadow NVR storage schema. As described in
 [README.md](../README.md), this consists of two kinds of state:
 
    * a SQLite database, typically <1 GiB. It should be stored on flash if
@@ -40,7 +40,7 @@ SQLite database:
     discover a problem while running the new software against the upgraded
     database in read-only mode. If disk space is tight, you can save this
     to a different filesystem than the primary copy.
-*   copies 3 and 4: internal copies made and destroyed by Moonfire NVR and
+*   copies 3 and 4: internal copies made and destroyed by Moonshadow NVR and
     SQLite during the upgrade:
 
     *   during earlier steps, possibly duplicate copies of tables, which
@@ -61,19 +61,19 @@ SQLite database:
         this automatically, but you will want to verify by hand that you are
         no longer in the dangerous mode.
 
-Next ensure Moonfire NVR is not running and does not automatically restart if
+Next ensure Moonshadow NVR is not running and does not automatically restart if
 the system is rebooted during the upgrade. If you followed the standard
 instructions, you can do this as follows:
 
 ```console
-$ sudo systemctl disable --now moonfire-nvr
+$ sudo systemctl disable --now moonshadow-nvr
 ```
 
 Then back up your SQLite database. If you are using the default path, you can
 do so as follows:
 
 ```console
-$ sudo -u moonfire-nvr cp /var/lib/moonfire-nvr/db/db{,.pre-upgrade}
+$ sudo -u moonshadow-nvr cp /var/lib/moonshadow-nvr/db/db{,.pre-upgrade}
 ```
 
 By default, the upgrade command will reset the SQLite `journal_mode` to
@@ -101,7 +101,7 @@ To just run directly within the console until you hit ctrl-C, use the following
 command:
 
 ```console
-$ sudo -u moonfire-nvr moonfire-nvr run --read-only
+$ sudo -u moonshadow-nvr moonshadow-nvr run --read-only
 ```
 
 Go to the web interface and ensure the system is operating correctly. If
@@ -112,7 +112,7 @@ read-write operation, a restore will be more complicated.
 Once you're satisfied, ctrl-C and start the system in read-write mode:
 
 ```console
-$ sudo systemctl enable --now moonfire-nvr
+$ sudo systemctl enable --now moonshadow-nvr
 ```
 
 Hopefully your system is functioning correctly. If not, there are two options
@@ -130,12 +130,12 @@ for restore; neither are easy:
 *  undo the changes by hand. There's no documentation on this; you'll need
     to read the code and come up with a reverse transformation.
 
-The `sudo -u moonfire-nvr moonfire-nvr check` command will show you what
+The `sudo -u moonshadow-nvr moonshadow-nvr check` command will show you what
 problems exist on your system.
 
 ### Unversioned to version 0
 
-Early versions of Moonfire NVR (prior to 2016-12-20) did not include the
+Early versions of Moonshadow NVR (prior to 2016-12-20) did not include the
 version information in the schema. You can manually add this information to
 your schema using the `sqlite3` commandline. This process is backward
 compatible, meaning that software versions that accept an unversioned database
@@ -150,15 +150,15 @@ Version 0 makes two changes:
 There's a special procedure for this upgrade. The good news is that a backup
 is unnecessary; there's no risk with this procedure.
 
-First ensure Moonfire NVR is not running as described in the general procedure
+First ensure Moonshadow NVR is not running as described in the general procedure
 above.
 
 Then use `sqlite3` to manually edit the database. The default
-path is `/var/lib/moonfire-nvr/db/db`; if you've specified a different
+path is `/var/lib/moonshadow-nvr/db/db`; if you've specified a different
 `--db_dir`, use that directory with a suffix of `/db`.
 
 ```console
-$ sudo -u moonfire-nvr sqlite3 /var/lib/moonfire-nvr/db/db
+$ sudo -u moonshadow-nvr sqlite3 /var/lib/moonshadow-nvr/db/db
 sqlite3>
 ```
 
@@ -191,7 +191,7 @@ commit transaction;
 ```
 
 When you are done, you can restart the service via `systemctl` and continue
-using it with your existing or new version of Moonfire NVR.
+using it with your existing or new version of Moonshadow NVR.
 
 ### Version 0 to version 1
 
@@ -248,7 +248,7 @@ Version 5 adds over version 3:
 *   the `signals` schema, used to store status of signals such as camera
     motion detection, security system zones, etc. Note that while the schema
     is stable for now, there's no support yet for configuring signals via
-    the `moonfire-nvr config` subcommand.
+    the `moonshadow-nvr config` subcommand.
 *   the ability to recover from a completely full sample file directory (#65)
     without manual intervention.
 
@@ -269,7 +269,7 @@ Version 6 adds over version 5:
     SourceBuffer.
 *   decoupled "wall time" and "media time" of recordings, as a step toward
     implementing audio support without giving up clock frequency adjustment. See
-    [this comment](https://github.com/scottlamb/moonfire-nvr/issues/34#issuecomment-651548468).
+    [this comment](https://github.com/scottlamb/moonshadow-nvr/issues/34#issuecomment-651548468).
 
 On upgrading to this version, sessions will be revoked.
 

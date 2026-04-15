@@ -1,11 +1,11 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 //! `.mp4` virtual file serving.
 //!
 //! The `mp4` module builds virtual files representing ISO/IEC 14496-12 (ISO base media format /
-//! MPEG-4 / `.mp4`) video. See [the wiki page on standards and specifications](https://github.com/scottlamb/moonfire-nvr/wiki/Standards-and-specifications)
+//! MPEG-4 / `.mp4`) video. See [the wiki page on standards and specifications](https://github.com/scottlamb/moonshadow-nvr/wiki/Standards-and-specifications)
 //! to find a copy of the relevant standards. This code won't make much sense without them!
 //!
 //! The virtual files can be constructed from one or more recordings and are suitable
@@ -435,11 +435,11 @@ impl Segment {
 
         // This was a few percent faster when we didn't pre-initialize the
         // slice (as in the commented-out code below), but it was unsound. See
-        // <https://github.com/scottlamb/moonfire-nvr/issues/185>. It might be
+        // <https://github.com/scottlamb/moonshadow-nvr/issues/185>. It might be
         // nice to use `MaybeUninit::write_slice` here when it stabilizes,
         // more ergonomic than dealing with raw pointers. In the meantime, a few
         // percent difference in speed here probably isn't the biggest unsolved
-        // problem with Moonfire...
+        // problem with Moonshadow...
         let mut buf = vec![0; len].into_boxed_slice();
         // let mut buf = {
         //     let mut v = Vec::with_capacity(len);

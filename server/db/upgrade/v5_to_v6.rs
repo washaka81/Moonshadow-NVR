@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use base::{bail, err, Error};
@@ -84,7 +84,7 @@ pub fn run(_args: &super::Args, tx: &rusqlite::Transaction) -> Result<(), Error>
     )?;
 
     // Only insert still-referenced video sample entries. I've had problems with
-    // no-longer-referenced ones (perhaps from some ancient, buggy version of Moonfire NVR) for
+    // no-longer-referenced ones (perhaps from some ancient, buggy version of Moonshadow NVR) for
     // which avcc.create_context(()) fails.
     let mut stmt = tx.prepare(
         r#"

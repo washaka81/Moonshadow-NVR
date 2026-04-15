@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Upgrades the database schema.
@@ -22,6 +22,7 @@ mod v3_to_v4;
 mod v4_to_v5;
 mod v5_to_v6;
 mod v6_to_v7;
+mod v7_to_v8;
 
 #[derive(Debug)]
 pub struct Args<'a> {
@@ -58,6 +59,7 @@ fn upgrade(
         v4_to_v5::run,
         v5_to_v6::run,
         v6_to_v7::run,
+        v7_to_v8::run,
     ];
 
     {
@@ -93,7 +95,10 @@ fn upgrade(
                 insert into version (id, unix_time, notes)
                              values (?, cast(strftime('%s', 'now') as int32), ?)
                 "#,
-                params![ver + 1, format!("Upgraded using moonfire-nvr {sw_version}")],
+                params![
+                    ver + 1,
+                    format!("Upgraded using moonshadow-nvr {sw_version}")
+                ],
             )?;
             tx.commit()?;
         }
@@ -108,7 +113,7 @@ pub fn run(args: &Args, sw_version: &str, conn: &mut rusqlite::Connection) -> Re
     set_journal_mode(conn, args.preset_journal)?;
     upgrade(args, EXPECTED_SCHEMA_VERSION, sw_version, conn)?;
 
-    // As in "moonfire-nvr init": try for page_size=16384 and wal for the reasons explained there.
+    // As in "moonshadow-nvr init": try for page_size=16384 and wal for the reasons explained there.
     //
     // Do the vacuum prior to switching back to WAL for two reasons:
     // * page_size only takes effect on a vacuum in non-WAL mode.
@@ -218,7 +223,7 @@ mod tests {
     fn upgrade_and_compare() -> Result<(), Error> {
         testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-nvr-test")
+            .prefix("moonshadow-nvr-test")
             .tempdir()?;
         //let path = tmpdir.path().to_str().ok_or_else(|| err!("invalid UTF-8"))?.to_owned();
         let mut upgraded = new_conn()?;
@@ -292,6 +297,7 @@ mod tests {
             (5, Some(include_str!("v5.sql"))),
             (6, Some(include_str!("v6.sql"))),
             (7, Some(include_str!("../schema.sql"))),
+            (8, Some(include_str!("../schema.sql"))),
         ] {
             upgrade(
                 &Args {

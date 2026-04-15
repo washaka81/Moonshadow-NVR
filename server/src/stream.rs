@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2016 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2016 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use async_trait::async_trait;
@@ -83,6 +83,7 @@ pub struct VideoFrame {
 
 #[async_trait]
 pub trait Stream: Send {
+    #[allow(dead_code)]
     fn tool(&self) -> Option<&retina::client::Tool>;
     fn video_sample_entry(&self) -> &db::sample_entries::Video;
     async fn next(&mut self) -> Result<VideoFrame, Error>;
@@ -102,7 +103,7 @@ impl Opener for RealOpener {
     ) -> Result<Box<dyn Stream>, Error> {
         options.session = options
             .session
-            .user_agent(format!("Moonfire NVR {}", env!("CARGO_PKG_VERSION")));
+            .user_agent(format!("Moonshadow NVR {}", env!("CARGO_PKG_VERSION")));
         let stream = tokio::time::timeout(RETINA_TIMEOUT, RetinaStream::play(label, url, options))
             .await
             .map_err(|e| {
@@ -118,13 +119,13 @@ impl Opener for RealOpener {
 
 /// Real stream, implemented with the Retina library.
 ///
-/// Retina is asynchronous and tokio-based where currently Moonfire expects
+/// Retina is asynchronous and tokio-based where currently Moonshadow expects
 /// a synchronous stream interface. This blocks on the tokio operations.
 ///
 /// Experimentally, it appears faster to have one thread hand-off per frame via
 /// `handle.block_on(handle.spawn(...))` rather than the same without the
 /// `handle.spawn(...)`. See
-/// [#206](https://github.com/scottlamb/moonfire-nvr/issues/206).
+/// [#206](https://github.com/scottlamb/moonshadow-nvr/issues/206).
 struct RetinaStream {
     label: String,
     session: Demuxed,

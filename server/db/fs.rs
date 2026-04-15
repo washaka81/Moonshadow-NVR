@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2019 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2019 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Filesystem utilities.
@@ -44,10 +44,17 @@ impl Dir {
     /// Opens the given path as a directory.
     pub fn open<P: ?Sized + NixPath>(path: &P, mkdir: bool) -> Result<Dir, nix::Error> {
         if mkdir {
-            match nix::unistd::mkdir(path, nix::sys::stat::Mode::S_IRWXU) {
-                Ok(()) | Err(nix::Error::EEXIST) => {}
-                Err(e) => return Err(e),
-            }
+            path.with_nix_path(|cstr| {
+                let path_bytes = cstr.to_bytes();
+                let path_str = std::str::from_utf8(path_bytes).map_err(|_| nix::Error::EINVAL)?;
+                std::fs::create_dir_all(path_str).map_err(|e| {
+                    if let Some(code) = e.raw_os_error() {
+                        nix::Error::from_i32(code)
+                    } else {
+                        nix::Error::UnknownErrno
+                    }
+                })
+            }).map_err(|_| nix::Error::EINVAL)??;
         }
         let fd = nix::fcntl::open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty())?;
         Ok(Dir(fd))

@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2026 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2026 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 use std::{io::Write as _, sync::Arc};
@@ -484,7 +484,7 @@ mod tests {
     async fn basic() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-dir-writer")
+            .prefix("moonshadow-db-test-dir-writer")
             .tempdir()
             .unwrap();
 
@@ -556,7 +556,7 @@ mod tests {
     async fn abandon_behind() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-dir-writer-abandon")
+            .prefix("moonshadow-db-test-dir-writer-abandon")
             .tempdir()
             .unwrap();
 
@@ -628,7 +628,7 @@ mod tests {
     async fn multi_recording() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-dir-writer-multi")
+            .prefix("moonshadow-db-test-dir-writer-multi")
             .tempdir()
             .unwrap();
 
@@ -738,7 +738,7 @@ mod tests {
     async fn two_streams_shutdown() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-dir-writer-two")
+            .prefix("moonshadow-db-test-dir-writer-two")
             .tempdir()
             .unwrap();
 
@@ -798,7 +798,7 @@ mod tests {
     async fn wake_already_on_worker() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-dir-writer-wake")
+            .prefix("moonshadow-db-test-dir-writer-wake")
             .tempdir()
             .unwrap();
 

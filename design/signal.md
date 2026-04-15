@@ -1,8 +1,8 @@
-# Moonfire NVR Signals
+# Moonshadow NVR Signals
 
 Status: **draft**.
 
-"Signals" are what Moonfire NVR uses to describe non-video timeseries data
+"Signals" are what Moonshadow NVR uses to describe non-video timeseries data
 such as "was motion detected?" or "what mode was my burglar alarm in?" They are
 intended to be displayed in the UI with the video scrub bar to aid in finding
 a relevant portion of video.

@@ -1,4 +1,4 @@
-# Securing Moonfire NVR and exposing it to the Internet <!-- omit in toc -->
+# Securing Moonshadow NVR and exposing it to the Internet <!-- omit in toc -->
 
 * [The problem](#the-problem)
 * [VPN or port forwarding?](#vpn-or-port-forwarding)
@@ -8,7 +8,7 @@
 * [3. Set up port forwarding](#3-set-up-port-forwarding)
 * [4. Configure a public DNS name](#4-configure-a-public-dns-name)
 * [5. Install a TLS certificate](#5-install-a-tls-certificate)
-* [6. Reconfigure Moonfire NVR](#6-reconfigure-moonfire-nvr)
+* [6. Reconfigure Moonshadow NVR](#6-reconfigure-moonshadow-nvr)
 * [7. Configure the webserver](#7-configure-the-webserver)
 * [Verify it works](#verify-it-works)
 
@@ -23,12 +23,12 @@ within your home, but one that is insecure in a couple ways:
   2. It doesn't require you to sign in (with your chosen username and
      password) to authenticate yourself to it.
 
-You'll want to change these points if you expose Moonfire NVR's web interface
+You'll want to change these points if you expose Moonshadow NVR's web interface
 to the Internet. Security-minded folks would say you shouldn't even allow
 unauthenticated sessions within your local network.
 
 Besides security, the nature of home Internet setups presents challenges in
-exposing Moonfire NVR to the Internet:
+exposing Moonshadow NVR to the Internet:
 
   1. you likely have a single IPv4 address that all your devices share via NAT.
      (Your ISP may also provide a set of IPv6 addresses; even if they do, you
@@ -36,13 +36,13 @@ exposing Moonfire NVR to the Internet:
      You'll need to set up "port forwarding" on your home router, and there
      are many routers with different interfaces for doing so.
   2. that IPv4 address is likely dynamic, so you'll need to configure "dynamic
-     DNS" to get a consistent URL to access Moonfire NVR. Most people do this
+     DNS" to get a consistent URL to access Moonshadow NVR. Most people do this
      through their router's interface as well.
   3. you may want to share your single IP address's `http` and `https` ports
      with other web interfaces, such as a network-attached storage device.
      This requires setting up a proxy and configuring it with each
      destination.
-  4. unlike some commercial providers, Moonfire NVR doesn't have any central
+  4. unlike some commercial providers, Moonshadow NVR doesn't have any central
      organization to provide a central high-bandwidth, Internet-accessible
      proxying service.
 
@@ -54,7 +54,7 @@ consult your home router's manual and other external guides or forums.
 
 ## VPN or port forwarding?
 
-This guide describes how to set up Moonfire NVR with port forwarding.
+This guide describes how to set up Moonshadow NVR with port forwarding.
 
 Any security camera forums such as [ipcamtalk](https://ipcamtalk.com/) will
 recommend that you use a VPN to connect to your NVR rather than port
@@ -70,7 +70,7 @@ trusted to perform proper authentication itself.
 Port forwarding's advantage is that, once installed on the server, it's far
 more convenient to use. There's no VPN client necessary, just a web browser.
 
-I believe Moonfire NVR authenticates properly. It's also open-source, so it's
+I believe Moonshadow NVR authenticates properly. It's also open-source, so it's
 practical to verify this yourself given sufficient time and expertise.
 
 If you'd prefer to use a VPN, the [ipcamtalk Cliff
@@ -87,15 +87,15 @@ Noobs](https://ipcamtalk.com/threads/vpn-primer-for-noobs.14601/).
   3. Set up port forwarding
   4. Configure a public DNS name
   5. Install a TLS certificate
-  6. Reconfigure Moonfire NVR
+  6. Reconfigure Moonshadow NVR
   7. Configure the webserver
   8. Verify it works
 
 ## 1. Install a webserver
 
-Moonfire NVR's builtin webserver doesn't yet support `https` (see [issue
-\#27](https://github.com/scottlamb/moonfire-nvr/issues/27)), so you'll need to
-proxy through a webserver that does. If Moonfire NVR will be sharing an
+Moonshadow NVR's builtin webserver doesn't yet support `https` (see [issue
+\#27](https://github.com/scottlamb/moonshadow-nvr/issues/27)), so you'll need to
+proxy through a webserver that does. If Moonshadow NVR will be sharing an
 `https` port with anything else, you'll need to set up the webserver to proxy
 to all of these interfaces as well.
 
@@ -104,7 +104,7 @@ prefer [Apache httpd](https://httpd.apache.org/) or some other webserver.
 Anything will work. I include snippets of a `nginx` config below, so stick
 with that if you're not comfortable adapting it to some other server.
 
-I run the proxying webserver on the same machine as Moonfire NVR itself. You
+I run the proxying webserver on the same machine as Moonshadow NVR itself. You
 might want to do something else, but this is the simplest setup that means you
 only need to configure one machine with a static internal IP address.
 
@@ -146,7 +146,7 @@ Also in your router's setup, look for "Dynamic DNS" or "DDNS". Configure it to
 update some DNS name with your home's external IP address. You should then be
 able to go to this address in a web browser and reach your webserver again.
 
-(It's possible to instead set up a dynamic DNS client on the Moonfire NVR
+(It's possible to instead set up a dynamic DNS client on the Moonshadow NVR
 machine instead. See [this Ubuntu
 guide](https://help.ubuntu.com/community/DynamicDNS). One disadvantage is that
 it may be slower to recognize IP address changes, so there may be a longer
@@ -159,9 +159,9 @@ Authority to obtain a TLS certificate that will be automatically trusted by
 your browser. See [How to secure Nginx with Let's Encrypt on Ubuntu
 20.04](https://www.digitalocean.com/community/tutorials/how-to-secure-nginx-with-let-s-encrypt-on-ubuntu-20-04).
 
-## 6. Reconfigure Moonfire NVR
+## 6. Reconfigure Moonshadow NVR
 
-If you follow the recommended setup, your `/etc/moonfire-nvr.toml` will contain
+If you follow the recommended setup, your `/etc/moonshadow-nvr.toml` will contain
 this line:
 
 ```toml
@@ -178,23 +178,23 @@ This change has two effects:
 
    * No `allowUnauthenticatedPermissions` means that web users must
      authenticate.
-   * `trustForwardHeaders` means that Moonfire NVR will look for `X-Real-IP`
+   * `trustForwardHeaders` means that Moonshadow NVR will look for `X-Real-IP`
      and `X-Forwarded-Proto` headers as added by the webserver configuration
      in the next section.
 
 See also [ref/config.md](../ref/config.md) for more about the configuration file.
 
-If the webserver is running on the same machine as Moonfire NVR, you might
-also change the `ipv4 = "0.0.0.0:8080"` line in `/etc/moonfire-nvr/toml` to
+If the webserver is running on the same machine as Moonshadow NVR, you might
+also change the `ipv4 = "0.0.0.0:8080"` line in `/etc/moonshadow-nvr/toml` to
 `ipv4 = "127.0.0.1:8080"`, so that only the local host can directly connect to
-Moonfire NVR. If other machines can connect directly, they can impersonate
+Moonshadow NVR. If other machines can connect directly, they can impersonate
 the proxy, which would effectively allow them to lie about the client's IP and
 protocol.
 
-To make this take effect, you'll need to restart Moonfire NVR:
+To make this take effect, you'll need to restart Moonshadow NVR:
 
 ```console
-$ sudo systemctl restart moonfire-nvr
+$ sudo systemctl restart moonshadow-nvr
 ```
 
 ## 7. Configure the webserver
@@ -203,7 +203,7 @@ Since step 5, you should have a `https`-capable webserver set up on your
 desired DNS name. Now finalize its configuration:
 
    * redirect all `http` traffic to `https`
-   * proxy `https` traffic to Moonfire NVR
+   * proxy `https` traffic to Moonshadow NVR
    * when proxying, set the `X-Real-IP` header to the original IP address
      (removing any previous occurrences of this header)
    * when proxying, set the `X-Forwarded-Proto` header to the original
@@ -214,7 +214,7 @@ The author's system does this via the following
 `/etc/nginx/sites-available/nvr.home.slamb.org` file:
 
 ```nginx
-upstream moonfire {
+upstream moonshadow {
     server 127.0.0.1:8080;
 }
 
@@ -230,7 +230,7 @@ server {
     server_name nvr.home.slamb.org;
 
     location / {
-        proxy_pass http://moonfire;
+        proxy_pass http://moonshadow;
         # try_files $uri $uri/ =404;
     }
 
@@ -281,7 +281,7 @@ Go to `http://your.domain.here/api/request` and verify the following:
 Then go to `https://your.domain.here/` and you should see the web interface,
 including a login form.
 
-Login with the credentials you added through `moonfire-nvr config` in the
+Login with the credentials you added through `moonshadow-nvr config` in the
 [previous guide](install.md). You should see your username and "logout" in the
 upper-right corner of the web interface.
 

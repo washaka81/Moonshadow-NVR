@@ -1,4 +1,4 @@
-# Moonfire NVR API <!-- omit in toc -->
+# Moonshadow NVR API <!-- omit in toc -->
 
 Status: **current**.
 
@@ -48,7 +48,7 @@ In the future, this is likely to be expanded:
 
 Currently the API is considered an internal contract between the server and the
 UI which are bundled together. Thus, breaking changes in the API may happen in
-any release of Moonfire NVR, even a "minor" or "patch" release. From version
+any release of Moonshadow NVR, even a "minor" or "patch" release. From version
 0.7.0 onward, API changes should be described in the
 [changelog](../CHANGELOG.md).
 
@@ -146,7 +146,7 @@ The `application/json` response will have a JSON object as follows:
             with non-zero total duration of recordings for that day. Currently
             this includes uncommitted and growing recordings. This is likely
             to change in a future release for
-            [#40](https://github.com/scottlamb/moonfire-nvr/issues/40). The
+            [#40](https://github.com/scottlamb/moonshadow-nvr/issues/40). The
             keys are of the form `YYYY-mm-dd`; the values are objects with the
             following attributes:
             *   `totalDuration90k` is the total duration recorded during that
@@ -353,7 +353,7 @@ arbitrary order. Each recording object has the following properties:
     retrieve more data than described here if not bounded by duration.
     Additionally, if `startId` == `endId`, the start time of the recording is
     "unanchored" and may change in subsequent accesses.
-*   `openId`. Each time Moonfire NVR starts in read-write mode, it is assigned
+*   `openId`. Each time Moonshadow NVR starts in read-write mode, it is assigned
     an increasing "open id". This field is the open id as of when these
     recordings were written. This can be used to disambiguate ids referring to
     uncommitted recordings.
@@ -372,7 +372,7 @@ arbitrary order. Each recording object has the following properties:
     this row (`endId` if present, otherwise `startId`) has a duration of 0.
     A frame's duration is calculated by subtracting its timestamp from the
     following frame's timestamp. When a run ends, there's no following frame
-    and Moonfire NVR fills in a duration of 0. When using `/view.mp4`, it's
+    and Moonshadow NVR fills in a duration of 0. When using `/view.mp4`, it's
     not possible to append additional segments after such frames, as noted
     below.
 *   `endReason`: the reason the recording ended. Absent if the recording did
@@ -504,7 +504,7 @@ Bugs and limitations:
     the server will return a 400 error like `Invalid argument: unable to append
     recording 2/16672 after recording 2/16671 with trailing zero`. See also
     `hasTrailingZero` above, and
-    [#178](https://github.com/scottlamb/moonfire-nvr/issues/178).
+    [#178](https://github.com/scottlamb/moonshadow-nvr/issues/178).
 
 ### `GET /api/cameras/<uuid>/<stream>/view.mp4.txt`
 
@@ -541,11 +541,11 @@ Expected query parameters:
 
 *   `s` (one or more): as with the `.mp4` URL.
 
-It's recommended that each `.m4s` retrieval be for at most one Moonfire NVR
+It's recommended that each `.m4s` retrieval be for at most one Moonshadow NVR
 recording. The fundamental reason is that the Media Source Extension API appears
 structured for adding a complete segment at a time. Large media segments thus
 impose significant latency on seeking. Additionally, because of this fundamental
-reason Moonfire NVR makes no effort to make multiple-segment `.m4s` requests
+reason Moonshadow NVR makes no effort to make multiple-segment `.m4s` requests
 practical:
 
 *   There is currently a hard limit of 4 GiB of data because the `.m4s` uses a
@@ -592,7 +592,7 @@ following headers will be included:
 *   `X-Video-Sample-Entry-Id`: An id to use when fetching an initialization segment.
 *   `X-Recording-Id`: the open id, a period, and the recording id of the
     recording these frames belong to.
-*   `X-Recording-Start`: the timestamp (in Moonfire NVR's usual 90,000ths
+*   `X-Recording-Start`: the timestamp (in Moonshadow NVR's usual 90,000ths
     of a second) of the start of the recording. Note that if the recording
     is "unanchored" (as described in `GET /api/.../recordings`), the
     recording's start time may change before it is completed.

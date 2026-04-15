@@ -1,4 +1,4 @@
-# Moonfire NVR change log
+# Moonshadow NVR change log
 
 Below are some highlights in each release. For a full description of all
 changes, see Git history. Each release is tagged in git.
@@ -13,12 +13,12 @@ even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 *   support changing video sample parameters in live view.
 *   update to Retina v0.4.18, supporting cameras which improperly set the
     RTP "MARK" bit on SEI packets.
-    Fixes [#352](https://github.com/scottlamb/moonfire-nvr/issues/352).
+    Fixes [#352](https://github.com/scottlamb/moonshadow-nvr/issues/352).
 
 ## v0.7.30 (2026-02-19)
 
 *   fix another v0.7.26 regression,
-    [#350](https://github.com/scottlamb/moonfire-nvr/issues/350): severe timestamp
+    [#350](https://github.com/scottlamb/moonshadow-nvr/issues/350): severe timestamp
     drift. This was a pair of errors in the new writer path: the "local start time"
     was not being reset at recording rotation, and the wall clock was not accounting
     for the final frame of each recording.
@@ -49,15 +49,15 @@ even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
     could resolve out of order, delivering fMP4 segments to the SourceBuffer
     with non-monotonic decode timestamps. Fix by processing messages
     sequentially via promise chaining.
-    Fixes [#343](https://github.com/scottlamb/moonfire-nvr/issues/343).
+    Fixes [#343](https://github.com/scottlamb/moonshadow-nvr/issues/343).
 *   Use real hyperlinks to issues in live view error alert.
-    Fixes [#326](https://github.com/scottlamb/moonfire-nvr/issues/326).
+    Fixes [#326](https://github.com/scottlamb/moonshadow-nvr/issues/326).
 *   Fix 9x16 videos being stretched to the full screen dimensions in
     list view full screen mode. Clean up some references to ancient
     Firefox versions along the way.
 *   Test and fix dir pool shutdown with multiple streams.
     `v0.7.26` introduced a busy loop error in this case.
-*   Fix debug-mode panics within `moonfire-nvr config` command.
+*   Fix debug-mode panics within `moonshadow-nvr config` command.
 *   Update to [retina 0.4.17](https://github.com/scottlamb/retina/blob/main/CHANGELOG.md#v0417-2026-02-17),
     which improves compatibility with several camera models.
 
@@ -108,7 +108,7 @@ even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 *   in UI, replace unhelpful `TypeError: Failed to fetch` messages with more descriptive errors such as `POST /api/login failed; see browser console`.
 *   update the tested and supported [Node.js](https://nodejs.org/en) versions to 20, 22, 24, or 25. Fix some test failures on 24+.
 *   quick fix for `valid timestamp: parameter 'second' with value 102481911520608 is not in the required range of -377705023201..=253402207200 ` panics.
-    See [#346](https://github.com/scottlamb/moonfire-nvr/issues/346).
+    See [#346](https://github.com/scottlamb/moonshadow-nvr/issues/346).
 *   abort on panics. This avoids situations in which the binary continues to run in a broken state after mutexes have been "poisoned". It should be less confusing, and when coupled with typical systemd/Docker policies, will cause the system to recover on its own.
 *   reduce the amount of debug info in the binary.
 *   update Retina from v0.4.14 to v0.4.16, improving camera compatibility.
@@ -116,7 +116,7 @@ even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 ## v0.7.23 (2025-10-03)
 
 *   update Retina to [v0.4.14](https://github.com/scottlamb/retina/blob/main/CHANGELOG.md#v0414-2025-10-03),
-    improving camera compatibility. Fixes [#344](https://github.com/scottlamb/moonfire-nvr/issues/344).
+    improving camera compatibility. Fixes [#344](https://github.com/scottlamb/moonshadow-nvr/issues/344).
 *   bump minimum Rust version to 1.88.
 
 ## v0.7.22 (2025-10-03)
@@ -138,7 +138,7 @@ even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 
 ## v0.7.19 (2025-01-28)
 
-*   support recording H.265 ([#33](https://github.com/scottlamb/moonfire-nvr/issues/33)).
+*   support recording H.265 ([#33](https://github.com/scottlamb/moonshadow-nvr/issues/33)).
     Browser support may vary.
 *   bump minimum Rust version to 1.82.
 *   improve error message on timeout opening stream.
@@ -153,10 +153,10 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 *   bump minimum Rust version to 1.79.
 *   in UI's list view, add a tooltip on the end time which shows why the
     recording ended.
-*   fix [#121](https://github.com/scottlamb/moonfire-nvr/issues/121):
+*   fix [#121](https://github.com/scottlamb/moonshadow-nvr/issues/121):
     iPhone live view.
 *   update to hyper and http version 1.0. In the process, no longer wait for
-    pending HTTP requests on shutdown. This just extended the time Moonfire was
+    pending HTTP requests on shutdown. This just extended the time Moonshadow was
     running without streaming.
 *   upgrade to Retina 0.4.10, adding support for recording MJPEG video. Note
     major browsers do not support playback of MJPEG videos, however.
@@ -172,7 +172,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 ## v0.7.14 (2024-04-16)
 
-*   Many UI improvements in [#315](https://github.com/scottlamb/moonfire-nvr/pull/315)
+*   Many UI improvements in [#315](https://github.com/scottlamb/moonshadow-nvr/pull/315)
     from [@michioxd](https://github.com/michioxd). See the PR description for
     full details, including screenshots.
     *   dark/light modes
@@ -180,7 +180,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
     *   live view: new dual camera layout, more descriptive layout names,
         full screen option, re-open with last layout and camera selection
     *   list view: filter button becomes outlined when enabled
-*   Fix [#286](https://github.com/scottlamb/moonfire-nvr/issues/286):
+*   Fix [#286](https://github.com/scottlamb/moonshadow-nvr/issues/286):
     live view now works on Firefox! Formerly, it'd fail with messages such as
     `Security Error: Content at https://mydomain.com/ may not load data from blob:https://mydomain.com/44abc5dc-750d-48d1-817d-2e6a52445592`.
 
@@ -189,7 +189,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 *   seamlessly merge together recordings which have imperceptible changes in
     their `VideoSampleEntry`. Improves
-    [#302](https://github.com/scottlamb/moonfire-nvr/issues/302).
+    [#302](https://github.com/scottlamb/moonshadow-nvr/issues/302).
 
 ## v0.7.12 (2024-01-08)
 
@@ -208,13 +208,13 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 *   build docker images again
 *   upgrade date/time pickers to `@mui/x-date-pickers` v6 beta, improving
     time entry. Fixes
-    [#256](https://github.com/scottlamb/moonfire-nvr/issues/256).
+    [#256](https://github.com/scottlamb/moonshadow-nvr/issues/256).
 
 ## v0.7.9 (2023-10-21)
 
 *  `systemd` integration on Linux
    *   notify `systemd` on starting/stopping. To take advantage of this, you'll
-       need to modify your `/etc/systemd/moonfire-nvr.service`. See
+       need to modify your `/etc/systemd/moonshadow-nvr.service`. See
        [`guide/install.md`](guide/install.md).
    *   socket activation. See [`ref/config.md`](ref/config.md).
 
@@ -227,7 +227,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 ## v0.7.7 (2023-08-03)
 
-*  fix [#289](https://github.com/scottlamb/moonfire-nvr/issues/289): crash on
+*  fix [#289](https://github.com/scottlamb/moonshadow-nvr/issues/289): crash on
    pressing the `Add` button in the sample file directory dialog
 *  log to `stderr` again, fixing a regression with the `tracing` change in 0.7.6.
 *  experimental (off by default) support for bundling UI files into the
@@ -237,11 +237,11 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 *   new log formats using `tracing`. This will allow richer context information.
 *   bump minimum Rust version to 1.70.
-*   expect camelCase in `moonfire-nvr.toml` file, for consistency with the JSON
+*   expect camelCase in `moonshadow-nvr.toml` file, for consistency with the JSON
     API. You'll need to adjust your config file when upgrading.
 *   use Retina 0.4.5.
     * This version is newly compatible with rtsp-simple-server v0.19.3 and some
-      TP-Link cameras. Fixes [#238](https://github.com/scottlamb/moonfire-nvr/issues/238).
+      TP-Link cameras. Fixes [#238](https://github.com/scottlamb/moonshadow-nvr/issues/238).
     * Fixes problems connecting to cameras that use RTP extensions.
     * Fixes problems with Longse cameras
       [scottlamb/retina#77](https://github.com/scottlamb/retina/pull/77).
@@ -255,37 +255,37 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
     *   `DELETE /users/<id>` endpoint to delete a user
 *   improved API documentation in [`ref/api.md`](ref/api.md).
 *   first draft of a web UI for user administration. Rough edges expected!
-*   `moonfire-nvr login --permissions` now accepts the JSON format documented
+*   `moonshadow-nvr login --permissions` now accepts the JSON format documented
     in `ref/api.md`, not an undocumented plaintext protobuf format.
-*   fix [#257](https://github.com/scottlamb/moonfire-nvr/issues/257):
+*   fix [#257](https://github.com/scottlamb/moonshadow-nvr/issues/257):
     Live View: select None Not Possible After Selecting a Camera.
 *   get rid of live view's dreaded `ws close: 1006` error altogether. The live
     view WebSocket protocol now conveys errors in a way that allows the
     Javscript UI to see them.
-*   fix [#282](https://github.com/scottlamb/moonfire-nvr/issues/282):
+*   fix [#282](https://github.com/scottlamb/moonshadow-nvr/issues/282):
     sessions' last use information wasn't getting persisted.
-*   improvements to `moonfire-nvr config`,
+*   improvements to `moonshadow-nvr config`,
     thanks to [@sky1e](https://github.com/sky1e).
 
 ## v0.7.5 (2022-05-09)
 
-*   [#219](https://github.com/scottlamb/moonfire-nvr/issues/219): fix
+*   [#219](https://github.com/scottlamb/moonshadow-nvr/issues/219): fix
     live stream failing with `ws close: 1006` on URLs with port numbers.
 *   build Docker images with link-time optimization.
 *   bump minimum Rust version to 1.60.
-*   [#224](https://github.com/scottlamb/moonfire-nvr/issues/224): upgrade to
+*   [#224](https://github.com/scottlamb/moonshadow-nvr/issues/224): upgrade to
     Retina 0.3.10, improving compatibility with OMNY M5S2A 2812 cameras that
     send invalid `rtptime` values.
 
 ## v0.7.4 (2022-04-13)
 
 *   upgrade to Retina 0.3.9, improving camera interop and diagnostics.
-    Fixes [#213](https://github.com/scottlamb/moonfire-nvr/issues/213),
-    [#209](https://github.com/scottlamb/moonfire-nvr/issues/209).
-*   [#217](https://github.com/scottlamb/moonfire-nvr/issues/217): no longer
+    Fixes [#213](https://github.com/scottlamb/moonshadow-nvr/issues/213),
+    [#209](https://github.com/scottlamb/moonshadow-nvr/issues/209).
+*   [#217](https://github.com/scottlamb/moonshadow-nvr/issues/217): no longer
     drop the connection to the camera when it changes video parameters, instead
     continuing the run seamlessly.
-*   [#206](https://github.com/scottlamb/moonfire-nvr/issues/206#issuecomment-1086442543):
+*   [#206](https://github.com/scottlamb/moonshadow-nvr/issues/206#issuecomment-1086442543):
     fix `teardown Sender shouldn't be dropped: RecvError(())` errors on shutdown.
 
 ## v0.7.3 (2022-03-22)
@@ -296,19 +296,19 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 ## v0.7.2 (2022-03-16)
 
-*   introduce a configuration file `/etc/moonfire-nvr.toml`; you will need
+*   introduce a configuration file `/etc/moonshadow-nvr.toml`; you will need
     to create one when upgrading.
 *   bump minimum Rust version from 1.53 to 1.56.
-*   fix [#187](https://github.com/scottlamb/moonfire-nvr/issues/187):
+*   fix [#187](https://github.com/scottlamb/moonshadow-nvr/issues/187):
     incompatibility with cameras that (incorrectly) omit the SDP origin line.
-*   fix [#182](https://github.com/scottlamb/moonfire-nvr/issues/182): error
+*   fix [#182](https://github.com/scottlamb/moonshadow-nvr/issues/182): error
     on upgrade from schema 6 to schema 7 when a camera's `onvif_host` is empty.
 *   API bugfix: in the `GET /api/` response, include `ext` streams if
     configured.
-*   fix [#184](https://github.com/scottlamb/moonfire-nvr/issues/184):
-    Moonfire NVR would stop recording on a camera that hit the live555 stale
+*   fix [#184](https://github.com/scottlamb/moonshadow-nvr/issues/184):
+    Moonshadow NVR would stop recording on a camera that hit the live555 stale
     file descriptor bug, rather than waiting for the stale session to expire.
-*   progress on [#70](https://github.com/scottlamb/moonfire-nvr/issues/184):
+*   progress on [#70](https://github.com/scottlamb/moonshadow-nvr/issues/184):
     shrink the binary from 154 MiB to 70 MiB by reducing debugging information.
 
 ## v0.7.1 (2021-10-27)
@@ -358,12 +358,12 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 
 ## v0.6.6 (2021-09-23)
 
-*   fix [#146](https://github.com/scottlamb/moonfire-nvr/issues/146): "init
+*   fix [#146](https://github.com/scottlamb/moonshadow-nvr/issues/146): "init
     segment fetch error" when browsers have cached data from `v0.6.4` and
     before.
-*   fix [#147](https://github.com/scottlamb/moonfire-nvr/issues/147): confusing
+*   fix [#147](https://github.com/scottlamb/moonshadow-nvr/issues/147): confusing
     `nvr init` failures when using very old versions of SQLite.
-*   fix [#157](https://github.com/scottlamb/moonfire-nvr/issues/157): broken
+*   fix [#157](https://github.com/scottlamb/moonshadow-nvr/issues/157): broken
     live view when using multi-view and selecting the first listed camera
     then selecting another camera for the upper left grid square.
 *   support `--rtsp-transport=udp`, which may work better with cameras that
@@ -373,7 +373,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
     reliability with old live555 versions when using TCP also.
 *   improve compatibility with cameras that send non-compliant SDP, including
     models from Geovision and Anpviz.
-*   fix [#117](https://github.com/scottlamb/moonfire-nvr/issues/117): honor
+*   fix [#117](https://github.com/scottlamb/moonshadow-nvr/issues/117): honor
     shutdown requests when out of disk space, instead of retrying forever.
 *   shut down immediately on a second `SIGINT` or `SIGTERM`. The normal
     "graceful" shutdown will still be slow in some cases, eg when waiting for a
@@ -393,7 +393,7 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
     `sub` stream is unconfigured, or `sub` stream is not set to record.
 *   upgrade to retina v0.1.0, which uses `SET_PARAMETERS` rather than
     `GET_PARAMETERS` as a RTSP keepalive. GW Security cameras would ignored
-    the latter, causing Moonfire NVR to drop the connection every minute.
+    the latter, causing Moonshadow NVR to drop the connection every minute.
 
 ## v0.6.4 (2021-06-28)
 
@@ -416,24 +416,24 @@ This release was skipped due to build problems on `armv7-unknown-linux-musleabif
 ## v0.6.2 (2021-03-12)
 
 *   Fix panics when a stream's PTS has extreme jumps
-    ([#113](https://github.com/scottlamb/moonfire-nvr/issues/113))
+    ([#113](https://github.com/scottlamb/moonshadow-nvr/issues/113))
 *   Improve logging. Console log output is now color-coded. ffmpeg errors
     and panics are now logged in the same way as other messages.
 *   Fix an error that could prevent the
-    `moonfire-nvr check --delete-orphan-rows` command from actually deleting
+    `moonshadow-nvr check --delete-orphan-rows` command from actually deleting
     rows.
 
 ## v0.6.1 (2021-02-16)
 
 *   Improve the server's error messages on the console and in logs.
 *   Switch the UI build from the `yarn` package manager to `npm`.
-    This makes Moonfire NVR a bit easier to build from scratch.
-*   Extend the `moonfire-nvr check` command to clean up several problems that
+    This makes Moonshadow NVR a bit easier to build from scratch.
+*   Extend the `moonshadow-nvr check` command to clean up several problems that
     can be caused by filesystem corruption.
-*   Set the page size to 16 KiB on `moonfire-nvr init` and
-    `moonfire-nvr upgrade`. This improves performance.
+*   Set the page size to 16 KiB on `moonshadow-nvr init` and
+    `moonshadow-nvr upgrade`. This improves performance.
 *   Fix mangled favicons
-    ([#105](https://github.com/scottlamb/moonfire-nvr/issues/105))
+    ([#105](https://github.com/scottlamb/moonshadow-nvr/issues/105))
 
 ## v0.6.0 (2021-01-22)
 

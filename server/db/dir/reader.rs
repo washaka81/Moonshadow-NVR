@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 //! Reads sample files in a dedicated thread pool.
@@ -364,7 +364,7 @@ impl Worker {
         //
         // If the read is out of bounds of the file, we'll get a SIGBUS.
         // That's not a safety violation. It also shouldn't happen because the
-        // length was set properly at open time, Moonfire NVR is a closed
+        // length was set properly at open time, Moonshadow NVR is a closed
         // system (nothing else ever touches its files), and sample files are
         // never truncated (only appended to or unlinked).
         unsafe {
@@ -396,7 +396,7 @@ mod tests {
     async fn basic() {
         crate::testutil::init();
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-db-test-reader")
+            .prefix("moonshadow-db-test-reader")
             .tempdir()
             .unwrap();
         let one = const { std::num::NonZeroUsize::new(1).unwrap() };

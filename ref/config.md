@@ -1,11 +1,11 @@
-# Moonfire NVR Configuration File
+# Moonshadow NVR Configuration File
 
-Moonfire NVR has a small runtime configuration file. By default it's called
-`/etc/moonfire-nvr.toml`. You can specify a different path on the commandline,
+Moonshadow NVR has a small runtime configuration file. By default it's called
+`/etc/moonshadow-nvr.toml`. You can specify a different path on the commandline,
 e.g. as follows:
 
 ```console
-$ moonfire-nvr run --config /path/to/config.toml
+$ moonshadow-nvr run --config /path/to/config.toml
 ```
 
 `.toml` refers to [Tom's Obvious Minimal Language](https://toml.io/en/). This
@@ -24,7 +24,7 @@ ipv4 = "0.0.0.0:8080"
 allowUnauthenticatedPermissions = { viewVideo = true }
 
 [[binds]]
-unix = "/var/lib/moonfire-nvr/sock"
+unix = "/var/lib/moonshadow-nvr/sock"
 ownUidIsPrivileged = true
 ```
 
@@ -39,59 +39,59 @@ ipv4 = "0.0.0.0:8080"
 trustForwardHeaders = true
 
 [[binds]]
-unix = "/var/lib/moonfire-nvr/sock"
+unix = "/var/lib/moonshadow-nvr/sock"
 ownUidIsPrivileged = true
 ```
 
 ### `systemd` socket activation
 
 `systemd` socket activation (Linux-only) expects `systemd` to create the sockets
-on behalf of Moonfire NVR. This can speed startup of services that depend on them and allow
-Moonfire to bind to privileged ports (80 or 443) without root privileges. The latter is
+on behalf of Moonshadow NVR. This can speed startup of services that depend on them and allow
+Moonshadow to bind to privileged ports (80 or 443) without root privileges. The latter is
 expected to be more useful once
-[moonfire-nvr#27](https://github.com/scottlamb/moonfire-nvr/issues/27) is
-complete and Moonfire is suitable for direct use as an Internet-facing webserver.
+[moonshadow-nvr#27](https://github.com/scottlamb/moonshadow-nvr/issues/27) is
+complete and Moonshadow is suitable for direct use as an Internet-facing webserver.
 
 To set this up, you'll need an additional systemd unit file for each socket and
-to reference them from `/etc/moonfire-nvr.toml`. Be sure to run `sudo systemctl
+to reference them from `/etc/moonshadow-nvr.toml`. Be sure to run `sudo systemctl
 daemon-reload` to tell `systemd` to read in the new unit files. Your
-`moonfire-nvr.service` file should also `Requires=` each socket file.
+`moonshadow-nvr.service` file should also `Requires=` each socket file.
 
-#### `/etc/moonfire-nvr.toml`
+#### `/etc/moonshadow-nvr.toml`
 
 ```toml
 [[binds]]
-systemd = "moonfire-nvr-tcp.socket"
+systemd = "moonshadow-nvr-tcp.socket"
 allowUnauthenticatedPermissions = { viewVideo = true }
 
 [[binds]]
-systemd = "moonfire-nvr-unix.socket"
+systemd = "moonshadow-nvr-unix.socket"
 ownUidIsPrivileged = true
 ```
 
-### `/etc/systemd/system/moonfire-nvr.service`
+### `/etc/systemd/system/moonshadow-nvr.service`
 
 ```ini
 [Unit]
-Requires=moonfire-nvr-tcp.socket
-Requires=moonfire-nvr-unix.socket
+Requires=moonshadow-nvr-tcp.socket
+Requires=moonshadow-nvr-unix.socket
 # ...rest as before...
 ```
 
-### `/etc/systemd/system/moonfire-nvr-tcp.socket`
+### `/etc/systemd/system/moonshadow-nvr-tcp.socket`
 
 ```ini
 [Socket]
 ListenStream=80
-Service=moonfire-nvr.service
+Service=moonshadow-nvr.service
 ```
 
-### `/etc/systemd/system/moonfire-nvr-unix.socket`
+### `/etc/systemd/system/moonshadow-nvr-unix.socket`
 
 ```ini
 [Socket]
-ListenStream=/var/lib/moonfire-nvr/sock
-Service=moonfire-nvr.service
+ListenStream=/var/lib/moonshadow-nvr/sock
+Service=moonshadow-nvr.service
 ```
 
 ## Reference
@@ -99,10 +99,10 @@ Service=moonfire-nvr.service
 At the top level, before any `[[binds]]` lines, the following
 keys are understood:
 
-*   `dbDir`: path to the SQLite database directory. Defaults to `/var/lib/moonfire-nvr/db`.
+*   `dbDir`: path to the SQLite database directory. Defaults to `/var/lib/moonshadow-nvr/db`.
 *   `uiDir`: UI to serve; can be a path. Defaults to the special value
     `uiDir = { bundled = true }` if a UI was built into the binary, or
-    `/usr/local/lib/moonfire-nvr/ui` otherwise. Release builds have UIs
+    `/usr/local/lib/moonshadow-nvr/ui` otherwise. Release builds have UIs
     built in; you can replicate this yourself via `--features=bundled` or `--features=bundled-ui`
     when [building the server](../guide/build.md). **Note:** it's unusual
     to override this value. For UI development, a much more pleasant
@@ -122,12 +122,12 @@ should start with a `[[binds]]` line and specify one of the following:
 *   `unix`: a path in the local filesystem where a UNIX-domain socket can be created. Permissions on the
     enclosing directories control which users are allowed to connect to it. Web browsers typically don't
     support directly connecting to UNIX domain sockets, but other tools do, e.g.:
-    *   `curl --unix-socket /var/lib/moonfire-nvr/sock http://nvr/api/` will
+    *   `curl --unix-socket /var/lib/moonshadow-nvr/sock http://nvr/api/` will
         issue a request from the commandline. (The hostname in the URL doesn't
         matter.)
-    *   `ssh -L localhost:8080:/var/lib/moonfire-nvr/sock moonfire-nvr@nvr-host`
+    *   `ssh -L localhost:8080:/var/lib/moonshadow-nvr/sock moonshadow-nvr@nvr-host`
         will allow a web browser on your local machine to connect to the
-        Moonfire NVR instance on `nvr-host` via https://localhost:8080/. If
+        Moonshadow NVR instance on `nvr-host` via https://localhost:8080/. If
         `ownUidIsPrivileged` is specified (see below), it will additionally
         have all permissions.
 *   `systemd` (Linux-only): a name of a socket passed from `systemd`. See
@@ -137,14 +137,14 @@ should start with a `[[binds]]` line and specify one of the following:
 Additional options within `[[binds]]`:
 
 *   `ownUidIsPrivileged` (UNIX domain sockets only): boolean. If true, a client
-    running as Moonfire NVR's own uid can perform any action without additional
+    running as Moonshadow NVR's own uid can perform any action without additional
     authentication. Once the configuration UI is complete, this will be a handy
     way to set up the first user accounts.
 *   `allowUnauthenticatedPermissions`: dictionary. Clients connecting to this
     bind will have the specified permissions, even without UID or session
     authentication. The supported permissions are as in the [`Permissions`
     section of api.md](api.md#permissions).
-*   `trustForwardHeaders`: boolean. Moonfire NVR will look for `X-Real-IP` and
+*   `trustForwardHeaders`: boolean. Moonshadow NVR will look for `X-Real-IP` and
     `X-Forwarded-Proto` headers added by a proxy server to determine the
     client's IP address and protocol (`http` or `https`). See
     [guide/secure.md](../guide/secure.md) for more information. *Note:* when

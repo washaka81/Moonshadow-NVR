@@ -1,23 +1,23 @@
-# Installing Moonfire NVR <!-- omit in toc -->
+# Installing Moonshadow NVR <!-- omit in toc -->
 
-* [Downloading, installing, and configuring Moonfire NVR](#downloading-installing-and-configuring-moonfire-nvr)
+* [Downloading, installing, and configuring Moonshadow NVR](#downloading-installing-and-configuring-moonshadow-nvr)
     * [Dedicated hard drive setup](#dedicated-hard-drive-setup)
     * [Completing configuration through the UI](#completing-configuration-through-the-ui)
     * [Starting it up](#starting-it-up)
 
-## Downloading, installing, and configuring Moonfire NVR
+## Downloading, installing, and configuring Moonshadow NVR
 
-This document describes how to download, install, and configure Moonfire NVR
+This document describes how to download, install, and configure Moonshadow NVR
 via the prebuilt Linux binaries available for x86-64, arm64, and arm. If you
-instead want to build Moonfire NVR yourself, see the [Build
+instead want to build Moonshadow NVR yourself, see the [Build
 instructions](build.md).
 
 <table><tr><td><details>
-<summary>Go to the instructions for your exact Moonfire version</summary>
+<summary>Go to the instructions for your exact Moonshadow version</summary>
 
 Make sure you are viewing instructions that match the release you intend
 to install. When viewing this page on Github, look for a pull-down in the upper
-left, and pick the [latest tagged version](https://github.com/scottlamb/moonfire-nvr/releases/latest):
+left, and pick the [latest tagged version](https://github.com/scottlamb/moonshadow-nvr/releases/latest):
 
 <img src="install-version.png" height=367 alt="Selecting a version of install instructions">
 
@@ -25,80 +25,80 @@ left, and pick the [latest tagged version](https://github.com/scottlamb/moonfire
 
 
 Download the binary for your platform from the matching GitHub release.
-Install it as `/usr/local/bin/moonfire-nvr` and ensure it is executable, e.g.
+Install it as `/usr/local/bin/moonshadow-nvr` and ensure it is executable, e.g.
 for version `v0.7.31`:
 
 ```console
 $ VERSION=v0.7.31
 $ ARCH=$(uname -m)
-$ curl -OL "https://github.com/scottlamb/moonfire-nvr/releases/download/$VERSION/moonfire-nvr-$VERSION-$ARCH"
-$ sudo install -m 755 "moonfire-nvr-$VERSION-$ARCH" /usr/local/bin/moonfire-nvr
+$ curl -OL "https://github.com/scottlamb/moonshadow-nvr/releases/download/$VERSION/moonshadow-nvr-$VERSION-$ARCH"
+$ sudo install -m 755 "moonshadow-nvr-$VERSION-$ARCH" /usr/local/bin/moonshadow-nvr
 ```
 
 <table><tr><td><details>
 <summary>Docker</summary>
 
-The procedure above, in which Moonfire runs directly on the host, is strongly
+The procedure above, in which Moonshadow runs directly on the host, is strongly
 recommended.
 
   * The single binary installed in `/usr/local/bin` has zero dependencies.
     It is statically linked and bundles the UI. It just works. There's no
     complex distribution-specific install procedures or danger of conflicting
-    version requirements between Moonfire and other software. These are the same
+    version requirements between Moonshadow and other software. These are the same
     problems most people use Docker to solve.
-  * Moonfire's recommended install method used to involve Docker. In our
+  * Moonshadow's recommended install method used to involve Docker. In our
     experience, complexity around Docker commands, filesystem/process namespace
     mappings, broken seccomp defaults that do not allow standard system calls
     like `clock_gettime`, etc. has been a major frustration for folks installing
-    Moonfire. Now that we have the zero-dependencies binary, we recommend
+    Moonshadow. Now that we have the zero-dependencies binary, we recommend
     sidestepping all of this and have rewritten the docs accordingly.
 
 …but, you may still prefer Docker for familiarity or other reasons. If so, you
-can install the [`ghcr.io/scottlamb/moonfire-nvr`](https://github.com/scottlamb/moonfire-nvr/pkgs/container/moonfire-nvr) Docker images instead. We'll
+can install the [`ghcr.io/scottlamb/moonshadow-nvr`](https://github.com/scottlamb/moonshadow-nvr/pkgs/container/moonshadow-nvr) Docker images instead. We'll
 assume you know your way around your preferred tools and can adapt the
 instructions to the workflow you use with Docker.  You may find the following
 Docker compose snippet useful:
 
 ```yaml
 services:
-  moonfire-nvr:
+  moonshadow-nvr:
     # The `vX.Y.Z` images will work on any architecture (x86-64, arm, or
     # aarch64); just pick the correct version.
-    image: ghcr.io/scottlamb/moonfire-nvr:v0.7.31
+    image: ghcr.io/scottlamb/moonshadow-nvr:v0.7.31
     command: run
 
     volumes:
-      # Pass through `/var/lib/moonfire-nvr` from the host.
-      - "/var/lib/moonfire-nvr:/var/lib/moonfire-nvr"
+      # Pass through `/var/lib/moonshadow-nvr` from the host.
+      - "/var/lib/moonshadow-nvr:/var/lib/moonshadow-nvr"
 
-      # Pass through `/etc/moonfire-nvr.toml` from the host.
-      # Be sure to create `/etc/moonfire-nvr.toml` first (see below).
+      # Pass through `/etc/moonshadow-nvr.toml` from the host.
+      # Be sure to create `/etc/moonshadow-nvr.toml` first (see below).
       # Docker will "helpfully" create a directory by this name otherwise.
-      - "/etc/moonfire-nvr.toml:/etc/moonfire-nvr.toml:ro"
+      - "/etc/moonshadow-nvr.toml:/etc/moonshadow-nvr.toml:ro"
 
       # Pass through `/var/tmp` from the host.
       # SQLite expects to be able to create temporary files in this dir, which
-      # was not created in Moonfire's minimal Docker image prior to 0.7.26.
+      # was not created in Moonshadow's minimal Docker image prior to 0.7.26.
       # See: <https://www.sqlite.org/tempfiles.html>
       - "/var/tmp:/var/tmp"
 
       # Add additional mount lines here for each sample file directory
-      # outside of /var/lib/moonfire-nvr, e.g.:
+      # outside of /var/lib/moonshadow-nvr, e.g.:
       # - "/media/nvr:/media/nvr"
 
       # The Docker image doesn't include the time zone database; you must mount
-      # it from the host for Moonfire to support local time.
+      # it from the host for Moonshadow to support local time.
       - "/usr/share/zoneinfo:/usr/share/zoneinfo:ro"
 
-    # Edit this to match your `moonfire-nvr` user.
+    # Edit this to match your `moonshadow-nvr` user.
     # Note that Docker will not honor names from the host here, even if
     # `/etc/passwd` is passed through.
     # - Be sure to run the `useradd` command below first.
-    # - Then run `echo $(id -u moonfire-nvr):$(id -g moonfire-nvr)` to see
+    # - Then run `echo $(id -u moonshadow-nvr):$(id -g moonshadow-nvr)` to see
     #   what should be filled in here.
     user: UID:GID
 
-    # Uncomment this if Moonfire fails with `clock_gettime failed` (likely on
+    # Uncomment this if Moonshadow fails with `clock_gettime failed` (likely on
     # older 32-bit hosts). <https://github.com/moby/moby/issues/40734>
     # security_opt:
     # - seccomp:unconfined
@@ -115,7 +115,7 @@ services:
     logging:
       driver: journald
       options:
-        tag: moonfire-nvr
+        tag: moonshadow-nvr
 
     restart: unless-stopped
 
@@ -128,28 +128,28 @@ Command reference:
 <table>
 
 <tr><th colspan="2">Initialize the database</th></tr>
-<tr><th>Non-Docker</th><td><code>sudo -u moonfire-nvr moonfire-nvr init</code></td></tr>
-<tr><th>Docker</th><td><code>sudo docker compose run --rm moonfire-nvr init</code></td></tr>
+<tr><th>Non-Docker</th><td><code>sudo -u moonshadow-nvr moonshadow-nvr init</code></td></tr>
+<tr><th>Docker</th><td><code>sudo docker compose run --rm moonshadow-nvr init</code></td></tr>
 
 <tr><th colspan="2">Run interactive configuration</th></tr>
-<tr><th>Non-Docker</th><td><code>sudo -u moonfire-nvr moonfire-nvr config 2>debug-log</code></td></tr>
-<tr><th>Docker</th><td><code>sudo docker compose run --rm moonfire-nvr config 2>debug-log</code></td></tr>
+<tr><th>Non-Docker</th><td><code>sudo -u moonshadow-nvr moonshadow-nvr config 2>debug-log</code></td></tr>
+<tr><th>Docker</th><td><code>sudo docker compose run --rm moonshadow-nvr config 2>debug-log</code></td></tr>
 
 <tr><th colspan="2">Enable and start the server</th></tr>
-<tr><th>Non-Docker<td><code>sudo systemctl enable --now moonfire-nvr</code></td></tr>
-<tr><th>Docker</th><td><code>sudo docker compose up --detach moonfire-nvr</code></td></tr>
+<tr><th>Non-Docker<td><code>sudo systemctl enable --now moonshadow-nvr</code></td></tr>
+<tr><th>Docker</th><td><code>sudo docker compose up --detach moonshadow-nvr</code></td></tr>
 
 </table>
 
 </details></td></tr></table>
 
-Next, you'll need to set up your filesystem and the Moonfire NVR user.
+Next, you'll need to set up your filesystem and the Moonshadow NVR user.
 
-Moonfire NVR keeps two kinds of state:
+Moonshadow NVR keeps two kinds of state:
 
 *   a SQLite database, typically <1 GiB. It should be stored on flash if
     available. In most cases your root filesystem is on flash, so the
-    default location of `/var/lib/moonfire-nvr/db` will be fine.
+    default location of `/var/lib/moonshadow-nvr/db` will be fine.
 *   the "sample file directories", which hold the actual samples/frames of
     H.264 video. These should be quite large and are typically stored on hard
     drives. More below.
@@ -159,35 +159,35 @@ Moonfire NVR keeps two kinds of state:
 On most Linux systems, you can create the user as follows:
 
 ```console
-$ sudo useradd --user-group --create-home --home /var/lib/moonfire-nvr moonfire-nvr
+$ sudo useradd --user-group --create-home --home /var/lib/moonshadow-nvr moonshadow-nvr
 ```
 
-Use your favorite editor to create `/etc/moonfire-nvr.toml`,
+Use your favorite editor to create `/etc/moonshadow-nvr.toml`,
 starting from the configurations below:
 
 ```console
-$ sudo nano /etc/moonfire-nvr.toml
+$ sudo nano /etc/moonshadow-nvr.toml
 (see below for contents)
 ```
 
-`/etc/moonfire-nvr.toml` (see [ref/config.md](../ref/config.md) for more explanation):
+`/etc/moonshadow-nvr.toml` (see [ref/config.md](../ref/config.md) for more explanation):
 ```toml
 [[binds]]
 ipv4 = "0.0.0.0:8080"
 allowUnauthenticatedPermissions = { viewVideo = true }
 
 [[binds]]
-unix = "/var/lib/moonfire-nvr/sock"
+unix = "/var/lib/moonshadow-nvr/sock"
 ownUidIsPrivileged = true
 ```
 
 Then initialize the database:
 
 ```console
-$ sudo -u moonfire-nvr moonfire-nvr init
+$ sudo -u moonshadow-nvr moonshadow-nvr init
 ```
 
-This will create a directory `/var/lib/moonfire-nvr/db` with a SQLite3 database
+This will create a directory `/var/lib/moonshadow-nvr/db` with a SQLite3 database
 within it.
 
 ### Dedicated hard drive setup
@@ -196,7 +196,7 @@ If a dedicated hard drive is available, set it up now.
 
 If you haven't yet created the filesystem, consider using
 `mkfs.ext4 -T largefile -m 1`, as described in more detail [on the
-wiki](https://github.com/scottlamb/moonfire-nvr/wiki/System-setup). If you're
+wiki](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup). If you're
 using a USB SATA bridge, this is also a good time to ensure you're not
 using UAS, as described there. UAS has been linked to filesystem corruption.
 
@@ -209,7 +209,7 @@ $ sudo nano /etc/fstab
 (see below for line to add)
 $ sudo mkdir -p /media/nvr
 $ sudo mount /media/nvr
-$ sudo install -d -o moonfire-nvr -g moonfire-nvr -m 700 /media/nvr/sample
+$ sudo install -d -o moonshadow-nvr -g moonshadow-nvr -m 700 /media/nvr/sample
 ```
 
 In `/etc/fstab`, add a line similar to this:
@@ -227,20 +227,20 @@ recovering from problems.
 
 Once your system is set up, it's time to initialize an empty database
 and add the cameras and sample directories. You can do this
-by using the `moonfire-nvr` binary's text-based configuration tool.
+by using the `moonshadow-nvr` binary's text-based configuration tool.
 
 ```console
-$ sudo -u moonfire-nvr moonfire-nvr config 2>debug-log
+$ sudo -u moonshadow-nvr moonshadow-nvr config 2>debug-log
 ```
 
 <table><tr><td><details>
 <summary>Did it return without doing anything?</summary>
 
-If `moonfire-nvr config` returns you to the console prompt right away, look in
-the `debug-log` file for why. One common reason is that you have Moonfire NVR
+If `moonshadow-nvr config` returns you to the console prompt right away, look in
+the `debug-log` file for why. One common reason is that you have Moonshadow NVR
 running; you'll need to shut it down first. If you are running a systemd
-service as described below, try `sudo systemctl stop moonfire-nvr` before
-editing the config and `sudo systemctl start moonfire-nvr` after.
+service as described below, try `sudo systemctl stop moonshadow-nvr` before
+editing the config and `sudo systemctl start moonshadow-nvr` after.
 </details></td></tr></table>
 
 In the user interface,
@@ -251,13 +251,13 @@ In the user interface,
 
     If you used a dedicated hard drive, use the directory you precreated
     (eg `/media/nvr/sample`). Otherwise, try
-    `/var/lib/moonfire-nvr/sample`. Moonfire NVR will create the directory as
+    `/var/lib/moonshadow-nvr/sample`. Moonshadow NVR will create the directory as
     long as it has the required permissions on the parent directory.
 
 2.  add cameras under "Cameras and streams".
 
-    *   See the [wiki](https://github.com/scottlamb/moonfire-nvr/wiki) for notes
-        about specific camera models. The [Configuring cameras](https://github.com/scottlamb/moonfire-nvr/wiki/Configuring-cameras)
+    *   See the [wiki](https://github.com/scottlamb/moonshadow-nvr/wiki) for notes
+        about specific camera models. The [Configuring cameras](https://github.com/scottlamb/moonshadow-nvr/wiki/Configuring-cameras)
         page mentions a couple tools that can autodetect RTSP URLs.
 
     *   There's a "Test" button to verify your settings directly from the add/edit
@@ -292,7 +292,7 @@ In the user interface,
         will take up to (8 Mbps * 300 sec / 8 bits/byte) = 300 MB ~= 286 MiB
         of extra disk space.
     *   If a file is open when it is deleted (such as if a HTTP client is
-        downloading it), it stays around until the file is closed. Moonfire NVR
+        downloading it), it stays around until the file is closed. Moonshadow NVR
         currently doesn't account for this.
     *   Smaller factors: deletion isn't instantaneous, and directories
         themselves take up some disk space.
@@ -302,18 +302,18 @@ In the user interface,
 
 ### Starting it up
 
-With this config, Moonfire NVR's web interface is **insecure**: it doesn't use
+With this config, Moonshadow NVR's web interface is **insecure**: it doesn't use
 `https` and doesn't require you to authenticate to it. You might be comfortable
 starting it in this configuration to try it out, particularly if the machine
 it's running on is behind a home router's firewall. You might not; in that case
 read through [secure the system](secure.md) first.
 
-Assuming you want to proceed, you can launch Moonfire NVR through `systemd`.
-Create `/etc/systemd/system/moonfire-nvr.service`:
+Assuming you want to proceed, you can launch Moonshadow NVR through `systemd`.
+Create `/etc/systemd/system/moonshadow-nvr.service`:
 
 ```ini
 [Unit]
-Description=Moonfire NVR
+Description=Moonshadow NVR
 After=network-online.target
 
 # If you use an external hard drive, uncomment this with a reference to the
@@ -321,14 +321,14 @@ After=network-online.target
 # RequiresMountsFor=/media/nvr
 
 [Service]
-ExecStart=/usr/local/bin/moonfire-nvr run
-Environment=MOONFIRE_FORMAT=systemd
-Environment=MOONFIRE_LOG=info
+ExecStart=/usr/local/bin/moonshadow-nvr run
+Environment=MOONSHADOW_FORMAT=systemd
+Environment=MOONSHADOW_LOG=info
 Environment=RUST_BACKTRACE=1
 Type=notify
 # large installations take a while to scan the sample file dirs
 TimeoutStartSec=300
-User=moonfire-nvr
+User=moonshadow-nvr
 Restart=on-failure
 CPUAccounting=true
 MemoryAccounting=true
@@ -342,19 +342,19 @@ Then start it up as follows:
 
 ```console
 $ sudo systemctl daemon-reload              # read in the new config file
-$ sudo systemctl enable --now moonfire-nvr  # start the service now and on boot
+$ sudo systemctl enable --now moonshadow-nvr  # start the service now and on boot
 ```
 
 Some handy commands:
 
 ```console
 $ sudo systemctl daemon-reload                                  # reload configuration files
-$ sudo systemctl start moonfire-nvr                             # start the service now without enabling on boot
-$ sudo systemctl stop moonfire-nvr                              # stop the service now (but don't wait for it finish stopping)
-$ sudo systemctl status moonfire-nvr                            # show if the service is running and the last few log lines
-$ sudo systemctl enable moonfire-nvr                            # start the service on boot
-$ sudo systemctl disable moonfire-nvr                           # don't start the service on boot
-$ sudo journalctl --unit=moonfire-nvr --since='-5 min' --follow # look at recent logs and await more
+$ sudo systemctl start moonshadow-nvr                             # start the service now without enabling on boot
+$ sudo systemctl stop moonshadow-nvr                              # stop the service now (but don't wait for it finish stopping)
+$ sudo systemctl status moonshadow-nvr                            # show if the service is running and the last few log lines
+$ sudo systemctl enable moonshadow-nvr                            # start the service on boot
+$ sudo systemctl disable moonshadow-nvr                           # don't start the service on boot
+$ sudo journalctl --unit=moonshadow-nvr --since='-5 min' --follow # look at recent logs and await more
 ```
 
 See the [systemd](http://www.freedesktop.org/wiki/Software/systemd/)
@@ -369,9 +369,9 @@ on the same machine, you can access it at
 If the system isn't working, see the [Troubleshooting
 guide](troubleshooting.md).
 
-See also the [system setup guide](https://github.com/scottlamb/moonfire-nvr/wiki/System-setup)
+See also the [system setup guide](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup)
 on the wiki, which has additional advice on configuring a Linux system which
-runs Moonfire NVR.
+runs Moonshadow NVR.
 
-Once the web interface seems to be working, read through [securing Moonfire
+Once the web interface seems to be working, read through [securing Moonshadow
 NVR](secure.md).

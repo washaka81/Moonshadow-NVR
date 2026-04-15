@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import Button from "@mui/material/Button";
@@ -29,7 +29,7 @@ interface Props {
 }
 
 // https://material-ui.com/components/app-bar/
-function MoonfireMenu(props: Props) {
+function MoonshadowMenu(props: Props) {
   const { mode, setMode } = useColorScheme();
   const changeMode = React.useCallback(() => {
     setMode(mode === "dark" ? "light" : mode === "light" ? "system" : "dark");
@@ -70,7 +70,7 @@ function MoonfireMenu(props: Props) {
           <MenuIcon />
         </IconButton>
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Moonfire NVR
+          Moonshadow NVR
         </Typography>
         {props.activityMenuPart !== null && (
           <Box sx={{ marginRight: theme.spacing(2) }}>
@@ -131,4 +131,4 @@ function MoonfireMenu(props: Props) {
   );
 }
 
-export default MoonfireMenu;
+export default MoonshadowMenu;

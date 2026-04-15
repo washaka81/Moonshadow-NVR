@@ -1,4 +1,4 @@
-# Moonfire UI
+# Moonshadow UI
 
 This is a UI built in [TypeScript](https://www.typescriptlang.org/), [React](https://react.dev/), and [MUI](https://mui.com/).
 

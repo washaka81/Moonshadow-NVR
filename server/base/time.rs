@@ -1,8 +1,9 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Time and durations for Moonfire NVR's internal format.
+//! Time and durations for Moonshadow NVR's internal format.
 
 use crate::{bail, err, Error};
 use nom::branch::alt;
@@ -27,7 +28,7 @@ pub const TIME_UNITS_PER_SEC: i64 = 90_000;
 ///
 /// Note that while fresh calls to `jiff::tz::TimeZone::system()` might return
 /// new values, this time zone is fixed for the entire run. This is important
-/// for `moonfire_db::days::Map`, where it's expected that adding values and
+/// for `moonshadow_db::days::Map`, where it's expected that adding values and
 /// then later subtracting them will cancel out.
 static GLOBAL_ZONE: std::sync::OnceLock<jiff::tz::TimeZone> = std::sync::OnceLock::new();
 
@@ -231,7 +232,7 @@ impl fmt::Display for Time {
 }
 
 /// A duration specified in 1/90,000ths of a second.
-/// Durations are typically non-negative, but a `moonfire_db::db::StreamDayValue::duration` may be
+/// Durations are typically non-negative, but a `moonshadow_db::db::StreamDayValue::duration` may be
 /// negative when used as a `<StreamDayValue as Value>::Change`.
 #[derive(Clone, Copy, Default, Deserialize, Eq, Ord, PartialEq, PartialOrd, Serialize)]
 pub struct Duration(pub i64);

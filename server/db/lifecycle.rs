@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2025 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2025 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Lifecycle management for recordings.
@@ -334,7 +335,7 @@ pub struct NewLimit {
 /// Note this doesn't change the limit in the database; it only deletes files.
 /// Pass a limit of 0 to delete all recordings associated with a camera.
 ///
-/// This is expected to be performed from `moonfire-nvr config` when no syncer is running.
+/// This is expected to be performed from `moonshadow-nvr config` when no syncer is running.
 /// It potentially flushes the database twice (before and after the actual deletion).
 pub async fn lower_retention(db: &db::Database, limits: &[NewLimit]) -> Result<(), Error> {
     do_rotation(db, |db| {

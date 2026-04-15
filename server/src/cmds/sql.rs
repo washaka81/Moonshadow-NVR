@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Subcommand to run a SQLite shell.
@@ -12,7 +13,7 @@ use std::os::unix::process::CommandExt;
 use std::path::PathBuf;
 use std::process::Command;
 
-/// Runs a SQLite3 shell on Moonfire NVR's index database.
+/// Runs a SQLite3 shell on Moonshadow NVR's index database.
 ///
 ///
 /// Note this locks the database to prevent simultaneous access with a running server. The
@@ -24,12 +25,12 @@ pub struct Args {
     db_dir: PathBuf,
 
     /// Opens the database in read-only mode and locks it only for shared access.
-    /// This can be run simultaneously with `moonfire-nvr run --read-only`.
+    /// This can be run simultaneously with `moonshadow-nvr run --read-only`.
     read_only: bool,
 
     /// Arguments to pass to sqlite3.
     /// Use the `--` separator to pass sqlite3 options, as in
-    /// `moonfire-nvr sql -- -line 'select username from user'`.
+    /// `moonshadow-nvr sql -- -line 'select username from user'`.
     #[bpaf(positional)]
     arg: Vec<OsString>,
 }

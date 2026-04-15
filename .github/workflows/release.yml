@@ -35,7 +35,7 @@ jobs:
       # Upload the UI and changelog as *job* artifacts (not *release* artifacts), used below.
       - uses: actions/upload-artifact@v6
         with:
-          name: moonfire-nvr-ui-${{ github.ref_name }}
+          name: moonshadow-nvr-ui-${{ github.ref_name }}
           path: ui/dist
           if-no-files-found: error
       - uses: actions/upload-artifact@v6
@@ -70,7 +70,7 @@ jobs:
       - name: Download UI
         uses: actions/download-artifact@v7
         with:
-          name: moonfire-nvr-ui-${{ github.ref_name }}
+          name: moonshadow-nvr-ui-${{ github.ref_name }}
           path: ui/dist
 
       # actions-rust-cross doesn't actually use cross for x86_64.
@@ -104,24 +104,24 @@ jobs:
           tar cf output/fs-skel.tar --owner=0 --group=0 --directory=fs-skel .
           tar tvf output/fs-skel.tar
 
-          ln ./server/target/${{ matrix.rust_target }}/release/moonfire-nvr output/
+          ln ./server/target/${{ matrix.rust_target }}/release/moonshadow-nvr output/
           echo ${{secrets.GITHUB_TOKEN}} | docker login --username ${{github.actor}} --password-stdin ghcr.io
           docker build --platform ${{ matrix.docker_platform }} --provenance=false --push --tag "${tag}" --file - output <<EOF
           FROM scratch
-          LABEL org.opencontainers.image.title="Moonfire NVR"
+          LABEL org.opencontainers.image.title="Moonshadow NVR"
           LABEL org.opencontainers.image.description="security camera network video recorder"
           LABEL org.opencontainers.image.source="https://github.com/${{ github.repository }}"
           LABEL org.opencontainers.image.version="${{ github.ref_name }}"
           ADD fs-skel.tar /
-          COPY --chmod=755 ./moonfire-nvr /usr/local/bin/moonfire-nvr
-          ENTRYPOINT ["/usr/local/bin/moonfire-nvr"]
+          COPY --chmod=755 ./moonshadow-nvr /usr/local/bin/moonshadow-nvr
+          ENTRYPOINT ["/usr/local/bin/moonshadow-nvr"]
           EOF
       # Upload as a *job* artifact (not *release* artifact), used below.
       - name: Upload Job Artifact
         uses: actions/upload-artifact@v6
         with:
-          name: moonfire-nvr-${{ github.ref_name }}-${{ matrix.arch }}
-          path: output/moonfire-nvr
+          name: moonshadow-nvr-${{ github.ref_name }}-${{ matrix.arch }}
+          path: output/moonshadow-nvr
           if-no-files-found: error
 
   release:
@@ -138,8 +138,8 @@ jobs:
         run: find . -ls
       - name: Rearrange
         run: |
-          (cd artifacts/moonfire-nvr-ui-${GITHUB_REF_NAME} && zip -r ../../moonfire-nvr-ui-${GITHUB_REF_NAME}.zip .)
-          (cd artifacts; for i in moonfire-nvr-*/moonfire-nvr; do mv $i "../$(dirname $i)"; done)
+          (cd artifacts/moonshadow-nvr-ui-${GITHUB_REF_NAME} && zip -r ../../moonshadow-nvr-ui-${GITHUB_REF_NAME}.zip .)
+          (cd artifacts; for i in moonshadow-nvr-*/moonshadow-nvr; do mv $i "../$(dirname $i)"; done)
       - name: ls after rearranging
         run: find . -ls
       - name: Upload Docker Manifest (ghcr.io)
@@ -154,4 +154,4 @@ jobs:
         with:
           body_path: artifacts/CHANGELOG-${{ github.ref_name }}/CHANGELOG-${{ github.ref_name }}.md
           files: |
-            moonfire-nvr-*
+            moonshadow-nvr-*

@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 /**
@@ -16,13 +16,12 @@
  * flexibility (yet).
  */
 
-import IconButton from "@mui/material/IconButton";
 import Snackbar, {
   SnackbarCloseReason,
   SnackbarProps,
 } from "@mui/material/Snackbar";
-import CloseIcon from "@mui/icons-material/Close";
 import React, { useContext } from "react";
+import { Alert, AlertProps } from "@mui/material";
 
 interface SnackbarProviderProps {
   /**
@@ -33,20 +32,23 @@ interface SnackbarProviderProps {
   children: React.ReactNode;
 }
 
-export interface MySnackbarProps extends Omit<
-  SnackbarProps,
-  | "key"
-  | "anchorOrigin"
-  | "open"
-  | "handleClosed"
-  | "TransitionProps"
-  | "actions"
-> {
+export interface MySnackbarProps
+  extends Omit<
+    SnackbarProps,
+    "key" |
+    "anchorOrigin" |
+    "open" |
+    "handleClosed" |
+    "TransitionProps" |
+    "message" |
+    "actions"
+  > {
   key?: React.Key;
+  message: string;
+  severity?: AlertProps["severity"];
 }
 
-type MySnackbarPropsWithRequiredKey = Omit<MySnackbarProps, "key"> &
-  Required<Pick<MySnackbarProps, "key">>;
+type MySnackbarPropsWithRequiredKey = Omit<MySnackbarProps, "key"> & Required<Pick<MySnackbarProps, "key">>;
 interface Enqueued extends MySnackbarPropsWithRequiredKey {
   open: boolean;
 }
@@ -167,17 +169,16 @@ export class SnackbarProvider
             TransitionProps={{
               onExited: () => this.handleSnackbarExited(first.key),
             }}
-            action={
-              <IconButton
-                size="small"
-                aria-label="close"
-                color="inherit"
-                onClick={() => this.close(first.key)}
-              >
-                <CloseIcon fontSize="small" />
-              </IconButton>
-            }
-          />
+          >
+            <Alert
+              onClose={() => this.close(first.key)}
+              severity={first.severity}
+              variant="filled"
+              sx={{ width: "100%" }}
+            >
+              {first.message}
+            </Alert>
+          </Snackbar>
         )}
       </ctx.Provider>
     );

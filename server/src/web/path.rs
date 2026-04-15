@@ -14,6 +14,8 @@ pub(super) enum Path {
     Request,                                          // "/api/request"
     InitSegment(i32, bool),                           // "/api/init/<id>.mp4{.txt}"
     Camera(Uuid),                                     // "/api/cameras/<uuid>/"
+    Cameras,
+    CamerasAutodetect,
     Signals,                                          // "/api/signals"
     StreamRecordings(Uuid, db::StreamType),           // "/api/cameras/<uuid>/<type>/recordings"
     StreamViewMp4(Uuid, db::StreamType, bool),        // "/api/cameras/<uuid>/<type>/view.mp4{.txt}"
@@ -24,6 +26,7 @@ pub(super) enum Path {
     Static,                                           // (anything that doesn't start with "/api/")
     Users,                                            // "/api/users"
     User(i32),                                        // "/api/users/<id>"
+    AiEvents,
     NotFound,
 }
 
@@ -40,6 +43,7 @@ impl Path {
             "logout" => return Path::Logout,
             "request" => return Path::Request,
             "signals" => return Path::Signals,
+            "ai/events" => return Path::AiEvents,
             _ => {}
         };
         if let Some(path) = path.strip_prefix("init/") {
@@ -55,6 +59,10 @@ impl Path {
                 return Path::InitSegment(id, debug);
             }
             Path::NotFound
+        } else if path == "cameras" {
+            Path::Cameras
+        } else if path == "cameras/autodetect" {
+            Path::CamerasAutodetect
         } else if let Some(path) = path.strip_prefix("cameras/") {
             let (uuid, path) = match path.split_once('/') {
                 Some(pair) => pair,

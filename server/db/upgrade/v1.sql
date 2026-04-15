@@ -1,8 +1,8 @@
--- This file is part of Moonfire NVR, a security camera network video recorder.
--- Copyright (C) 2016 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+-- This file is part of Moonshadow NVR, a security camera network video recorder.
+-- Copyright (C) 2016 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 -- SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.';
 
--- schema.sql: SQLite3 database schema for Moonfire NVR.
+-- schema.sql: SQLite3 database schema for Moonshadow NVR.
 -- See also design/schema.md.
 
 -- This table tracks the schema version.

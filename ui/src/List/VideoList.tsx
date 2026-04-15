@@ -1,11 +1,11 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import React from "react";
 import * as api from "../api";
 import { useSnackbars } from "../snackbars";
-import { Stream } from "../types";
+import { Stream, AiEvent } from "../types";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
 import TableRow, { TableRowProps } from "@mui/material/TableRow";
@@ -14,6 +14,9 @@ import Alert from "@mui/material/Alert";
 import Tooltip from "@mui/material/Tooltip";
 import ErrorIcon from "@mui/icons-material/Error";
 import Icon from "@mui/material/Icon";
+import Chip from "@mui/material/Chip";
+import PersonIcon from "@mui/icons-material/Person";
+import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
 
 interface Props {
   stream: Stream;
@@ -22,6 +25,7 @@ interface Props {
   trimStartAndEnd: boolean;
   setActiveRecording: (recording: [Stream, CombinedRecording] | null) => void;
   formatTime: (time90k: number) => string;
+  onAiEventsLoaded?: (events: AiEvent[]) => void;
 }
 
 /**
@@ -131,6 +135,7 @@ interface State {
   range90k: [number, number];
   split90k?: number;
   response: { status: "skeleton" } | api.FetchResult<CombinedRecording[]>;
+  aiEvents: AiEvent[];
 }
 
 interface RowProps extends TableRowProps {
@@ -141,6 +146,7 @@ interface RowProps extends TableRowProps {
   fps: React.ReactNode;
   storage: React.ReactNode;
   bitrate: React.ReactNode;
+  aiEvents?: AiEvent[];
 }
 
 const Row = ({
@@ -151,6 +157,7 @@ const Row = ({
   fps,
   storage,
   bitrate,
+  aiEvents,
   ...rest
 }: RowProps) => (
   <TableRow {...rest}>
@@ -176,7 +183,52 @@ const Row = ({
     <TableCell align="right" className="opt">
       {storage}
     </TableCell>
-    <TableCell align="right">{bitrate}</TableCell>
+    <TableCell align="right">
+      {bitrate}
+      {aiEvents && aiEvents.length > 0 && (
+        <div style={{ marginTop: "4px", display: "flex", gap: "2px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+          {aiEvents.map((event, idx) => (
+            <Tooltip
+              key={idx}
+              title={
+                event.type_ === "plate"
+                  ? `Plate: ${event.value}`
+                  : event.type_ === "person_reid"
+                  ? `Person: ${event.value}`
+                  : `${event.type_}: ${event.value}`
+              }
+            >
+              <Chip
+                size="small"
+                icon={
+                  event.type_ === "plate" ? (
+                    <DirectionsCarIcon fontSize="small" />
+                  ) : event.type_ === "person_reid" ? (
+                    <PersonIcon fontSize="small" />
+                  ) : undefined
+                }
+                label={
+                  event.type_ === "plate"
+                    ? event.value
+                    : event.type_ === "person_reid"
+                    ? event.value.replace("person_", "P")
+                    : event.type_
+                }
+                sx={{
+                  height: "20px",
+                  fontSize: "0.7rem",
+                  ...(event.type_ === "plate"
+                    ? { backgroundColor: "#e3f2fd", color: "#1565c0" }
+                    : event.type_ === "person_reid"
+                    ? { backgroundColor: "#fce4ec", color: "#c2185b" }
+                    : { backgroundColor: "#f3e5f5", color: "#7b1fa2" }),
+                }}
+              />
+            </Tooltip>
+          ))}
+        </div>
+      )}
+    </TableCell>
   </TableRow>
 );
 
@@ -199,6 +251,7 @@ const VideoList = ({
   trimStartAndEnd,
   setActiveRecording,
   formatTime,
+  onAiEventsLoaded,
 }: Props) => {
   const snackbars = useSnackbars();
   const [state, setState] = React.useState<State | null>(null);
@@ -221,6 +274,29 @@ const VideoList = ({
       if (response.status === "success") {
         // Sort recordings in descending order.
         response.response.recordings.sort((a, b) => b.startId - a.startId);
+
+        // Fetch AI events for this time range and camera.
+        let aiEvents: AiEvent[] = [];
+        try {
+          const aiReq: api.AiEventsRequest = {
+            cameraId: stream.camera.id,
+            startTime90k: range90k[0],
+            endTime90k: range90k[1],
+            limit: 500,
+          };
+          const aiResp = await api.aiEvents(aiReq, { signal });
+          if (aiResp.status === "success") {
+            aiEvents = aiResp.response.events;
+          }
+        } catch (e) {
+          // Ignore AI events fetch errors - recordings are still usable
+        }
+
+        // Notify parent about loaded events
+        if (onAiEventsLoaded) {
+          onAiEventsLoaded(aiEvents);
+        }
+
         setState({
           range90k,
           split90k,
@@ -228,14 +304,15 @@ const VideoList = ({
             status: "success",
             response: combine(split90k, response.response),
           },
+          aiEvents,
         });
       } else {
-        setState({ range90k, split90k, response });
+        setState({ range90k, split90k, response, aiEvents: [] });
       }
     };
     if (range90k !== null) {
       const timerId = setTimeout(
-        () => setState({ range90k, response: { status: "skeleton" } }),
+        () => setState({ range90k, response: { status: "skeleton" }, aiEvents: [] }),
         1000,
       );
       doFetch(abort.signal, timerId, range90k);
@@ -244,7 +321,7 @@ const VideoList = ({
         clearTimeout(timerId);
       };
     }
-  }, [range90k, split90k, snackbars, stream]);
+  }, [range90k, split90k, snackbars, stream, onAiEventsLoaded]);
 
   if (state === null) {
     return null;
@@ -272,6 +349,15 @@ const VideoList = ({
     );
   } else if (state.response.status === "success") {
     const resp = state.response.response;
+    const aiEvents = state.aiEvents;
+
+    // Helper to find AI events within a recording's time range
+    const findEventsForRecording = (startTime90k: number, endTime90k: number) => {
+      return aiEvents.filter(
+        (e) => e.time_90k >= startTime90k && e.time_90k < endTime90k
+      );
+    };
+
     body = resp.map((r: CombinedRecording) => {
       const durationSec = (r.endTime90k - r.startTime90k) / 90000;
       const rate = (r.sampleFileBytes / durationSec) * 0.000008;
@@ -281,6 +367,9 @@ const VideoList = ({
       const end = trimStartAndEnd
         ? Math.min(r.endTime90k, state.range90k[1])
         : r.endTime90k;
+
+      const recordingAiEvents = findEventsForRecording(r.startTime90k, r.endTime90k);
+
       return (
         <Row
           key={r.startId}
@@ -293,6 +382,7 @@ const VideoList = ({
           fps={frameRateFmt.format(r.videoSamples / durationSec)}
           storage={`${sizeFmt.format(r.sampleFileBytes / 1048576)} MiB`}
           bitrate={`${sizeFmt.format(rate)} Mbps`}
+          aiEvents={recordingAiEvents.length > 0 ? recordingAiEvents : undefined}
         />
       );
     });

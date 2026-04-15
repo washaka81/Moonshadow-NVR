@@ -1,10 +1,11 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Comparison of actual and expected on-disk schema.
-//! This is used as part of the `moonfire-nvr check` database integrity checking
-//! and for tests of `moonfire-nvr upgrade`.
+//! This is used as part of the `moonshadow-nvr check` database integrity checking
+//! and for tests of `moonshadow-nvr upgrade`.
 
 use base::Error;
 use rusqlite::params;

@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Session management: `/api/login` and `/api/logout`.
@@ -47,8 +47,8 @@ impl Service {
 
         // Use SameSite=Lax rather than SameSite=Strict. Safari apparently doesn't send
         // SameSite=Strict cookies on WebSocket upgrade requests. There's no real security
-        // difference for Moonfire NVR anyway. SameSite=Strict exists as CSRF protection for
-        // sites that (unlike Moonfire NVR) don't follow best practices by (a)
+        // difference for Moonshadow NVR anyway. SameSite=Strict exists as CSRF protection for
+        // sites that (unlike Moonshadow NVR) don't follow best practices by (a)
         // mutating based on GET requests and (b) not using CSRF tokens.
         use auth::SessionFlag;
         let flags = (SessionFlag::HttpOnly as i32)

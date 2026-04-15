@@ -1,13 +1,13 @@
-# Building Moonfire NVR <!-- omit in toc -->
+# Building Moonshadow NVR <!-- omit in toc -->
 
-This document has notes for software developers on building Moonfire NVR from
+This document has notes for software developers on building Moonshadow NVR from
 source code for development. If you just want to install precompiled
 binaries, see the [installation instructions](install.md) instead.
 
 This document doesn't spell out as many details as the installation
-instructions. Please ask on Moonfire NVR's [issue
-tracker](https://github.com/scottlamb/moonfire-nvr/issues) or
-[mailing list](https://groups.google.com/d/forum/moonfire-nvr-users) when
+instructions. Please ask on Moonshadow NVR's [issue
+tracker](https://github.com/scottlamb/moonshadow-nvr/issues) or
+[mailing list](https://groups.google.com/d/forum/moonshadow-nvr-users) when
 stuck. Please also send pull requests to improve this doc.
 
 * [Downloading](#downloading)
@@ -17,25 +17,25 @@ stuck. Please also send pull requests to improve this doc.
 
 ## Downloading
 
-See the [github page](https://github.com/scottlamb/moonfire-nvr) (in case
+See the [github page](https://github.com/scottlamb/moonshadow-nvr) (in case
 you're not reading this text there already). You can download the
 bleeding-edge version from the commandline via git:
 
 ```console
-$ git clone https://github.com/scottlamb/moonfire-nvr.git
-$ cd moonfire-nvr
+$ git clone https://github.com/scottlamb/moonshadow-nvr.git
+$ cd moonshadow-nvr
 ```
 
 ## Building
 
-Moonfire NVR should run natively on any Unix-like system. It's been tested on
+Moonshadow NVR should run natively on any Unix-like system. It's been tested on
 Linux, macOS, and FreeBSD. (In theory [Windows Subsystem for
 Linux](https://docs.microsoft.com/en-us/windows/wsl/about) should also work.
 Please speak up if you try it.)
 
 To build the server, you will need [SQLite3](https://www.sqlite.org/). You
 can skip this if compiling with `--features=rusqlite/bundled` and don't
-mind the `moonfire-nvr sql` command not working.
+mind the `moonshadow-nvr sql` command not working.
 
 To build the UI, you'll need a [nodejs](https://nodejs.org/en/download/) release
 in "Maintenance", "LTS", or "Current" status on the
@@ -74,13 +74,13 @@ your Linux distribution's Rust packages, which tend to be too old.
 (At least on Debian-based systems; Arch and Gentoo might be okay.)
 
 Once prerequisites are installed, you can build the server and find it in
-`target/release/moonfire-nvr`:
+`target/release/moonshadow-nvr`:
 
 ```console
 $ cd server
 $ cargo test
 $ cargo build --release
-$ sudo install -m 755 target/release/moonfire-nvr /usr/local/bin
+$ sudo install -m 755 target/release/moonshadow-nvr /usr/local/bin
 $ cd ..
 ```
 
@@ -90,9 +90,9 @@ You can build the UI via `pnpm` and find it in the `ui/build` directory:
 $ cd ui
 $ pnpm install
 $ pnpm run build
-$ sudo mkdir /usr/local/lib/moonfire-nvr
+$ sudo mkdir /usr/local/lib/moonshadow-nvr
 $ cd ..
-$ sudo rsync --recursive --delete --chmod=D755,F644 ui/dist/ /usr/local/lib/moonfire-nvr/ui
+$ sudo rsync --recursive --delete --chmod=D755,F644 ui/dist/ /usr/local/lib/moonshadow-nvr/ui
 ```
 
 For more information about using `pnpm`, check out the [Developing UI Guide](./developing-ui.md#requirements).
@@ -108,18 +108,18 @@ The author finds it convenient for local development to set up symlinks so that
 the binaries in the working copy will run via just `nvr`:
 
 ```console
-$ sudo mkdir /usr/local/lib/moonfire-nvr
-$ sudo ln -s `pwd`/ui/dist /usr/local/lib/moonfire-nvr/ui
-$ sudo mkdir /var/lib/moonfire-nvr
-$ sudo chown $USER: /var/lib/moonfire-nvr
-$ ln -s `pwd`/server/target/release/moonfire-nvr $HOME/bin/moonfire-nvr 
-$ ln -s moonfire-nvr $HOME/bin/nvr
+$ sudo mkdir /usr/local/lib/moonshadow-nvr
+$ sudo ln -s `pwd`/ui/dist /usr/local/lib/moonshadow-nvr/ui
+$ sudo mkdir /var/lib/moonshadow-nvr
+$ sudo chown $USER: /var/lib/moonshadow-nvr
+$ ln -s `pwd`/server/target/release/moonshadow-nvr $HOME/bin/moonshadow-nvr 
+$ ln -s moonshadow-nvr $HOME/bin/nvr
 $ nvr init
 $ nvr config
 $ nvr run
 ```
 
-(Alternatively, you could symlink to `target/debug/moonfire-nvr` and compile
+(Alternatively, you could symlink to `target/debug/moonshadow-nvr` and compile
 with `cargo build` rather than `cargo build --release`, for a faster build
 cycle and slower performance.)
 

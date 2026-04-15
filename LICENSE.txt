@@ -1,4 +1,4 @@
-Moonfire NVR is licensed under the GPLv3 (reproduced below). The
+Moonshadow NVR is licensed under the GPLv3 (reproduced below). The
 following additional permissions are granted under GNU GPL version 3 section 7:
 
 If you modify this Program, or any covered work, by linking or combining it

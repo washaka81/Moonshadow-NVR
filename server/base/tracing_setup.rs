@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2023 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2023 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Logic for setting up a `tracing` subscriber according to our preferences
@@ -115,11 +115,11 @@ fn panic_hook(p: &std::panic::PanicHookInfo) {
 pub fn install() {
     let filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
-        .with_env_var("MOONFIRE_LOG")
+        .with_env_var("MOONSHADOW_LOG")
         .from_env_lossy();
     tracing_log::LogTracer::init().unwrap();
 
-    match std::env::var("MOONFIRE_FORMAT") {
+    match std::env::var("MOONSHADOW_FORMAT") {
         Ok(s) if s == "systemd" => {
             let sub = tracing_subscriber::registry()
                 .with(
@@ -155,7 +155,7 @@ pub fn install() {
         }
     }
 
-    let use_panic_hook = ::std::env::var("MOONFIRE_PANIC_HOOK")
+    let use_panic_hook = ::std::env::var("MOONSHADOW_PANIC_HOOK")
         .map(|s| s != "false" && s != "0")
         .unwrap_or(true);
     if use_panic_hook {
@@ -166,7 +166,7 @@ pub fn install() {
 pub fn install_for_tests() {
     let filter = tracing_subscriber::EnvFilter::builder()
         .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
-        .with_env_var("MOONFIRE_LOG")
+        .with_env_var("MOONSHADOW_LOG")
         .from_env_lossy();
     tracing_log::LogTracer::init().unwrap();
     let sub = tracing_subscriber::registry()

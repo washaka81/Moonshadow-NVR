@@ -1,8 +1,8 @@
--- This file is part of Moonfire NVR, a security camera network video recorder.
--- Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+-- This file is part of Moonshadow NVR, a security camera network video recorder.
+-- Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 -- SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.';
 
--- schema.sql: SQLite3 database schema for Moonfire NVR.
+-- schema.sql: SQLite3 database schema for Moonshadow NVR.
 -- See also design/schema.md.
 
 -- Database metadata. There should be exactly one row in this table.
@@ -423,5 +423,15 @@ create table signal_change (
   changes blob not null
 );
 
+-- AI metadata for advanced detections (ReID and LPR).
+create table ai_metadata (
+  time_90k integer not null,
+  camera_id integer not null references camera (id),
+  type text not null, -- 'plate' or 'person_reid'
+  value text not null, -- License plate text or person ID
+  embedding blob, -- Vector for ReID
+  primary key (time_90k, camera_id, type)
+);
+
 insert into version (id, unix_time,                           notes)
-             values (7,  cast(strftime('%s', 'now') as int), 'db creation');
+             values (8,  cast(strftime('%s', 'now') as int), 'db creation');

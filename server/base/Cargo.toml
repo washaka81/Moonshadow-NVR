@@ -1,12 +1,13 @@
 [package]
-name = "moonfire-base"
+name = "moonshadow-base"
 version = "0.0.0"
-authors = ["Scott Lamb <slamb@slamb.org>"]
+authors = ["Washaka81 <washaka81@example.com>", "Fork: Moonshadow NVR"]
 readme = "../README.md"
 edition = "2021"
 license-file = "../../LICENSE.txt"
 publish = false
 rust-version = "1.91"
+description = "Moonshadow NVR base utilities (fork of Moonshadow NVR)"
 
 [features]
 mimalloc = ["dep:libmimalloc-sys"]

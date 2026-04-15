@@ -1,17 +1,17 @@
 # Troubleshooting <!-- omit in toc -->
 
-Here are some tips for diagnosing various problems with Moonfire NVR. Feel free
-to open an [issue](https://github.com/scottlamb/moonfire-nvr/issues) if you
+Here are some tips for diagnosing various problems with Moonshadow NVR. Feel free
+to open an [issue](https://github.com/scottlamb/moonshadow-nvr/issues) if you
 need more help.
 
-* [Viewing Moonfire NVR's logs](#viewing-moonfire-nvrs-logs)
+* [Viewing Moonshadow NVR's logs](#viewing-moonshadow-nvrs-logs)
     * [Flushes](#flushes)
     * [Panic errors](#panic-errors)
     * [Slow operations](#slow-operations)
     * [Camera stream errors](#camera-stream-errors)
 * [Problems](#problems)
     * [Docker setup](#docker-setup)
-        * [`"/etc/moonfire-nvr.toml" is a directory`](#etcmoonfire-nvrtoml-is-a-directory)
+        * [`"/etc/moonshadow-nvr.toml" is a directory`](#etcmoonshadow-nvrtoml-is-a-directory)
         * [`Error response from daemon: unable to find user UID: no matching entries in passwd file`](#error-response-from-daemon-unable-to-find-user-uid-no-matching-entries-in-passwd-file)
         * [`clock_gettime(CLOCK_MONOTONIC) failed: EPERM: Operation not permitted`](#clock_gettimeclock_monotonic-failed-eperm-operation-not-permitted)
         * [`VFS is unable to determine a suitable directory for temporary files`](#vfs-is-unable-to-determine-a-suitable-directory-for-temporary-files)
@@ -22,48 +22,48 @@ need more help.
         * [Database or filesystem corruption errors](#database-or-filesystem-corruption-errors)
         * [Incorrect timestamps](#incorrect-timestamps)
     * [Configuration interface problems](#configuration-interface-problems)
-        * [`moonfire-nvr config` displays garbage](#moonfire-nvr-config-displays-garbage)
+        * [`moonshadow-nvr config` displays garbage](#moonshadow-nvr-config-displays-garbage)
     * [Errors in kernel logs](#errors-in-kernel-logs)
         * [UAS errors](#uas-errors)
         * [Filesystem errors](#filesystem-errors)
 
-## Viewing Moonfire NVR's logs
+## Viewing Moonshadow NVR's logs
 
-While Moonfire NVR is running, logs will be written to stderr.
+While Moonshadow NVR is running, logs will be written to stderr.
 
 *   When running the configuration UI, you typically should redirect stderr
     to a text file to avoid poor interaction between the interactive stdout
     output and the logging. If you use the recommended
-    `moonfire-nvr config 2>debug-log` command, output will be in the
+    `moonshadow-nvr config 2>debug-log` command, output will be in the
     `debug-log` file.
 *   When running through systemd, stderr will be redirected to the journal.
-    Try `sudo journalctl --unit moonfire-nvr` to view the logs. You also
-    likely want to set `MOONFIRE_FORMAT=systemd` to format logs as
+    Try `sudo journalctl --unit moonshadow-nvr` to view the logs. You also
+    likely want to set `MOONSHADOW_FORMAT=systemd` to format logs as
     expected by systemd.
 
-*Note:* Moonfire's log format has recently changed significantly. You may
+*Note:* Moonshadow's log format has recently changed significantly. You may
 encounter the older format in the issue tracker or (despite best efforts)
 documentation that hasn't been updated.
 
 Logging options are controlled by environment variables:
 
-*   `MOONFIRE_LOG` controls the log level. Its format is similar to the
+*   `MOONSHADOW_LOG` controls the log level. Its format is similar to the
     `RUST_LOG` variable used by the
     [env-logger](http://rust-lang-nursery.github.io/log/env_logger/) crate.
-    `MOONFIRE_LOG=info` is the default.
-    `MOONFIRE_LOG=info,moonfire_nvr=debug` gives more detailed logging of the
-    `moonfire_nvr` crate itself.
-*   `MOONFIRE_FORMAT` selects an output format. It defaults to an output meant
+    `MOONSHADOW_LOG=info` is the default.
+    `MOONSHADOW_LOG=info,moonshadow_nvr=debug` gives more detailed logging of the
+    `moonshadow_nvr` crate itself.
+*   `MOONSHADOW_FORMAT` selects an output format. It defaults to an output meant
     for human consumption. It can be overridden to either of the following:
     *   `systemd` uses [sd-daemon logging prefixes](https://man7.org/linux/man-pages/man3/sd-daemon.3.html))
     *   `json` outputs one JSON-formatted log message per line, for machine
         consumption.
 *   Errors include a backtrace if `RUST_BACKTRACE=1` is set.
 
-With `MOONFIRE_FORMAT` left unset, log events look as follows:
+With `MOONSHADOW_FORMAT` left unset, log events look as follows:
 
 ```text
-2023-02-15T22:45:06.999329  INFO                   tokio-runtime-worker streamer{stream="courtyard-sub"}: moonfire_nvr::streamer: opening input url=rtsp://192.168.5.112/cam/realmonitor?channel=1&subtype=1&unicast=true&proto=Onvif
+2023-02-15T22:45:06.999329  INFO                   tokio-runtime-worker streamer{stream="courtyard-sub"}: moonshadow_nvr::streamer: opening input url=rtsp://192.168.5.112/cam/realmonitor?channel=1&subtype=1&unicast=true&proto=Onvif
 ```
 
 This example contains the following elements:
@@ -76,14 +76,14 @@ This example contains the following elements:
     context information for a group of messages. In this case there is a single
     span `streamer` with a single field `stream`. There can be multiple
     spans; they are listed starting from the root. Each may have fields.
-*   the target (`moonfire_nvr::streamer`), which generally corresponds to a Rust
+*   the target (`moonshadow_nvr::streamer`), which generally corresponds to a Rust
     module name.
 *   the log message (`opening input`), a human-readable string
 *   event fields (`url=...`)
 
-Moonfire NVR names a few important thread types as follows:
+Moonshadow NVR names a few important thread types as follows:
 
-*   `main`: during `moonfire-nvr run`, the main thread does initial setup then
+*   `main`: during `moonshadow-nvr run`, the main thread does initial setup then
     just waits for the other threads. In other subcommands, it does everything.
 *   `tokio-runtime-worker` (one per core, unless overridden with
     `--worker-threads`): these threads handle HTTP requests and read video
@@ -97,11 +97,11 @@ Below are some interesting log lines you may encounter.
 
 ### Flushes
 
-During normal operation, Moonfire NVR will periodically flush changes to its
+During normal operation, Moonshadow NVR will periodically flush changes to its
 SQLite3 database. Every flush is logged, as in the following info message:
 
 ```
-2021-03-08T23:14:18.388000 tokio-runtime-worker syncer{path=/media/14tb/sample}:flush{flush_count=2 reason="120 sec after start of 1 minute 14 seconds courtyard-main recording 3/1842086"}: moonfire_db::db: flush complete:
+2021-03-08T23:14:18.388000 tokio-runtime-worker syncer{path=/media/14tb/sample}:flush{flush_count=2 reason="120 sec after start of 1 minute 14 seconds courtyard-main recording 3/1842086"}: moonshadow_db::db: flush complete:
 /media/6tb/sample: added 98M 864K 842B in 8 recordings (4/1839795, 7/1503516, 6/1853939, 1/1838087, 2/1852096, 12/1516945, 8/1514942, 10/1506111), deleted 111M 435K 587B in 5 (4/1801170, 4/1801171, 6/1799708, 1/1801528, 2/1815572), GCed 9 recordings (6/1799707, 7/1376577, 4/1801168, 1/1801527, 4/1801167, 4/1801169, 10/1243252, 2/1815571, 12/1418785).
 /media/14tb/sample: added 8M 364K 643B in 3 recordings (3/1842086, 9/1505359, 11/1516695), deleted 0B in 0 (), GCed 0 recordings ().
 ```
@@ -109,7 +109,7 @@ SQLite3 database. Every flush is logged, as in the following info message:
 This log message is packed with debugging information:
 
 *   the date and time: `2021-03-08T23:14:18.388`.
-*   a flush count: `3810`. This is handy for checking how often Moonfire NVR
+*   a flush count: `3810`. This is handy for checking how often Moonshadow NVR
     is flushing.
 *   a reason for the flush: `120 sec after start of 1 minute 14 seconds courtyard-main recording 3/1842086`.
     This was a regular periodic flush at the `flush_if_sec` for the stream,
@@ -145,16 +145,16 @@ This log message is packed with debugging information:
 
 ### Panic errors
 
-Errors like the one below indicate a serious bug in Moonfire NVR. Please
+Errors like the one below indicate a serious bug in Moonshadow NVR. Please
 file a bug if you see one. It's helpful to set the `RUST_BACKTRACE`
 environment variable to include more information.
 
 ```
-2021-03-04T11:09:29.230291 ERROR tokio-runtime-worker streamer{stream="peck_west-main"}: panic: should always be an unindexed sample location=src/moonfire-nvr/server/db/writer.rs:750:54 backtrace=...
+2021-03-04T11:09:29.230291 ERROR tokio-runtime-worker streamer{stream="peck_west-main"}: panic: should always be an unindexed sample location=src/moonshadow-nvr/server/db/writer.rs:750:54 backtrace=...
 ```
 
 In this case, a streamer task panicked. That stream won't record again until
-Moonfire NVR is restarted.
+Moonshadow NVR is restarted.
 
 ### Slow operations
 
@@ -165,23 +165,23 @@ It's normal to see these warnings on startup and occasionally while running.
 Frequent occurrences may indicate a performance problem.
 
 ```
-2020-11-29T12:01:21.128725 WARN tokio-runtime-worker streamer{stream="driveway-main"}: moonfire_base::clock: opening rtsp://admin:redacted@192.168.5.108/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif took PT2.070715796S!
-2020-11-29T12:32:15.870658 WARN tokio-runtime-worker streamer{stream="west_side-sub"}: moonfire_base::clock: getting next packet took PT10.158121387S!
-2020-12-28T12:09:29.050464 WARN tokio-runtime-worker streamer{stream="s-back_east-sub"}: moonfire_base::clock: database lock acquisition took PT8.122452
-2020-12-28T21:22:32.012811 WARN main moonfire_base::clock: database operation took PT39.526386958S!
-2020-12-28T21:27:11.402259 WARN tokio-runtime-worker streamer{stream="s-driveway-sub"}: moonfire_base::clock: writing 37 bytes took PT20.701894190S!
+2020-11-29T12:01:21.128725 WARN tokio-runtime-worker streamer{stream="driveway-main"}: moonshadow_base::clock: opening rtsp://admin:redacted@192.168.5.108/cam/realmonitor?channel=1&subtype=0&unicast=true&proto=Onvif took PT2.070715796S!
+2020-11-29T12:32:15.870658 WARN tokio-runtime-worker streamer{stream="west_side-sub"}: moonshadow_base::clock: getting next packet took PT10.158121387S!
+2020-12-28T12:09:29.050464 WARN tokio-runtime-worker streamer{stream="s-back_east-sub"}: moonshadow_base::clock: database lock acquisition took PT8.122452
+2020-12-28T21:22:32.012811 WARN main moonshadow_base::clock: database operation took PT39.526386958S!
+2020-12-28T21:27:11.402259 WARN tokio-runtime-worker streamer{stream="s-driveway-sub"}: moonshadow_base::clock: writing 37 bytes took PT20.701894190S!
 ```
 
 ### Camera stream errors
 
 Warnings like the following indicate that a camera stream was lost due to some
-error and Moonfire NVR will try reconnecting shortly. `Stream ended` might
-happen when the camera is rebooting or if Moonfire is not consuming packets
+error and Moonshadow NVR will try reconnecting shortly. `Stream ended` might
+happen when the camera is rebooting or if Moonshadow is not consuming packets
 quickly enough. In the latter case, you'll likely see a
 `getting next packet took PT...S!` message as described above.
 
 ```
-2021-03-09T00:28:55.527078 WARN tokio-runtime-worker streamer{stream="courtyard-sub"}: moonfire_nvr::streamer: sleeping for PT1S after error: Stream ended
+2021-03-09T00:28:55.527078 WARN tokio-runtime-worker streamer{stream="courtyard-sub"}: moonshadow_nvr::streamer: sleeping for PT1S after error: Stream ended
 (set environment variable RUST_BACKTRACE=1 to see backtraces)
 ```
 
@@ -192,10 +192,10 @@ quickly enough. In the latter case, you'll likely see a
 If you are using the Docker compose snippet mentioned in the
 [install instructions](install.md), you might run into a few unique problems.
 
-#### `"/etc/moonfire-nvr.toml" is a directory`
+#### `"/etc/moonshadow-nvr.toml" is a directory`
 
 If you try running the Docker container with its
-`/etc/moonfire-nvr.toml:/etc/moonfire-nvr.toml:ro` mount before creating the
+`/etc/moonshadow-nvr.toml:/etc/moonshadow-nvr.toml:ro` mount before creating the
 config file, Docker will "helpfully" create it as a directory. Shut down
 the Docker container, remove the directory, create the config file,
 and try again.
@@ -205,11 +205,11 @@ and try again.
 If Docker produces this error, look at this section of the docker compose setup:
 
 ```yaml
-    # Edit this to match your `moonfire-nvr` user.
+    # Edit this to match your `moonshadow-nvr` user.
     # Note that Docker will not honor names from the host here, even if
     # `/etc/passwd` is passed through.
     # - Be sure to run the `useradd` command below first.
-    # - Then run `echo $(id -u moonfire-nvr):$(id -g moonfire-nvr)` to see
+    # - Then run `echo $(id -u moonshadow-nvr):$(id -g moonshadow-nvr)` to see
     #   what should be filled in here.
     user: UID:GID
 ```
@@ -223,7 +223,7 @@ problem in more detail. The simplest solution is to uncomment
 the `- seccomp: unconfined` line in your Docker compose file.
 
 ```console
-$ sudo docker compose run --rm moonfire-nvr --version
+$ sudo docker compose run --rm moonshadow-nvr --version
 clock_gettime(CLOCK_MONOTONIC) failed: EPERM: Operation not permitted
 
 This indicates a broken environment. See the troubleshooting guide.
@@ -231,13 +231,13 @@ This indicates a broken environment. See the troubleshooting guide.
 
 #### `VFS is unable to determine a suitable directory for temporary files`
 
-Moonfire NVR's database internally uses SQLite, which creates
+Moonshadow NVR's database internally uses SQLite, which creates
 [various temporary files](https://www.sqlite.org/tempfiles.html). If it can't
 find a path that exists and is writable by the current user, it will produce
 errors such as the following:
 
 ```
-2023-12-29T16:16:47.795330  WARN           sync-1 syncer{path=/media/nvr/sample}: moonfire_db::writer: flush failure on save for reason 120 sec after start of 59 seconds driveway-sub recording 10/1222348; will retry after PT60S: UNAVAILABLE
+2023-12-29T16:16:47.795330  WARN           sync-1 syncer{path=/media/nvr/sample}: moonshadow_db::writer: flush failure on save for reason 120 sec after start of 59 seconds driveway-sub recording 10/1222348; will retry after PT60S: UNAVAILABLE
 caused by: disk I/O error
 caused by: Error code 6410: VFS is unable to determine a suitable directory for temporary files
 ```
@@ -249,55 +249,55 @@ container in your Docker compose file.
 
 #### `unable to get IANA time zone name; check your $TZ, /etc/localtime, and /usr/share/zoneinfo/`
 
-Moonfire NVR loads the system time zone via the logic described at
+Moonshadow NVR loads the system time zone via the logic described at
 [`jiff::tz::TimeZone::system`](https://docs.rs/jiff/0.1.8/jiff/tz/struct.TimeZone.html#method.system)
 and expects to be able to get the IANA zone name.
 
 * On most systems, this just works because `/etc/localtime` is a symlink to a file in `/usr/share/zoneinfo/`,
-  and Moonfire learns the IANA zone name from the filename.
-* If `/etc/localtime` is an actual zone file rather than a symlink to one, Moonfire will fail
+  and Moonshadow learns the IANA zone name from the filename.
+* If `/etc/localtime` is an actual zone file rather than a symlink to one, Moonshadow will fail
   with this error, because zone files don't contain their own name.
 * You can override the zone by setting `TZ` to the name of your time zone, e.g. `TZ=America/Los_Angeles`.
-* Moonfire's Docker images don't contain a time zone database. If you are using Docker,
+* Moonshadow's Docker images don't contain a time zone database. If you are using Docker,
   mount `/usr/share/zoneinfo` from the host.
 
 #### `Error: pts not monotonically increasing; got 26615520 then 26539470`
 
-If your streams cut out and you see error messages like this one in Moonfire
+If your streams cut out and you see error messages like this one in Moonshadow
 NVR logs, it might mean that your camera outputs [B
 frames](https://en.wikipedia.org/wiki/Video_compression_picture_types#Bi-directional_predicted_.28B.29_frames.2Fslices_.28macroblocks.29).
-If you believe this is the case, file a feature request; Moonfire NVR
+If you believe this is the case, file a feature request; Moonshadow NVR
 currently doesn't support B frames. You may be able to configure your camera
 to disable B frames in the meantime.
 
 #### Out of disk space
 
-If Moonfire NVR runs out of disk space on a sample file directory, recording
+If Moonshadow NVR runs out of disk space on a sample file directory, recording
 will be stuck and you'll see log messages like the following:
 
 ```
-2021-04-01T11:21:07.365 WARN s-driveway-main streamer{stream="s-driveway-main"}: moonfire_base::clock: sleeping for PT1S after error: No space left on device (os error 28)
+2021-04-01T11:21:07.365 WARN s-driveway-main streamer{stream="s-driveway-main"}: moonshadow_base::clock: sleeping for PT1S after error: No space left on device (os error 28)
 ```
 
 If something else used more disk space on the filesystem than planned, just
-clean up the excess files. Moonfire NVR will start working again immediately.
+clean up the excess files. Moonshadow NVR will start working again immediately.
 
-If Moonfire NVR's own files are too large, follow this procedure:
+If Moonshadow NVR's own files are too large, follow this procedure:
 
 1.  Shut it down.
     ```console
-    $ sudo killall moonfire-nvr
+    $ sudo killall moonshadow-nvr
     ```
 2.  Reconfigure it use less disk space. See [Completing configuration through
     the UI](install.md#completing-configuration-through-the-ui) in the
     installation guide. Pay attention to the note about slack space.
-3.  Start Moonfire NVR again. It will clean up the excess disk files on
+3.  Start Moonshadow NVR again. It will clean up the excess disk files on
     startup and should run properly.
 
 #### Database or filesystem corruption errors
 
 It's helpful to check out your system's overall health when diagnosing
-this kind of problem with Moonfire NVR.
+this kind of problem with Moonshadow NVR.
 
 1.  Look at your kernel logs. On most Linux systems, you can browse them via
     `journalctl`, `dmesg`, or `less /var/log/messages`. See [Errors in kernel
@@ -322,19 +322,19 @@ this kind of problem with Moonfire NVR.
     startup via the `fsck.mode=force` kernel parameter, as documented
     [here](https://www.freedesktop.org/software/systemd/man/systemd-fsck@.service.html).
 
-    If you have hard drives dedicated to Moonfire NVR, you can also shut down
-    Moonfire NVR, unmount the filesystem, and run `fsck` on them without
+    If you have hard drives dedicated to Moonshadow NVR, you can also shut down
+    Moonshadow NVR, unmount the filesystem, and run `fsck` on them without
     rebooting.
 
-After the system as a whole is verified healthy, run `moonfire-nvr check` while
-Moonfire NVR is stopped to verify integrity of the SQLite database and sample
+After the system as a whole is verified healthy, run `moonshadow-nvr check` while
+Moonshadow NVR is stopped to verify integrity of the SQLite database and sample
 file directories.
 
 #### Incorrect timestamps
 
-Moonfire NVR uses the system clock when a run of recordings starts to determine
+Moonshadow NVR uses the system clock when a run of recordings starts to determine
 the run's initial timestamp. If the system clock is stepped after the run
-starts, Moonfire NVR will keep using timestamps based on the old (usually
+starts, Moonshadow NVR will keep using timestamps based on the old (usually
 incorrect) setting.
 
 This is most noticeable on the Raspberry Pi or other cheap SBCs which don't
@@ -344,9 +344,9 @@ few hours behind on startup following a power outage. You may notice in
 `journalctl` logs messages similar to the following when the clock is fixed:
 
 ```
-Aug 14 21:05:51 moonfire moonfire-nvr[710]: Aug 14 21:05:51.538 INFO reserved 590d892d-b2e8-4e6c-9e1b-c4418d0abd69
-Aug 14 22:37:39 moonfire systemd[1]: Time has been changed
-Aug 14 22:38:48 moonfire moonfire-nvr[710]: Aug 14 22:38:48.965 INFO Committing extra transaction because there's no cached uuid
+Aug 14 21:05:51 moonshadow moonshadow-nvr[710]: Aug 14 21:05:51.538 INFO reserved 590d892d-b2e8-4e6c-9e1b-c4418d0abd69
+Aug 14 22:37:39 moonshadow systemd[1]: Time has been changed
+Aug 14 22:38:48 moonshadow moonshadow-nvr[710]: Aug 14 22:38:48.965 INFO Committing extra transaction because there's no cached uuid
 ```
 
 Note the 1.5-hour gap between messages; this is roughly how much the clock was
@@ -361,19 +361,19 @@ Jul 13 10:05:52 pi4 systemd-timesyncd[340]: Synchronized to time server for the 
 
 Here's what you can do:
 
-*   *recover*: restart Moonfire NVR to pick up the new timestamp.
+*   *recover*: restart Moonshadow NVR to pick up the new timestamp.
 *   *prevent*: add a RTC module or fresh battery so your clock is correct
     at boot time. There's a
-    [guide](https://github.com/scottlamb/moonfire-nvr/wiki/System-setup#realtime-clock-on-raspberry-pi)
+    [guide](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup#realtime-clock-on-raspberry-pi)
     on the wiki.
 
-Currently Moonfire NVR doesn't have any logic to detect this happening or
+Currently Moonshadow NVR doesn't have any logic to detect this happening or
 mechanism to fix old timestamps after the fact. Ideas and help welcome; see
-[issue #9](https://github.com/scottlamb/moonfire-nvr/issues/9).
+[issue #9](https://github.com/scottlamb/moonshadow-nvr/issues/9).
 
 ### Configuration interface problems
 
-#### `moonfire-nvr config` displays garbage
+#### `moonshadow-nvr config` displays garbage
 
 This may happen if your machine is configured to a non-UTF-8 locale, due to
 gyscos/Cursive#13. As a workaround, try setting the environment variable
@@ -385,9 +385,9 @@ gyscos/Cursive#13. As a workaround, try setting the environment variable
 
 Some cheap USB SATA adapters don't appear to work reliably in UAS mode under
 Linux. If you see errors like the following, try [disabling
-UAS](https://github.com/scottlamb/moonfire-nvr/wiki/System-setup#disable-uas).
+UAS](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup#disable-uas).
 Unfortunately your filesystem is likely to have corruption, so after disabling UAS,
-run a `fsck` and then `moonfire-nvr check` to try recovering.
+run a `fsck` and then `moonshadow-nvr check` to try recovering.
 
 ```
 Sep 22 17:26:01 nuc kernel: sd 4:0:0:1: [sdb] tag#2 uas_eh_abort_handler 0 uas-tag 3 inflight: CMD OUT
@@ -398,7 +398,7 @@ Sep 22 17:26:01 nuc kernel: sd 4:0:0:1: [sdb] tag#2 CDB: Write(16) 8a 00 00 00 0
 
 Errors that mention `EXT4-fs` (or your filesystem of choice) likely indicate
 filesystem corruption. Run `fsck` to fix as described above. Once the
-corruption is addressed, use `moonfire-nvr check` to survey the damage to
+corruption is addressed, use `moonshadow-nvr check` to survey the damage to
 your database.
 
 ```

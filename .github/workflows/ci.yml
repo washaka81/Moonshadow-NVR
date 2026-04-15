@@ -7,7 +7,7 @@ defaults:
 
 env:
   CARGO_TERM_COLOR: always
-  MOONFIRE_COLOR: always
+  MOONSHADOW_COLOR: always
   RUST_BACKTRACE: 1
 
 jobs:
@@ -26,7 +26,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v6
         with:
-          # `git describe` output gets baked into the binary for `moonfire-nvr --version`.
+          # `git describe` output gets baked into the binary for `moonshadow-nvr --version`.
           # Fetch all revs so it can see tag history.
           fetch-depth: 0
           filter: "tree:0"

@@ -1,8 +1,9 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 pub mod accept;
+mod ai_events;
 mod live;
 mod path;
 mod session;
@@ -239,7 +240,33 @@ impl Service {
                 CacheControl::PrivateDynamic,
                 self.request(&req, &authreq, caller)?,
             ),
-            Path::Camera(uuid) => (CacheControl::PrivateDynamic, self.camera(&req, uuid)?),
+            Path::Camera(uuid) => match *req.method() {
+                http::Method::GET => (CacheControl::PrivateDynamic, self.camera(&req, uuid)?),
+                http::Method::PATCH => (
+                    CacheControl::PrivateDynamic,
+                    self.patch_camera(req, caller, uuid).await?,
+                ),
+                http::Method::DELETE => (
+                    CacheControl::PrivateDynamic,
+                    self.delete_camera(req, caller, uuid).await?,
+                ),
+                _ => bail!(InvalidArgument, msg("method not allowed")),
+            },
+            Path::Cameras => match *req.method() {
+                http::Method::GET => (CacheControl::PrivateDynamic, self.top_level(&req, caller)?),
+                http::Method::POST => (
+                    CacheControl::PrivateDynamic,
+                    self.post_camera(req, caller).await?,
+                ),
+                _ => bail!(InvalidArgument, msg("method not allowed")),
+            },
+            Path::CamerasAutodetect => match *req.method() {
+                http::Method::POST => (
+                    CacheControl::PrivateDynamic,
+                    self.autodetect_camera(req, caller).await?,
+                ),
+                _ => bail!(InvalidArgument, msg("method not allowed")),
+            },
             Path::StreamRecordings(uuid, type_) => (
                 CacheControl::PrivateDynamic,
                 self.stream_recordings(&req, uuid, type_)?,
@@ -256,6 +283,10 @@ impl Service {
                 unreachable!("StreamLiveMp4Segments should have already been handled")
             }
             Path::NotFound => bail!(NotFound, msg("path not understood")),
+            Path::AiEvents => (
+                CacheControl::PrivateDynamic,
+                ai_events::ai_events(req, caller, self.db.clone()).await?,
+            ),
             Path::Login => (
                 CacheControl::PrivateDynamic,
                 self.login(req, authreq).await?,
@@ -414,6 +445,216 @@ impl Service {
         )
     }
 
+    async fn post_camera(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+    ) -> ResponseResult {
+        if !caller.permissions.read_camera_configs {
+            bail!(PermissionDenied, msg("read_camera_configs required"));
+        }
+        let (_, body) = into_json_body(req).await?;
+        let req: json::PostCamera = parse_json_body(&body)?;
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let mut db = self.db.lock();
+        let dir_id = db
+            .sample_file_dirs_by_id()
+            .keys()
+            .next()
+            .copied()
+            .ok_or_else(|| err!(FailedPrecondition, msg("no sample file directories defined")))?;
+
+        let change = self.camera_subset_to_change(req.camera, dir_id);
+        db.add_camera(change)?;
+        Ok(plain_response(StatusCode::NO_CONTENT, ""))
+    }
+
+    async fn patch_camera(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+        uuid: Uuid,
+    ) -> ResponseResult {
+        if !caller.permissions.read_camera_configs {
+            bail!(PermissionDenied, msg("read_camera_configs required"));
+        }
+        let (_, body) = into_json_body(req).await?;
+        let req: json::PatchCamera = parse_json_body(&body)?;
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let mut db = self.db.lock();
+        let camera_id = db
+            .get_camera(uuid)
+            .ok_or_else(|| err!(NotFound, msg("no such camera {uuid}")))?
+            .id;
+        let dir_id = db
+            .sample_file_dirs_by_id()
+            .keys()
+            .next()
+            .copied()
+            .ok_or_else(|| err!(FailedPrecondition, msg("no sample file directories defined")))?;
+
+        let change = self.camera_subset_to_change(req.update, dir_id);
+        db.update_camera(camera_id, change)?;
+        Ok(plain_response(StatusCode::NO_CONTENT, ""))
+    }
+
+    async fn delete_camera(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+        uuid: Uuid,
+    ) -> ResponseResult {
+        if !caller.permissions.read_camera_configs {
+            bail!(PermissionDenied, msg("read_camera_configs required"));
+        }
+        // For DELETE, we might not have a body, but we might want CSRF in query or headers.
+        // But our standard is JSON body with CSRF.
+        let (_, body) = into_json_body(req).await?;
+        let req: json::DeleteUser = parse_json_body(&body)?; // Reuse DeleteUser for CSRF
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let mut db = self.db.lock();
+        let camera_id = db
+            .get_camera(uuid)
+            .ok_or_else(|| err!(NotFound, msg("no such camera {uuid}")))?
+            .id;
+        db.delete_camera(camera_id)?;
+        Ok(plain_response(StatusCode::NO_CONTENT, ""))
+    }
+
+    async fn autodetect_camera(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+    ) -> ResponseResult {
+        if !caller.permissions.read_camera_configs {
+            bail!(PermissionDenied, msg("read_camera_configs required"));
+        }
+        let (_, body) = into_json_body(req).await?;
+        let req: json::AutodetectRequest = parse_json_body(&body)?;
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let mut main_url = None;
+        let mut sub_url = None;
+        
+        let auth_str = match (&req.username, &req.password) {
+            (Some(u), Some(p)) if !u.is_empty() => format!("{}:{}@", u, p),
+            _ => String::new(),
+        };
+
+        // First check if port 554 is open
+        let addr = format!("{}:554", req.ip);
+        let port_open = match tokio::time::timeout(
+            std::time::Duration::from_secs(2),
+            tokio::net::TcpStream::connect(&addr)
+        ).await {
+            Ok(Ok(_)) => true,
+            _ => false,
+        };
+
+        if port_open {
+            let paths_main = [
+                "/stream1",
+                "/live",
+                "/cam/realmonitor?channel=1&subtype=0",
+                "/Streaming/Channels/101",
+                "/11",
+                "/",
+            ];
+            let paths_sub = [
+                "/stream2",
+                "/live/sub",
+                "/cam/realmonitor?channel=1&subtype=1",
+                "/Streaming/Channels/102",
+                "/12",
+            ];
+
+            for path in paths_main {
+                let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
+                if let Ok(url) = url::Url::parse(&url_str) {
+                    if let Ok(Ok(_)) = tokio::time::timeout(
+                        std::time::Duration::from_secs(1),
+                        retina::client::Session::describe(url, retina::client::SessionOptions::default())
+                    ).await {
+                        main_url = Some(url_str.replace(&auth_str, "")); // Return without auth in string, UI adds it to the config
+                        break;
+                    }
+                }
+            }
+
+            for path in paths_sub {
+                let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
+                if let Ok(url) = url::Url::parse(&url_str) {
+                    if let Ok(Ok(_)) = tokio::time::timeout(
+                        std::time::Duration::from_secs(1),
+                        retina::client::Session::describe(url, retina::client::SessionOptions::default())
+                    ).await {
+                        sub_url = Some(url_str.replace(&auth_str, ""));
+                        break;
+                    }
+                }
+            }
+        }
+        
+        // Fallbacks if nothing detected or port closed
+        if main_url.is_none() {
+            main_url = Some(format!("rtsp://{}:554/stream1", req.ip));
+        }
+        if sub_url.is_none() {
+            sub_url = Some(format!("rtsp://{}:554/stream2", req.ip));
+        }
+
+        let resp = json::AutodetectResponse {
+            main_url,
+            sub_url,
+        };
+
+        serve_json(
+            &http::Request::new(()),
+            &resp,
+        )
+    }
+
+    fn camera_subset_to_change(&self, c: json::CameraSubset, dir_id: i32) -> db::CameraChange {
+        let mut streams = [
+            db::StreamChange::default(),
+            db::StreamChange::default(),
+            db::StreamChange::default(),
+        ];
+        for (i, s) in c.streams.into_iter().enumerate() {
+            if i >= db::stream::NUM_STREAM_TYPES {
+                break;
+            }
+            streams[i] = db::StreamChange {
+                sample_file_dir_id: if s.enabled { Some(dir_id) } else { None },
+                config: db::json::StreamConfig {
+                    mode: if s.enabled {
+                        db::json::STREAM_MODE_RECORD.into()
+                    } else {
+                        "".into()
+                    },
+                    url: s.url.and_then(|u| url::Url::parse(&u).ok()),
+                    rtsp_transport: s.rtsp_transport,
+                    retain_bytes: s.retain_bytes,
+                    ..Default::default()
+                },
+            };
+        }
+        db::CameraChange {
+            short_name: c.short_name,
+            config: db::json::CameraConfig {
+                description: c.description,
+                onvif_base_url: c.onvif_base_url.and_then(|u| url::Url::parse(&u).ok()),
+                username: c.username,
+                password: c.password,
+                ..Default::default()
+            },
+            streams,
+        }
+    }
+
     fn stream_recordings(
         &self,
         req: &Request<::hyper::body::Incoming>,
@@ -566,7 +807,7 @@ impl Service {
     }
 
     /// Returns true iff the client is connected over `https`.
-    /// Moonfire NVR currently doesn't directly serve `https`, but it supports
+    /// Moonshadow NVR currently doesn't directly serve `https`, but it supports
     /// proxies which set the `X-Forwarded-Proto` header. See `guide/secure.md`
     /// for more information.
     fn is_secure(&self, hdrs: &http::HeaderMap) -> bool {
@@ -581,7 +822,7 @@ impl Service {
     ///
     /// If there's no session,
     /// 1.  if connected via Unix domain socket from the same effective uid
-    ///     as Moonfire NVR itself, return with all privileges.
+    ///     as Moonshadow NVR itself, return with all privileges.
     /// 2.  if `allow_unauthenticated_permissions` is configured, returns okay
     ///     with those permissions.
     /// 3.  if the caller specifies `unauth_path`, returns okay with no

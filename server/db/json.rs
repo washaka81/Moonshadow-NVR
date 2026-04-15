@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! JSON types for use in the database schema. See references from `schema.sql`.
@@ -294,7 +294,7 @@ pub struct UserConfig {
     /// If set, a Unix UID that is accepted for authentication when using HTTP over
     /// a Unix domain socket.
     ///
-    /// (Additionally, the UID running Moonfire NVR can authenticate as anyone;
+    /// (Additionally, the UID running Moonshadow NVR can authenticate as anyone;
     /// there's no point in trying to do otherwise.) This might be an easy
     /// bootstrap method once configuration happens through a web UI rather than
     /// text UI.

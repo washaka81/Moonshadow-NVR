@@ -1,8 +1,9 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2022 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2022 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Runtime configuration file (`/etc/moonfire-nvr.toml`).
+//! Runtime configuration file (`/etc/moonshadow-nvr.toml`).
 //! See `ref/config.md` for more description.
 
 use std::path::PathBuf;
@@ -24,7 +25,7 @@ pub struct ConfigFile {
 
     /// Directory holding the SQLite3 index database.
     ///
-    /// default: `/var/lib/moonfire-nvr/db`.
+    /// default: `/var/lib/moonshadow-nvr/db`.
     #[serde(default = "default_db_dir")]
     pub db_dir: PathBuf,
 
@@ -55,7 +56,7 @@ impl Default for UiDir {
 
     #[cfg(not(feature = "bundled-ui"))]
     fn default() -> Self {
-        UiDir::FromFilesystem("/usr/local/lib/moonfire-nvr/ui".into())
+        UiDir::FromFilesystem("/usr/local/lib/moonshadow-nvr/ui".into())
     }
 }
 
@@ -93,7 +94,7 @@ pub struct BindConfig {
     #[serde(default)]
     pub trust_forward_headers: bool,
 
-    /// On Unix-domain sockets, treat clients with the Moonfire NVR server's own
+    /// On Unix-domain sockets, treat clients with the Moonshadow NVR server's own
     /// effective UID as privileged.
     #[serde(default)]
     pub own_uid_is_privileged: bool,
@@ -109,7 +110,7 @@ pub enum AddressConfig {
     /// IPv6 address such as `[::]:8080` or `[::1]:8080`.
     Ipv6(std::net::SocketAddrV6),
 
-    /// Unix socket path such as `/var/lib/moonfire-nvr/sock`.
+    /// Unix socket path such as `/var/lib/moonshadow-nvr/sock`.
     Unix(PathBuf),
 
     /// `systemd` socket activation.

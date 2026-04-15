@@ -1,11 +1,10 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2023 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2023 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import viteCompression from "vite-plugin-compression";
-import viteLegacyPlugin from "@vitejs/plugin-legacy";
 
 const target = process.env.PROXY_TARGET ?? "http://localhost:8080/";
 
@@ -14,22 +13,19 @@ export default defineConfig({
   plugins: [
     react(),
     viteCompression(),
-    viteLegacyPlugin({
-      targets: ["defaults", "fully supports es6-module"],
-    }),
   ],
   server: {
     proxy: {
       "/api": {
         target,
 
-        // Moonfire NVR needs WebSocket connections for live connections (and
+        // Moonshadow NVR needs WebSocket connections for live connections (and
         // likely more in the future:
-        // <https://github.com/scottlamb/moonfire-nvr/issues/40>.)
+        // <https://github.com/scottlamb/moonshadow-nvr/issues/40>.)
         ws: true,
         changeOrigin: true,
 
-        // If the backing host is https, Moonfire NVR will set a `secure`
+        // If the backing host is https, Moonshadow NVR will set a `secure`
         // attribute on cookie responses, so that the browser will only send
         // them over https connections. This is a good security practice, but
         // it means a non-https development proxy server won't work. Strip out

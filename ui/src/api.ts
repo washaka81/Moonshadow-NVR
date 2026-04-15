@@ -1,9 +1,9 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 /**
- * @file Convenience wrapper around the Moonfire NVR API layer.
+ * @file Convenience wrapper around the Moonshadow NVR API layer.
  *
  * See <tt>ref/api.md</tt> for a description of the API. Some of the
  * documentation is copied into the docstrings here for convenience, but
@@ -13,9 +13,9 @@
  * This seems convenient for ensuring the caller handles all possibilities.
  */
 
-import { Camera, Session, Stream } from "./types";
+import { Camera, Session, Stream, AiEvent } from "./types";
 
-export type StreamType = "main" | "sub";
+export type StreamType = "main" | "sub" | "ext";
 
 export interface FetchSuccess<T> {
   status: "success";
@@ -348,7 +348,7 @@ export interface Recording {
   growing?: boolean;
 
   /**
-   * Each time Moonfire NVR starts in read-write mode, it is assigned an
+   * Each time Moonshadow NVR starts in read-write mode, it is assigned an
    * increasing "open id". This field is the open id as of when these
    * recordings were written. This can be used to disambiguate ids referring to
    * uncommitted recordings.
@@ -483,5 +483,123 @@ export function recordingUrl(
   return withQuery(`/api/cameras/${cameraUuid}/${stream}/view.mp4`, {
     s,
     ts: timestampTrack,
+  });
+}
+
+export interface AiEventsRequest {
+  type?: string;
+  cameraId?: number;
+  startTime90k?: number;
+  endTime90k?: number;
+  limit?: number;
+}
+
+export interface AiEventsResponse {
+  events: AiEvent[];
+}
+
+export async function aiEvents(req: AiEventsRequest, init: RequestInit) {
+  const url = withQuery(`/api/ai/events`, req);
+  return await json<AiEventsResponse>(url, init);
+}
+
+export interface CameraSubset {
+  shortName: string;
+  description: string;
+  onvifBaseUrl?: string;
+  username: string;
+  password: string;
+  streams: StreamSubset[];
+}
+
+export interface StreamSubset {
+  enabled: boolean;
+  url?: string;
+  rtspTransport: string;
+  retainBytes: number;
+}
+
+export interface PostCameraRequest {
+  csrf?: string;
+  camera: CameraSubset;
+}
+
+/** Creates a camera. */
+export async function postCamera(req: PostCameraRequest, init: RequestInit) {
+  return await myfetch("/api/cameras/", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
+  });
+}
+
+export interface PatchCameraRequest {
+  csrf?: string;
+  update: CameraSubset;
+}
+
+/** Updates a camera. */
+export async function patchCamera(
+  uuid: string,
+  req: PatchCameraRequest,
+  init: RequestInit,
+) {
+  return await myfetch(`/api/cameras/${uuid}`, {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
+  });
+}
+
+export interface DeleteCameraRequest {
+  csrf?: string;
+}
+
+/** Deletes a camera. */
+export async function deleteCamera(
+  uuid: string,
+  req: DeleteCameraRequest,
+  init: RequestInit,
+) {
+  return await myfetch(`/api/cameras/${uuid}`, {
+    method: "DELETE",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
+  });
+}
+
+export interface AutodetectRequest {
+  csrf?: string;
+  ip: string;
+  username?: string;
+  password?: string;
+}
+
+export interface AutodetectResponse {
+  mainUrl?: string;
+  subUrl?: string;
+}
+
+/** Autodetects camera stream URLs. */
+export async function autodetectCamera(
+  req: AutodetectRequest,
+  init: RequestInit,
+) {
+  return await json<AutodetectResponse>("/api/cameras/autodetect", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
   });
 }

@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 /**
@@ -29,6 +29,8 @@ import LiveActivity from "./Live";
 import UsersActivity from "./Users";
 import ChangePassword from "./ChangePassword";
 import Header from "./components/Header";
+import AiEventsActivity from "./AiEvents";
+import CamerasActivity from "./Cameras";
 
 export type LoginState =
   | "unknown"
@@ -180,6 +182,17 @@ function App() {
         path="users"
         element={
           <UsersActivity Frame={Frame} csrf={toplevel!.user?.session?.csrf} />
+        }
+      />
+      <Route path="ai-events" element={<AiEventsActivity Frame={Frame} />} />
+      <Route
+        path="cameras"
+        element={
+          <CamerasActivity
+            toplevel={toplevel}
+            Frame={Frame}
+            refetch={needNewFetch}
+          />
         }
       />
       <Route path="*" element={<Navigate to="/" replace />} />

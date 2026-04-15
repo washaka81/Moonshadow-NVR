@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use crate::stream;
@@ -22,6 +22,7 @@ where
     pub opener: &'a dyn stream::Opener,
     pub sample_entries: db::sample_entries::Handle,
     pub shutdown_rx: base::shutdown::Receiver,
+    pub detection_tx: Option<tokio::sync::mpsc::Sender<(Vec<u8>, i32, i64, Arc<db::Stream>)>>,
 }
 
 /// Connects to a given RTSP stream and writes recordings to the database via [`writer::Writer`].
@@ -39,6 +40,7 @@ pub struct Streamer<'a, C: Clocks + Clone> {
     url: Url,
     username: String,
     password: String,
+    camera_id: i32,
 }
 
 impl<'a, C: Clocks + Clone> Streamer<'a, C> {
@@ -87,6 +89,7 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
             url: url.clone(),
             username: c.config.username.clone(),
             password: c.config.password.clone(),
+            camera_id: c.id,
         })
     }
 
@@ -238,6 +241,16 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
                     self.rotate_interval_sec
                 }
             };
+            if frame.is_key {
+                if let Some(tx) = &self.env.detection_tx {
+                    let _ = tx.try_send((
+                        frame.data.clone(),
+                        self.camera_id,
+                        local_time.0,
+                        self.stream.clone(),
+                    ));
+                }
+            }
             w.write(
                 frame.data,
                 local_time,
@@ -428,6 +441,7 @@ mod tests {
             clocks,
             opener: &opener,
             shutdown_rx,
+            detection_tx: None,
         };
         let mut stream;
         let pool;

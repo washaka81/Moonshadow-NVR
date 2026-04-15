@@ -24,8 +24,8 @@ A clear and concise description of what you expected to happen.
 If applicable, add screenshots to help explain your problem.
 
 **Server (please complete the following information):**
-  - `moonfire-nvr --version`
-  - Attach a [log file](https://github.com/scottlamb/moonfire-nvr/blob/master/guide/troubleshooting.md#viewing-moonfire-nvrs-logs). Run with the `RUST_BACKTRACE=1` environment variable set if possible.
+  - `moonshadow-nvr --version`
+  - Attach a [log file](https://github.com/scottlamb/moonshadow-nvr/blob/master/guide/troubleshooting.md#viewing-moonshadow-nvrs-logs). Run with the `RUST_BACKTRACE=1` environment variable set if possible.
 
 **Camera (please complete the following information):**
   - Camera manufacturer and model: [e.g. Reolink RLC-410]

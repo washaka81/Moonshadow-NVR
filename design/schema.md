@@ -1,8 +1,8 @@
-# Moonfire NVR Storage Schema <!-- omit in toc -->
+# Moonshadow NVR Storage Schema <!-- omit in toc -->
 
 Status: **current**.
 
-This is the initial design for the most fundamental parts of the Moonfire NVR
+This is the initial design for the most fundamental parts of the Moonshadow NVR
 storage schema. See also [guide/schema.md](../guide/schema.md) for more
 administrator-focused documentation.
 
@@ -77,7 +77,7 @@ older camera models (which provided raw video or JPEG-encoded frames) because
 the encoding is prohibitively expensive in multi-camera setups.
 [libx264][libx264] supports "encoding 4 or more 1080p streams in realtime on a
 single consumer-level computer", but this does not apply to the low-cost devices
-Moonfire NVR targets. In fact, even decoding can be expensive on the
+Moonshadow NVR targets. In fact, even decoding can be expensive on the
 full-quality streams, enough to challenge the feasibility of on-NVR motion
 detection. It's valuable to have the "sub" stream for this purpose.
 
@@ -140,7 +140,7 @@ disk time fraction <= (seek rate) / (50 seeks/sec) +
 
 ## Overview
 
-Moonfire NVR divides video streams into 1-minute recordings. These boundaries
+Moonshadow NVR divides video streams into 1-minute recordings. These boundaries
 are invisible to the user. On playback, the UI moves from one recording to
 another seamlessly. When exporting video, recordings are automatically spliced
 together.
@@ -165,7 +165,7 @@ Each recording is stored in two places:
 Putting the metadata on flash means metadata operations can be fast
 (sub-millisecond random access, with parallelism) and do not take precious
 disk time fraction away from accessing sample data. Disk time can be saved for
-long sequential accesses. Assuming filesystem metadata is cached, Moonfire NVR
+long sequential accesses. Assuming filesystem metadata is cached, Moonshadow NVR
 can seek directly to the correct sample.
 
 To avoid a burst of seeks every minute, rotation times will be staggered. For
@@ -191,7 +191,7 @@ several reasons for this decision:
 *   No user administration required. SQLite3, unlike its heavier-weight friends
     MySQL and PostgreSQL, can be completely internal to the application. In
     many applications, end users are unaware of the existence of a RDBMS, and
-    Moonfire NVR should be no exception.
+    Moonshadow NVR should be no exception.
 *   Correctness. It's relatively easy to make guarantees about the state of an
     ACID database, and SQLite3 in particular has a robust implementation.
     (See [Files Are Hard][file-consistency].)
@@ -421,7 +421,7 @@ Precondition: database open read-write.
 ### Lifecycle of a recording
 
 Because a major part of the recording state is outside the SQL database, care
-must be taken to guarantee consistency and durability. Moonfire NVR maintains
+must be taken to guarantee consistency and durability. Moonshadow NVR maintains
 three invariants about sample files:
 
 1.  `recording` table rows have sample files on disk with the indicated size
@@ -431,7 +431,7 @@ three invariants about sample files:
     *   It has a `garbage` table row.
     *   Its recording id is greater than or equal to the `cum_recordings`
         for its stream.
-3.  After an orderly shutdown of Moonfire NVR, there is a `recording` table row
+3.  After an orderly shutdown of Moonshadow NVR, there is a `recording` table row
     for every sample file, even if there have been previous crashes.
 
 The first invariant provides certainty that a recording is properly stored. It
@@ -465,7 +465,7 @@ These invariants are updated through the following procedure:
 
 *Startup (crash recovery):*
 
-1.   Acquire a lock to guarantee this is the only Moonfire NVR process running
+1.   Acquire a lock to guarantee this is the only Moonshadow NVR process running
      against the given database. This lock is not released until program shutdown.
 2.   Query `garbage` table and `cum_recordings` field in the `stream` table.
 3.   `unlink()` all the sample files associated with garbage rows, ignoring
@@ -481,7 +481,7 @@ simultaneously. In particular, there is no need to hurry syncing deletions to
 disk, so deletion steps #3 and #4 can be done opportunistically if it's
 desirable to avoid extra disk seeks or flash write cycles.
 
-It'd also be possible to conserve some partial recordings. Moonfire NVR could,
+It'd also be possible to conserve some partial recordings. Moonshadow NVR could,
 as a recording is written, record the latest sample tables,
 size, and hash fields without marking the recording as fully written. On
 startup, the file would be truncated to match and then the recording marked
@@ -697,7 +697,7 @@ to store metadata and the simple, consistent format of sample indexes.
 [seeker]: http://www.linuxinsight.com/how_fast_is_your_disk.html
 [rfc-3551]: https://tools.ietf.org/html/rfc3551
 [hikvision-sr]: http://www.cctvforum.com/viewtopic.php?f=19&t=44534
-[iso-14496-12]: https://github.com/scottlamb/moonfire-nvr/wiki/Standards-and-specifications#multimedia-container-formats
+[iso-14496-12]: https://github.com/scottlamb/moonshadow-nvr/wiki/Standards-and-specifications#multimedia-container-formats
 [sqlite3]: https://www.sqlite.org/
 [sqlite3-wal]: https://www.sqlite.org/wal.html
 [file-consistency]: http://danluu.com/file-consistency/

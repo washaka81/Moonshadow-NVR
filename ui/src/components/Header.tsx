@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import AppBar from "@mui/material/AppBar";
@@ -11,9 +11,10 @@ import ListItemText from "@mui/material/ListItemText";
 import ListIcon from "@mui/icons-material/List";
 import PeopleIcon from "@mui/icons-material/People";
 import Videocam from "@mui/icons-material/Videocam";
+import AssessmentIcon from "@mui/icons-material/Assessment";
 import * as api from "../api";
 
-import MoonfireMenu from "../AppMenu";
+import MoonshadowMenu from "../AppMenu";
 import { useReducer } from "react";
 import { LoginState } from "../App";
 import { Link } from "react-router";
@@ -38,7 +39,7 @@ export default function Header({
   return (
     <>
       <AppBar position="sticky">
-        <MoonfireMenu
+        <MoonshadowMenu
           loginState={loginState}
           requestLogin={() => {
             setLoginState("user-requested-login");
@@ -80,6 +81,30 @@ export default function Header({
             </ListItemIcon>
             <ListItemText primary="Live view (experimental)" />
           </ListItemButton>
+          <ListItemButton
+            key="ai-events"
+            onClick={toggleShowMenu}
+            component={Link}
+            to="/ai-events"
+          >
+            <ListItemIcon>
+              <AssessmentIcon />
+            </ListItemIcon>
+            <ListItemText primary="AI Events" />
+          </ListItemButton>
+          {toplevel?.permissions.readCameraConfigs && (
+            <ListItemButton
+              key="cameras"
+              onClick={toggleShowMenu}
+              component={Link}
+              to="/cameras"
+            >
+              <ListItemIcon>
+                <Videocam />
+              </ListItemIcon>
+              <ListItemText primary="Cameras" />
+            </ListItemButton>
+          )}
           {toplevel?.permissions.adminUsers && (
             <ListItemButton
               key="users"

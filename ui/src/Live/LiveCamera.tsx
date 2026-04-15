@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 import React, { ReactNode } from "react";
@@ -137,7 +137,7 @@ class LiveCameraDriver {
         <span>
           see{" "}
           <a
-            href="https://github.com/scottlamb/moonfire-nvr/issues/119"
+            href="https://github.com/scottlamb/moonshadow-nvr/issues/119"
             target="_blank"
             rel="noopener noreferrer"
           >
@@ -145,7 +145,7 @@ class LiveCameraDriver {
           </a>{" "}
           and{" "}
           <a
-            href="https://github.com/scottlamb/moonfire-nvr/issues/120"
+            href="https://github.com/scottlamb/moonshadow-nvr/issues/120"
             target="_blank"
             rel="noopener noreferrer"
           >

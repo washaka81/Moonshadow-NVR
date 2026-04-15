@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Common code for WebSockets, including the live view WebSocket and a future
@@ -120,7 +120,7 @@ mod tests {
 
     #[test]
     fn origin_port_8080_okay() {
-        // By default, Moonfire binds to port 8080. Make sure that specifying a port number works.
+        // By default, Moonshadow binds to port 8080. Make sure that specifying a port number works.
         let mut hdrs = header::HeaderMap::new();
         hdrs.insert(header::HOST, "nvr:8080".try_into().unwrap());
         hdrs.insert(header::ORIGIN, "http://nvr:8080/".try_into().unwrap());

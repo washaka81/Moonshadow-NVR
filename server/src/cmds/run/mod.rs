@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2022 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2022 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use crate::streamer;
@@ -30,18 +31,75 @@ use self::config::ConfigFile;
 
 pub mod config;
 
+/// AI operation mode for intelligent surveillance.
+#[derive(Bpaf, Debug, Clone, Copy)]
+pub enum AiMode {
+    /// Disable all AI processing.
+    Off,
+    /// Low resource usage: process 1 frame every 30 seconds.
+    Low,
+    /// Balanced: process 1 frame every 8 seconds (default).
+    Medium,
+    /// High performance: process 1 frame every 2 seconds.
+    High,
+    /// Automatically detect hardware capabilities and choose optimal mode.
+    Auto,
+}
+
+impl std::str::FromStr for AiMode {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s.to_lowercase().as_str() {
+            "off" => Ok(AiMode::Off),
+            "low" => Ok(AiMode::Low),
+            "medium" => Ok(AiMode::Medium),
+            "high" => Ok(AiMode::High),
+            "auto" => Ok(AiMode::Auto),
+            _ => Err(format!(
+                "Invalid AI mode: '{}'. Valid modes: off, low, medium, high, auto",
+                s
+            )),
+        }
+    }
+}
+
 /// Runs the server, saving recordings and allowing web access.
 #[derive(Bpaf, Debug)]
 #[bpaf(command("run"))]
 pub struct Args {
     /// Path to configuration file. See `ref/config.md` for config file documentation.
-    #[bpaf(short, long, argument("PATH"), fallback("/etc/moonfire-nvr.toml".into()), debug_fallback)]
+    #[bpaf(short, long, argument("PATH"), fallback("/etc/moonshadow-nvr.toml".into()), debug_fallback)]
     config: PathBuf,
 
     /// Opens the database in read-only mode and disables recording.
     /// Note this is incompatible with session authentication; consider adding
     /// a bind with `allowUnauthenticatedPermissions` to your config.
     read_only: bool,
+
+    /// Path to YOLOv8 ONNX model for human and vehicle detection.
+    #[bpaf(long, argument("PATH"))]
+    model: Option<PathBuf>,
+
+    /// Path to OSNet ONNX model for person re-identification.
+    #[bpaf(long, argument("PATH"))]
+    reid_model: Option<PathBuf>,
+
+    /// Path to LPRNet ONNX model for license plate recognition.
+    #[bpaf(long, argument("PATH"))]
+    lpr_model: Option<PathBuf>,
+
+    /// AI processing mode for intelligent surveillance.
+    #[bpaf(long("ai-mode"), argument("MODE"), fallback(AiMode::Medium))]
+    ai_mode: AiMode,
+
+    /// Enable hardware acceleration (OpenVINO) if available.
+    #[bpaf(long("hardware-acceleration"), argument("BOOL"), fallback(true))]
+    hardware_acceleration: bool,
+
+    /// Automatically optimize settings for detected hardware capabilities.
+    #[bpaf(long("optimize-for-device"), argument("BOOL"), fallback(true))]
+    optimize_for_device: bool,
 }
 
 struct Flusher {
@@ -120,7 +178,7 @@ pub fn run(args: Args) -> Result<i32, Error> {
         builder.worker_threads(worker_threads);
     }
     let rt = builder.build()?;
-    let r = rt.block_on(async_run(args.read_only, &config));
+    let r = rt.block_on(async_run(args, &config));
 
     // tokio normally waits for all spawned tasks to complete, but:
     // * in the graceful shutdown path, we wait for specific tasks with logging.
@@ -130,7 +188,7 @@ pub fn run(args: Args) -> Result<i32, Error> {
     r
 }
 
-async fn async_run(read_only: bool, config: &ConfigFile) -> Result<i32, Error> {
+async fn async_run(args: Args, config: &ConfigFile) -> Result<i32, Error> {
     let (shutdown_tx, shutdown_rx) = base::shutdown::channel();
     let mut shutdown_tx = Some(shutdown_tx);
 
@@ -138,7 +196,7 @@ async fn async_run(read_only: bool, config: &ConfigFile) -> Result<i32, Error> {
         let int = signal(SignalKind::interrupt())?;
         let term = signal(SignalKind::terminate())?;
         let quit = signal(SignalKind::quit())?;
-        let inner = inner(read_only, config, shutdown_rx);
+        let inner = inner(args.read_only, config, args.model, args.reid_model, args.lpr_model, args.ai_mode, args.hardware_acceleration, args.optimize_for_device, shutdown_rx);
     }
 
     tokio::select! {
@@ -247,6 +305,12 @@ fn make_listener(
 async fn inner(
     read_only: bool,
     config: &ConfigFile,
+    model_path: Option<PathBuf>,
+    reid_model_path: Option<PathBuf>,
+    lpr_model_path: Option<PathBuf>,
+    ai_mode: AiMode,
+    hardware_acceleration: bool,
+    optimize_for_device: bool,
     shutdown_rx: base::shutdown::Receiver,
 ) -> Result<i32, Error> {
     let clocks = clock::RealClocks {};
@@ -280,6 +344,28 @@ async fn inner(
     db::lifecycle::initial_rotation(&db).await?;
     info!("Initial rotation is complete.");
 
+    let mut detection_tx = None;
+    if let Some(path) = model_path {
+        let detector = Arc::new(crate::detector::Detector::new(
+            &path,
+            reid_model_path.as_deref(),
+            lpr_model_path.as_deref(),
+            ai_mode,
+            hardware_acceleration,
+            optimize_for_device,
+        )?);
+        let (tx, rx) = tokio::sync::mpsc::channel(10);
+        detection_tx = Some(tx);
+        let worker = crate::detector::DetectionWorker::new(detector, rx, db.clocks());
+        let db_clone = db.clone();
+        tokio::task::Builder::new()
+            .name("detection-worker")
+            .spawn(async move {
+                worker.run(db_clone).await;
+            })
+            .expect("spawn should succeed");
+    }
+
     let zone = base::time::global_zone();
     let Some(time_zone_name) = zone.iana_name() else {
         bail!(
@@ -301,6 +387,7 @@ async fn inner(
             sample_entries: l.sample_entries().clone(),
             opener: &crate::stream::OPENER,
             shutdown_rx: shutdown_rx.clone(),
+            detection_tx,
         }));
         let streams = l.streams_by_id().len();
         for (i, (_id, stream)) in l.streams_by_id().iter().enumerate() {

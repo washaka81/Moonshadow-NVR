@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2016 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2016 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use base::{err, Error};
@@ -33,7 +33,7 @@ fn open_dir(db_dir: &Path, mode: OpenMode) -> Result<db::fs::Dir, Error> {
             err!(
                 NotFound,
                 msg(
-                    "db dir {} not found; try running moonfire-nvr init",
+                    "db dir {} not found; try running moonshadow-nvr init",
                     db_dir.display(),
                 ),
             )
@@ -83,7 +83,7 @@ fn open_conn(db_dir: &Path, mode: OpenMode) -> Result<(db::fs::Dir, rusqlite::Co
         // `rusqlite::Connection` is not Sync, so there's no reason to tell SQLite3 to use the
         // serialized threading mode.
         rusqlite::OpenFlags::SQLITE_OPEN_NO_MUTEX,
-        // In read/write mode, Moonfire holds a directory lock for its entire operation, as
+        // In read/write mode, Moonshadow holds a directory lock for its entire operation, as
         // described above. There's then no point in SQLite releasing its lock after each
         // transaction and reacquiring it, or in using shared memory for the wal-index.
         // See the following page: <https://www.sqlite.org/vfs.html>
@@ -102,7 +102,7 @@ mod tests {
     #[test]
     fn open_dir_error_msg() {
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-nvr-test")
+            .prefix("moonshadow-nvr-test")
             .tempdir()
             .unwrap();
         let mut nonexistent_dir = tmpdir.path().to_path_buf();
@@ -111,7 +111,7 @@ mod tests {
         assert!(
             nonexistent_open
                 .to_string()
-                .contains("try running moonfire-nvr init"),
+                .contains("try running moonshadow-nvr init"),
             "unexpected error {}",
             &nonexistent_open
         );
@@ -120,7 +120,7 @@ mod tests {
     #[test]
     fn create_dir_error_msg() {
         let tmpdir = tempfile::Builder::new()
-            .prefix("moonfire-nvr-test")
+            .prefix("moonshadow-nvr-test")
             .tempdir()
             .unwrap();
         let mut nonexistent_dir = tmpdir.path().to_path_buf();

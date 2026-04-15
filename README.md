@@ -1,11 +1,11 @@
-[![CI](https://github.com/scottlamb/moonfire-nvr/workflows/CI/badge.svg)](https://github.com/scottlamb/moonfire-nvr/actions?query=workflow%3ACI)
+[![CI](https://github.com/scottlamb/moonshadow-nvr/workflows/CI/badge.svg)](https://github.com/scottlamb/moonshadow-nvr/actions?query=workflow%3ACI)
 
 * [Introduction](#introduction)
 * [Documentation](#documentation)
 
 # Introduction
 
-Moonfire NVR is an open-source security camera network video recorder, started
+Moonshadow NVR is an open-source security camera network video recorder, started
 by Scott Lamb &lt;<slamb@slamb.org>&gt;. It saves H.264-over-RTSP streams from
 IP cameras to disk into a hybrid format: video frames in a directory on
 spinning disk, other data in a SQLite3 database on flash. It can construct
@@ -35,7 +35,7 @@ There's no support yet for motion detection, no https/TLS support (you'll
 need a proxy server, as described [here](guide/secure.md)), and only a
 console-based (rather than web-based) configuration UI.
 
-Moonfire NVR is pre-1.0, with will be no compatibility guarantees:
+Moonshadow NVR is pre-1.0, with will be no compatibility guarantees:
 configuration and storage formats may change from version to version. There is
 an [upgrade procedure](guide/schema.md) but it is not for the faint of heart.
 
@@ -57,6 +57,16 @@ could use to make this possible:
 *   taking advantage of on-camera analytics. They're often not as accurate, but
     they're the best way to stretch very inexpensive NVR machines.
 
+## AI Capabilities
+
+Moonshadow NVR extends Moonshadow NVR with intelligent surveillance features:
+
+*   **Person Re-Identification (ReID)**: Uses OSNet models to recognize individuals across camera streams.
+*   **License Plate Recognition (LPR)**: Integrated LPRNet model for Chinese plates; can be fine‑tuned for Chilean plates. See `models/` for details and conversion scripts.
+*   **Configurable AI Modes**: Off, Low (30s), Medium (8s), High (2s), and Auto modes.
+*   **Hardware Acceleration**: Support for OpenVINO (planned) and Tract ONNX backends.
+*   **Smart Sampling**: Processes frames based on AI mode to balance CPU usage and detection accuracy.
+
 # Documentation
 
 *   [Contributing](CONTRIBUTING.md)
@@ -68,12 +78,12 @@ could use to make this possible:
 *   [Guides](guide/), including:
     *   [Installing](guide/install.md)
     *   [Building from source](guide/build.md)
-    *   [Securing Moonfire NVR and exposing it to the Internet](guide/secure.md)
+    *   [Securing Moonshadow NVR and exposing it to the Internet](guide/secure.md)
     *   [UI Development](guide/developing-ui.md)
     *   [Troubleshooting](guide/troubleshooting.md)
 *   [References](ref/), including:
     *   [Configuration file](ref/config.md)
     *   [JSON API](ref/api.md)
 *   [Design documents](design/)
-*   [Wiki](https://github.com/scottlamb/moonfire-nvr/wiki) has hardware
+*   [Wiki](https://github.com/scottlamb/moonshadow-nvr/wiki) has hardware
     recommendations, notes on several camera models, etc. Please add more!

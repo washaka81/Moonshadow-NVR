@@ -1,8 +1,8 @@
--- This file is part of Moonfire NVR, a security camera network video recorder.
--- Copyright (C) 2016 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+-- This file is part of Moonshadow NVR, a security camera network video recorder.
+-- Copyright (C) 2016 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 -- SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.';
 
--- schema.sql: SQLite3 database schema for Moonfire NVR.
+-- schema.sql: SQLite3 database schema for Moonshadow NVR.
 -- See also design/schema.md.
 
 -- Database metadata. There should be exactly one row in this table.
@@ -85,7 +85,7 @@ create table stream (
   sample_file_dir_id integer references sample_file_dir (id),
   type text not null check (type in ('main', 'sub')),
 
-  -- If record is true, the stream should start recording when moonfire
+  -- If record is true, the stream should start recording when moonshadow
   -- starts. If false, no new recordings will be made, but old recordings
   -- will not be deleted.
   record integer not null check (record in (1, 0)),
@@ -299,7 +299,7 @@ create table user (
   password_failure_count integer not null default 0,
 
   -- If set, a Unix UID that is accepted for authentication when using HTTP over
-  -- a Unix domain socket. (Additionally, the UID running Moonfire NVR can authenticate
+  -- a Unix domain socket. (Additionally, the UID running Moonshadow NVR can authenticate
   -- as anyone; there's no point in trying to do otherwise.) This might be an easy
   -- bootstrap method once configuration happens through a web UI rather than text UI.
   unix_uid integer

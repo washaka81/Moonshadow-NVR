@@ -1,10 +1,10 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 //! HTTP body implementation using `ARefss<'static, [u8]>` chunks.
 //!
-//! Moonfire NVR uses this custom chunk type rather than [bytes::Bytes]. This
+//! Moonshadow NVR uses this custom chunk type rather than [bytes::Bytes]. This
 //! is mostly for historical reasons: we used to use `mmap`-backed chunks.
 //! The custom chunk type also helps minimize reference-counting in `mp4::File`
 //! as described [here](https://github.com/tokio-rs/bytes/issues/359#issuecomment-640812016),

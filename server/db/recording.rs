@@ -1,5 +1,6 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2020 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+// Fork of Moonshadow NVR. Copyright (C) 2020 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
+// Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 //! Building and reading recordings via understanding of their sample indexes.
@@ -188,7 +189,7 @@ impl SampleIndexEncoder {
 
 /// A segment represents a view of some or all of a single recording.
 /// This struct is not specific to a container format; for `.mp4`s, it's wrapped in a
-/// `moonfire_nvr::mp4::Segment`. Other container/transport formats could be
+/// `moonshadow_nvr::mp4::Segment`. Other container/transport formats could be
 /// supported in a similar manner.
 #[derive(Debug)]
 pub struct Segment {

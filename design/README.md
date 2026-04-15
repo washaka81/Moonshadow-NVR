@@ -1,2 +1,2 @@
 Design documents and [Architectural Decision Records](https://adr.github.io/)
-for Moonfire NVR. Meant for developers.
+for Moonshadow NVR. Meant for developers.

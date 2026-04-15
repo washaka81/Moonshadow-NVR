@@ -1,5 +1,5 @@
-// This file is part of Moonfire NVR, a security camera network video recorder.
-// Copyright (C) 2021 The Moonfire NVR Authors; see AUTHORS and LICENSE.txt.
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
 use base::FastHashMap;
@@ -269,7 +269,7 @@ fn copy_cameras(tx: &rusqlite::Transaction) -> Result<(), Error> {
             onvif_base_url: onvif_host
                 // Older releases set the onvif host to the empty string instead
                 // of using a SQL NULL, so convert empty to None here.
-                // https://github.com/scottlamb/moonfire-nvr/issues/182
+                // https://github.com/scottlamb/moonshadow-nvr/issues/182
                 .filter(|h| !h.is_empty())
                 .map(|h| Url::parse(&format!("http://{h}/")))
                 .transpose()

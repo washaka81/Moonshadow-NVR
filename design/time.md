@@ -1,4 +1,4 @@
-# Moonfire NVR Time Handling <!-- omit in toc -->
+# Moonshadow NVR Time Handling <!-- omit in toc -->
 
 Status: **current**.
 
@@ -22,7 +22,7 @@ Status: **current**.
 
 ## Objective
 
-Maximize the likelihood Moonfire NVR's timestamps are useful.
+Maximize the likelihood Moonshadow NVR's timestamps are useful.
 
 The timestamp corresponding to a video frame should roughly match timestamps
 from other sources:
@@ -87,11 +87,11 @@ and [More falsehoods programmers believe about time; "wisdom of the crowd"
 edition](http://infiniteundo.com/post/25509354022/more-falsehoods-programmers-believe-about-time)
 give a taste of the problems encountered. These problems are found even in
 datacenters with expensive, well-tested hardware and relatively reliable
-network connections. Moonfire NVR is meant to run on an inexpensive
+network connections. Moonshadow NVR is meant to run on an inexpensive
 single-board computer and record video from budget, closed-source cameras,
 so such problems are to be expected.
 
-Moonfire NVR typically has access to the following sources of time
+Moonshadow NVR typically has access to the following sources of time
 information:
 
 *   the local `CLOCK_REALTIME`. Ideally this is maintained by `ntpd`:
@@ -100,7 +100,7 @@ information:
     if the network is unavailable on startup. In the worst case, the system
     has no real-time clock or no battery and a network connection is
     unavailable. The time is far in the past on startup and is never
-    corrected or is corrected via a step while Moonfire NVR is running.
+    corrected or is corrected via a step while Moonshadow NVR is running.
 *   the local `CLOCK_MONOTONIC`. This should be frequency-corrected by `ntpd`
     and guaranteed to never experience "steps", though its reference point is
     unspecified.
@@ -141,7 +141,7 @@ RTP doesn't transmit the duration of each video frame; it must be calculated
 from the timestamp of the following frame. This means that if a stream is
 terminated, the final frame has unknown duration.
 
-As described in [schema.md](schema.md), Moonfire NVR saves RTSP video streams
+As described in [schema.md](schema.md), Moonshadow NVR saves RTSP video streams
 into roughly one-minute *recordings,* with a fixed rotation offset after the
 minute in the NVR's wall time.
 
@@ -150,7 +150,7 @@ are italicized on first use.
 
 ## Overview
 
-Moonfire NVR will use the RTP timestamps to calculate video frames' durations,
+Moonshadow NVR will use the RTP timestamps to calculate video frames' durations,
 relying on the camera's clock for the *media duration* of frames and
 recordings. In the first recording in a *run*, it will use these durations
 and the NVR's wall clock time to establish the start time of the run. In
@@ -161,7 +161,7 @@ accurate.
 
 ## Detailed design
 
-On every frame of video, Moonfire NVR will get a timestamp from
+On every frame of video, Moonshadow NVR will get a timestamp from
 `CLOCK_MONOTONIC`. On the first frame, it will additionally get a timestamp
 from `CLOCK_REALTIME` and compute the difference. It uses these to compute a
 monotonically increasing real time of receipt for every frame, called the
@@ -199,7 +199,7 @@ durations of the samples they contain.
 
 Over a long run, the start time plus the media duration may drift
 significantly from the actual time samples were recorded because of
-inaccuracies in the camera's clock. Therefore, Moonfire NVR also calculates
+inaccuracies in the camera's clock. Therefore, Moonshadow NVR also calculates
 a *wall duration* of recordings which more closely matches the NVR's clock.
 It is calculated as follows:
 
@@ -245,7 +245,7 @@ or its camera start time, determined via the following rules:
 
 These rules are a compromise. When a system starts up without NTP or a clock
 battery, it typically reverts to a time in the distant past. Therefore times
-before Moonfire NVR was written should be checked for and avoided. When both
+before Moonshadow NVR was written should be checked for and avoided. When both
 systems have a believably recent timestamp, the local time is typically more
 accurate, but the camera time allows a closer match between two streams of
 the same camera.
@@ -255,7 +255,7 @@ better. When using camera start times, different cameras' streams may be
 mismatched by up twice the 5-second threshold described above. This could even
 happen for two streams within the same camera if a significant step happens
 between their establishment. More frequent SNTP adjustments may help, so that
-individual steps are less frequent. Or Moonfire NVR could attempt to address
+individual steps are less frequent. Or Moonshadow NVR could attempt to address
 this with more complexity: use sender reports of established RTSP sessions to
 detect and compensate for these clock splits.
 
@@ -265,8 +265,8 @@ simplest approach will be adopted initially and adapted as necessary.
 ### Time discontinuities
 
 If the local system's wall clock time jumps during a recording ([as has
-happened](https://github.com/scottlamb/moonfire-nvr/issues/9#issuecomment-322663674)),
-Moonfire NVR will continue to use the initial wall clock time for as long as
+happened](https://github.com/scottlamb/moonshadow-nvr/issues/9#issuecomment-322663674)),
+Moonshadow NVR will continue to use the initial wall clock time for as long as
 the recording lasts. This can result in some unfortunate behaviors:
 
 *   a recording that lasts for months might have an incorrect time all the
@@ -296,7 +296,7 @@ smear](https://developers.google.com/time/smear) policy in which instead of
 one second happening twice, the clock runs slower. For a 24-hour period, the
 clock runs slower by a factor of 1/86,400 (an extra ~11.6 μs/s).
 
-In Moonfire NVR, all wall times in the database are based on UTC as reported
+In Moonshadow NVR, all wall times in the database are based on UTC as reported
 by the system, and it's assumed that `start + duration = end`. Thus, a leap
 second is similar to a one-second time jump (see "Time discontinuities"
 above).
@@ -306,12 +306,12 @@ Here are some options for improvement:
 #### Use `clock_gettime(CLOCK_TAI, ...)` timestamps
 
 Timestamps in the TAI clock system don't skip leap seconds. There's a system
-interface intended to provide timestamps in this clock system, and Moonfire
+interface intended to provide timestamps in this clock system, and Moonshadow
 NVR could use it. Unfortunately this has several problems:
 
 *   `CLOCK_TAI` is only available on Linux. It'd be preferable to handle
     timestamps in a consistent way on other platforms. (At least on macOS,
-    Moonfire NVR's current primary development platform.)
+    Moonshadow NVR's current primary development platform.)
 *   `CLOCK_TAI` is wrong on startup and possibly adjusted later. The offset
     between TAI and UTC is initially assumed to be 0. It's corrected when/if
     a sufficiently new `ntpd` starts.
@@ -324,7 +324,7 @@ NVR could use it. Unfortunately this has several problems:
 
 #### Use a leap second table when calculating differences
 
-Moonfire NVR could retrieve UTC timestamps from the system then translate then
+Moonshadow NVR could retrieve UTC timestamps from the system then translate then
 to TAI via a leap second table, either before writing them to the database or
 whenever doing math on timestamps.
 
@@ -337,12 +337,12 @@ second would still be ambiguous.
 
 #### Use smeared time
 
-Moonfire NVR could make no code changes and ask the system administrator to
+Moonshadow NVR could make no code changes and ask the system administrator to
 use smeared time. This is the simplest option. On a leap smear system, there
 are no time jumps. The ~11.6 *ppm* frequency error and the maximum introduced
 absolute error of 0.5 sec can be considered acceptable.
 
-Alternatively, Moonfire NVR could assume a specific leap smear policy (such as
+Alternatively, Moonshadow NVR could assume a specific leap smear policy (such as
 24-hour linear smear from 12:00 the day before to 12:00 the day after) and
 attempt to correct the time into TAI with a leap second table. This behavior
 would work well on a system with the expected configuration and produce
