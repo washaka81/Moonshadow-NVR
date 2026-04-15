@@ -1,0 +1,49 @@
+# yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
+
+language: "en-US"
+
+reviews:
+  profile: "assertive"
+  request_changes_workflow: false
+  high_level_summary: true
+  poem: false
+  review_status: true
+  collapse_walkthrough: false
+  changed_files_summary: true
+  path_filters:
+    - "!**/target/**"
+    - "!**/dist/**"
+    - "!**/node_modules/**"
+    - "!**/logs/**"
+    - "!**/bin/**"
+    - "!**/*.log"
+    - "!**/*.db"
+    - "!**/*.onnx"
+    - "!**/Cargo.lock"
+    - "!**/package-lock.json"
+    - "!**/yarn.lock"
+    - "!**/*.tar.gz"
+    - "!**/mediamtx*"
+  path_instructions:
+    - path: "server/**"
+      instructions: |
+        Focus on Rust best practices: memory safety, error handling, async patterns, performance.
+        Pay special attention to security aspects in an NVR system: input validation, authentication, data protection.
+        Ensure proper use of tokio for async operations and clippy warnings.
+    - path: "ui/**"
+      instructions: |
+        Focus on React and TypeScript best practices: component lifecycle, hooks usage, type safety.
+        Ensure accessibility (a11y) with Material-UI components.
+        Check for security: XSS prevention, secure handling of user inputs.
+        Verify testing coverage and proper error boundaries.
+  auto_review:
+    enabled: true
+    drafts: false
+
+chat:
+  auto_reply: true
+
+knowledge_base:
+  opt_out: false
+  learnings:
+    scope: "auto"
