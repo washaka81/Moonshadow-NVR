@@ -1,89 +1,59 @@
-[![CI](https://github.com/scottlamb/moonshadow-nvr/workflows/CI/badge.svg)](https://github.com/scottlamb/moonshadow-nvr/actions?query=workflow%3ACI)
+# Moonshadow NVR 🌙🛡️
 
-* [Introduction](#introduction)
-* [Documentation](#documentation)
+[![CI](https://github.com/washaka81/Moonshadow-NVR/workflows/CI/badge.svg)](https://github.com/washaka81/Moonshadow-NVR/actions)
+[![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE.txt)
 
-# Introduction
+Moonshadow NVR is an intelligent, high-performance, and open-source Network Video Recorder. Based on the original Moonfire NVR by Scott Lamb, it has been evolved into a security system with built-in AI capabilities and hardware-accelerated computer vision.
 
-Moonshadow NVR is an open-source security camera network video recorder, started
-by Scott Lamb &lt;<slamb@slamb.org>&gt;. It saves H.264-over-RTSP streams from
-IP cameras to disk into a hybrid format: video frames in a directory on
-spinning disk, other data in a SQLite3 database on flash. It can construct
-`.mp4` files for arbitrary time ranges on-the-fly. It does not decode,
-analyze, or re-encode video frames, so it requires little CPU. It handles six
-1080p/30fps streams on a [Raspberry Pi
-2](https://www.raspberrypi.org/products/raspberry-pi-2-model-b/), using
-less than 10% of the machine's total CPU.
+## 🚀 Key Evolutions in Moonshadow NVR
 
-**Help wanted to make it great! Please see the [contributing
-guide](CONTRIBUTING.md).**
+### 🧠 Intelligent AI Engine
+*   **Person Re-Identification (ReID)**: Recognizes and tracks individuals across multiple camera streams using OSNet.
+*   **License Plate Recognition (LPR)**: Integrated LPRNet for real-time license plate detection and decoding (supporting Chinese and Chilean formats).
+*   **Smart Event Correlation**: Detection events are automatically mapped to the video timeline in the UI.
+*   **Adaptive Sampling**: Dynamic processing modes (Off, Low, Medium, High, Auto) to balance accuracy and power consumption.
 
-So far, the web interface is basic: a filterable list of video segments,
-with support for trimming them to arbitrary time ranges. No scrub bar yet.
-There's also an experimental live view UI.
+### ⚡ Hardware Acceleration
+Powered by **ONNX Runtime (`ort`)**, Moonshadow NVR automatically optimizes inference based on your hardware:
+1.  **NVIDIA TensorRT / CUDA**: Maximum performance for high-end GPUs.
+2.  **Intel OpenVINO**: Optimized for Intel iGPUs, CPUs, and NPUs.
+3.  **CPU Fallback**: Universal support for any architecture.
 
-<table>
-  <tbody>
-    <tr valign=top>
-      <td><a href="screenshots/list.png"><img src="screenshots/list.png" width=360 height=345 alt="list view screenshot"></a></td>
-      <td><a href="screenshots/live.jpg"><img src="screenshots/live.jpg" width=360 height=212 alt="live view screenshot"></a></td>
-    </tr>
-  </tbody>
-</table>
+### 🖥️ Modern Interfaces
+*   **Interactive TUI Dashboard**: A completely redesigned terminal interface for configuration. No more boring wizards—manage cameras, directories, and users with a fluid, tabbed dashboard.
+*   **Enhanced Web UI**:
+    *   **Live Multiview**: View multiple streams simultaneously.
+    *   **AI Timelines**: Recordings now feature "AI Chips" (🚗 Plates, 👤 Persons) for instant visual navigation of events.
+    *   **Autodetect RTSP**: One-click camera setup—the system automatically scans for valid RTSP paths.
 
-There's no support yet for motion detection, no https/TLS support (you'll
-need a proxy server, as described [here](guide/secure.md)), and only a
-console-based (rather than web-based) configuration UI.
+---
 
-Moonshadow NVR is pre-1.0, with will be no compatibility guarantees:
-configuration and storage formats may change from version to version. There is
-an [upgrade procedure](guide/schema.md) but it is not for the faint of heart.
+## 📸 Screenshots
 
-I hope to add features such as video analytics. In time, we can build
-a full-featured hobbyist-oriented multi-camera NVR that requires nothing but
-a cheap machine with a big hard drive. There are many exciting techniques we
-could use to make this possible:
+*Coming soon: Updated screenshots of the TUI Dashboard and AI Timeline.*
 
-*   avoiding CPU-intensive H.264 encoding in favor of simply continuing to use
-    the camera's already-encoded video streams. Cheap IP cameras these days
-    provide pre-encoded H.264 streams in both "main" (full-sized) and "sub"
-    (lower resolution, compression quality, and/or frame rate) varieties. The
-    "sub" stream is more suitable for fast computer vision work as well as
-    remote/mobile streaming. Disk space these days is quite cheap (with 4 TB
-    drives costing about $100), so we can afford to keep many camera-months
-    of both streams on disk.
-*   off-loading on-NVR analytics to an inexpensive USB or M.2 neural network
-    accelerator and hardware H.264 decoders.
-*   taking advantage of on-camera analytics. They're often not as accurate, but
-    they're the best way to stretch very inexpensive NVR machines.
+---
 
-## AI Capabilities
+## ⚙️ Core Features
+*   **Efficient Recording**: Saves H.264 streams directly to disk without re-encoding, keeping CPU usage extremely low (e.g., <10% on a Raspberry Pi 2 for 6 streams).
+*   **Hybrid Storage**: Video frames are stored in a simple directory structure, while metadata is managed in a high-performance SQLite database.
+*   **On-the-fly MP4**: Construct `.mp4` files for any time range instantly for export or viewing.
+*   **RTSP Robustness**: Built-in "Retina Patch" to handle non-standard RTSP headers from various camera manufacturers (Dahua, Hikvision, etc.).
 
-Moonshadow NVR extends Moonshadow NVR with intelligent surveillance features:
+## 📖 Documentation
 
-*   **Person Re-Identification (ReID)**: Uses OSNet models to recognize individuals across camera streams.
-*   **License Plate Recognition (LPR)**: Integrated LPRNet model for Chinese plates; can be fine‑tuned for Chilean plates. See `models/` for details and conversion scripts.
-*   **Configurable AI Modes**: Off, Low (30s), Medium (8s), High (2s), and Auto modes.
-*   **Hardware Acceleration**: Support for OpenVINO (planned) and Tract ONNX backends.
-*   **Smart Sampling**: Processes frames based on AI mode to balance CPU usage and detection accuracy.
+*   [**Installation Guide**](guide/install.md)
+*   [**Building from Source**](guide/build.md)
+*   [**UI Development**](guide/developing-ui.md)
+*   [**Securing Your NVR**](guide/secure.md)
+*   [**API Reference**](ref/api.md)
+*   [**Configuration Reference**](ref/config.md)
 
-# Documentation
+## 🤝 Contributing
+Contributions are welcome! Whether it's adding new AI models, improving the TUI, or enhancing the web interface, please see our [Contributing Guide](CONTRIBUTING.md).
 
-*   [Contributing](CONTRIBUTING.md)
-*   [License](LICENSE.txt) —
-    [GPL-3.0-or-later](https://spdx.org/licenses/GPL-3.0-or-later.html)
-    with [GPL-3.0-linking-exception](https://spdx.org/licenses/GPL-3.0-linking-exception.html)
-    for OpenSSL.
-*   [Change log](CHANGELOG.md) / release notes.
-*   [Guides](guide/), including:
-    *   [Installing](guide/install.md)
-    *   [Building from source](guide/build.md)
-    *   [Securing Moonshadow NVR and exposing it to the Internet](guide/secure.md)
-    *   [UI Development](guide/developing-ui.md)
-    *   [Troubleshooting](guide/troubleshooting.md)
-*   [References](ref/), including:
-    *   [Configuration file](ref/config.md)
-    *   [JSON API](ref/api.md)
-*   [Design documents](design/)
-*   [Wiki](https://github.com/scottlamb/moonshadow-nvr/wiki) has hardware
-    recommendations, notes on several camera models, etc. Please add more!
+## 📄 License
+Moonshadow NVR is licensed under [GPL-3.0-or-later](LICENSE.txt) with a linking exception for OpenSSL.
+
+---
+*Started by Scott Lamb & evolved by the Moonshadow Community.*
