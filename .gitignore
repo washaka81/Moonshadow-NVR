@@ -1,63 +1,109 @@
-.DS_Store
-*.swp
-/release-*
-/server/target
-.idea
-.aider*
+# --- Security & Secrets ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.pub
+secrets.*
+credentials.*
+id_rsa*
+id_ed25519*
+auth.toml
 
-# Log files
+# --- OS Specific ---
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# --- IDEs & Tools ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.aider*
+.history/
+.project
+.settings/
+.classpath
+
+# --- Project Specific Data & Temporary Files ---
+/release-*
+/bin/
+/logs/
+/config/
 *.log
 *.err
 *.out
-*debug.log
-*test.log
-*run.log
-
-# PID files
 *.pid
+build.log
+/screenshots/*
+avances*
+resultados_prueba.md
 
-# Runtime configuration files
-test-*.toml
-web-test.toml
-mediamtx.yml
-
-# Database files
-/test_db/
-/server/test_db/
+# --- Database & Runtime (SQLite) ---
 *.db
 *-wal
 *-shm
-
-# ONNX models (large binary files)
-*.onnx
-
-# Build artifacts
-/target/
-/server/target/
-build.log
-/server/build.log
-
-# Downloaded binaries
+/test_db/
+/server/test_db/
+test-*.toml
+web-test.toml
+mediamtx.yml
 /mediamtx
 /mediamtx*.tar.gz
 
-# Runtime directories
-/bin/
-/models/
-/logs/
-/config/
+# --- Rust (Server) ---
+/target/
+/server/target/
 
-# User notes (optional)
-avances.txt
-avances.txt.backup
-avances_implementacion.md
-resultados_prueba.md
-
-# Screenshots (optional)
-/screenshots/*
-server/src/detector.rs.backup
-.vscode/
-models/venv/
-models/tfenv/
+# --- Node.js / UI ---
+node_modules/
+ui/node_modules/
+ui/dist/
 ui/package-lock.json
-avances*
+ui/pnpm-lock.yaml
+ui/yarn.lock
+.eslintcache
+.stylelintcache
+coverage/
+
+# --- AI Models & Python ---
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+*.onnx
+*.onnx.data
+*.pth
+*.pth.tar
+*.weights
+*.tflite
+*.h5
+
+# --- Models Directory Specifics ---
+/models/venv/
+/models/tfenv/
+/models/.cache/
+/models/chilean_plates/
+/models/license-plate-recognition/
+/models/license-plate-recognition-barrier-0007/
+/models/LPRNet_Pytorch/
+/models/LPR-CBAM-Net/
+/models/platesGenerator/
+/models/*.tar.gz
+/models/*.bin
+/models/hf_search_output.txt
+/models/*.log
+
+# --- Backups ---
+*.bak
+*.backup
+*.tmp
+*.old
+server/src/detector.rs.backup
