@@ -46,7 +46,7 @@ async function myfetch(
     // `Request`, which fails with a `TypeError` if given a relative URL.
     // Resolve it ourselves here. Harmless in production, makes the tests work.
     response = await fetch(new URL(url, window.location.origin), init);
-  } catch (e) {
+  } catch {
     // fetch throws AbortError (on signal abort) or TypeError (on network
     // errors): <https://developer.mozilla.org/en-US/docs/Web/API/fetch#exceptions>
     // We avoid `instanceof` because it fails across JavaScript realms
@@ -70,7 +70,7 @@ async function myfetch(
     let text;
     try {
       text = await response.text();
-    } catch (e) {
+    } catch {
       if (e instanceof Error && e.name === "AbortError") {
         return { status: "aborted" };
       }
@@ -115,7 +115,7 @@ export async function init(
   let body;
   try {
     body = await fetchRes.response.arrayBuffer();
-  } catch (e) {
+  } catch {
     if (e instanceof Error && e.name === "AbortError") {
       return { status: "aborted" };
     }
@@ -139,7 +139,7 @@ async function json<T>(
   let body;
   try {
     body = await fetchRes.response.json();
-  } catch (e) {
+  } catch {
     if (e instanceof Error && e.name === "AbortError") {
       return { status: "aborted" };
     }

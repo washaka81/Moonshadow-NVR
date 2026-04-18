@@ -288,7 +288,7 @@ const VideoList = ({
           if (aiResp.status === "success") {
             aiEvents = aiResp.response.events;
           }
-        } catch (e) {
+        } catch {
           // Ignore AI events fetch errors - recordings are still usable
         }
 
