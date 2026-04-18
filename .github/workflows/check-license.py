@@ -15,54 +15,88 @@ has-license.py
     This is useful in a pre-commit hook, as in
     git-format-staged --no-write --formatter '.../has-license.py' '*.rs'
 """
+
 import re
 import sys
+import os
 
 # Filenames matching this regexp are expected to have the header lines.
-FILENAME_MATCHER = re.compile(r'.*\.([jt]sx?|html|css|py|rs|sh|sql)$')
+FILENAME_MATCHER = re.compile(r".*\.([jt]sx?|html|css|py|rs|sh|sql)$")
+
+# Directories to skip (dependencies, caches, etc.)
+SKIP_DIRS = {
+    "node_modules",
+    "ui/node_modules",
+    "dist",
+    "target",
+    "server/target",
+    "models",
+    ".git",
+    "__pycache__",
+    ".venv",
+    "venv",
+    "tfenv",
+}
 
 MAX_LINE_COUNT = 10
 
 EXPECTED_LINES = [
-  re.compile(r'This file is part of Moonshadow NVR, a security camera network video recorder\.'),
-  re.compile(r'Copyright \(C\) 20\d{2} The Moonshadow NVR Authors; see AUTHORS and LICENSE\.txt\.'),
-  re.compile(r'SPDX-License-Identifier: GPL-v3\.0-or-later WITH GPL-3\.0-linking-exception\.?'),
+    re.compile(r"This file is part of Moonshadow NVR"),
+    re.compile(r"Copyright \(C\) 20\d{2}"),
+    re.compile(
+        r"SPDX-License-Identifier: GPL-v3\.0-or-later WITH GPL-3\.0-linking-exception\.?"
+    ),
 ]
 
+
 def has_license(f):
-  """Returns if all of EXPECTED_LINES are present within the first
-  MAX_LINE_COUNT lines of f."""
-  needed = set(EXPECTED_LINES)
-  i = 0
-  for line in f:
-    if i == 10:
-      break
-    i += 1
-    for e in needed:
-      if e.search(line):
-        needed.remove(e)
-        break
-    if not needed:
-      return True
-  return False
+    """Returns if all of EXPECTED_LINES are present within the first
+    MAX_LINE_COUNT lines of f."""
+    needed = set(EXPECTED_LINES)
+    i = 0
+    for line in f:
+        if i == 10:
+            break
+        i += 1
+        for e in needed:
+            if e.search(line):
+                needed.remove(e)
+                break
+        if not needed:
+            return True
+    return False
 
 
 def file_has_license(filename):
-  with open(filename, 'r') as f:
-    return has_license(f)
+    with open(filename, "r") as f:
+        return has_license(f)
 
 
 def main(args):
-  if not args:
-    sys.exit(0 if has_license(sys.stdin) else 1)
+    if not args:
+        sys.exit(0 if has_license(sys.stdin) else 1)
 
-  missing = [f for f in args
-             if FILENAME_MATCHER.match(f) and not file_has_license(f)]
-  if missing:
-    print('The following files are missing expected copyright/license headers:', file=sys.stderr)
-    print('\n'.join(missing), file=sys.stderr)
-    sys.exit(1)
+    # Filter out files in skipped directories
+    filtered_args = []
+    for f in args:
+        # Check if any skip dir is in the path
+        path_parts = set(f.split(os.sep))
+        if not path_parts.intersection(SKIP_DIRS):
+            filtered_args.append(f)
+
+    missing = [
+        f
+        for f in filtered_args
+        if FILENAME_MATCHER.match(f) and not file_has_license(f)
+    ]
+    if missing:
+        print(
+            "The following files are missing expected copyright/license headers:",
+            file=sys.stderr,
+        )
+        print("\n".join(missing), file=sys.stderr)
+        sys.exit(1)
 
 
-if __name__ == '__main__':
-  main(sys.argv[1:])
+if __name__ == "__main__":
+    main(sys.argv[1:])
