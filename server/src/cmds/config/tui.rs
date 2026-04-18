@@ -4,8 +4,6 @@
 
 //! Interactive TUI camera management with ratatui and Catppuccin theme.
 
-use crate::cmds::open_conn;
-use crate::cmds::OpenMode;
 use base::clock;
 use base::Error;
 use bpaf::Bpaf;
@@ -66,9 +64,199 @@ pub struct Args {
     pub db_dir: PathBuf,
 }
 
+pub fn run_main_menu(db: &Arc<db::Database>) -> Result<(), Error> {
+    enable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
+    let backend = CrosstermBackend::new(stdout);
+    let mut terminal = Terminal::new(backend)?;
+
+    let result = run_main_menu_app(&mut terminal, db);
+
+    disable_raw_mode()?;
+    execute!(
+        terminal.backend_mut(),
+        LeaveAlternateScreen,
+        DisableMouseCapture
+    )?;
+    terminal.show_cursor()?;
+
+    if let Err(e) = result {
+        eprintln!("Error: {}", e);
+    }
+
+    Ok(())
+}
+
+fn run_main_menu_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    db: &Arc<db::Database>,
+) -> io::Result<()> {
+    let mut state = MainMenuState::default();
+
+    loop {
+        terminal.draw(|f| render_main_menu(f, &mut state))?;
+
+        if let Event::Key(key) = event::read()? {
+            if key.kind == KeyEventKind::Press {
+                match key.code {
+                    KeyCode::Char('q') | KeyCode::Esc => {
+                        break;
+                    }
+                    KeyCode::Char('j') | KeyCode::Down => {
+                        state.next();
+                    }
+                    KeyCode::Char('k') | KeyCode::Up => {
+                        state.previous();
+                    }
+                    KeyCode::Enter => match state.selected {
+                        0 => {
+                            disable_raw_mode()?;
+                            execute!(
+                                terminal.backend_mut(),
+                                LeaveAlternateScreen,
+                                DisableMouseCapture
+                            )?;
+                            terminal.show_cursor()?;
+                            if let Err(e) = run_tui_camera_menu(db) {
+                                eprintln!("Camera menu error: {}", e);
+                            }
+                            enable_raw_mode()?;
+                            execute!(io::stdout(), EnterAlternateScreen, EnableMouseCapture)?;
+                            let backend = CrosstermBackend::new(io::stdout());
+                            *terminal = Terminal::new(backend)?;
+                        }
+                        1 => {
+                            break;
+                        }
+                        _ => {}
+                    },
+                    _ => {}
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[derive(Default)]
+struct MainMenuState {
+    selected: usize,
+}
+
+impl MainMenuState {
+    fn next(&mut self) {
+        if self.selected < 1 {
+            self.selected += 1;
+        }
+    }
+
+    fn previous(&mut self) {
+        if self.selected > 0 {
+            self.selected -= 1;
+        }
+    }
+}
+
+fn render_main_menu(frame: &mut Frame, state: &mut MainMenuState) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(5),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .split(frame.area());
+
+    render_menu_header(frame, chunks[0]);
+    render_menu_options(frame, chunks[1], state);
+    render_menu_footer(frame, chunks[2]);
+}
+
+fn render_menu_header(frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .style(Catppuccin::base())
+        .title(
+            Line::from(" 🎬 Moonshadow NVR - Configuration ")
+                .bold()
+                .fg(Catppuccin::lavender()),
+        );
+
+    frame.render_widget(block, area);
+
+    let inner = Rect::new(area.x + 1, area.y + 2, area.width - 2, area.height - 3);
+    let text = Paragraph::new("Interactive camera management system").style(Catppuccin::subtext0());
+    frame.render_widget(text, inner);
+}
+
+fn render_menu_options(frame: &mut Frame, area: Rect, state: &MainMenuState) {
+    let options = vec![
+        ("📷 Manage Cameras", "View, add, edit and delete cameras"),
+        ("🚪 Exit", "Return to terminal"),
+    ];
+
+    let items: Vec<ListItem> = options
+        .iter()
+        .enumerate()
+        .map(|(idx, (title, desc))| {
+            let line = Line::from(vec![
+                Span::raw(format!(
+                    "{:2} ",
+                    if idx == state.selected { "❯" } else { " " }
+                )),
+                Span::styled(
+                    *title,
+                    if idx == state.selected {
+                        Catppuccin::highlight()
+                    } else {
+                        Catppuccin::text()
+                    },
+                ),
+                Span::raw(" - "),
+                Span::styled(*desc, Catppuccin::subtext0()),
+            ]);
+
+            if idx == state.selected {
+                ListItem::new(line).style(Catppuccin::selection())
+            } else {
+                ListItem::new(line).style(Catppuccin::base())
+            }
+        })
+        .collect();
+
+    let list = List::new(items)
+        .block(
+            Block::default()
+                .borders(Borders::ALL)
+                .style(Catppuccin::base())
+                .title(Line::from(" Main Menu ").fg(Catppuccin::lavender()))
+                .border_style(Catppuccin::surface()),
+        )
+        .highlight_style(Catppuccin::highlight());
+
+    let mut list_state = ratatui::widgets::ListState::default();
+    list_state.select(Some(state.selected));
+    frame.render_stateful_widget(list, area, &mut list_state);
+}
+
+fn render_menu_footer(frame: &mut Frame, area: Rect) {
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .style(Catppuccin::surface());
+
+    let text = Paragraph::new("↑↓ Navigate | [Enter] Select | [q] Quit")
+        .style(Catppuccin::subtext0())
+        .block(block);
+
+    frame.render_widget(text, area);
+}
+
 #[allow(dead_code)]
 pub fn run(args: Args) -> Result<i32, Error> {
-    let (_db_dir, mut conn) = open_conn(&args.db_dir, OpenMode::ReadWrite)?;
+    let (_db_dir, mut conn) =
+        crate::cmds::open_conn(&args.db_dir, crate::cmds::OpenMode::ReadWrite)?;
 
     let cur_ver = db::get_schema_version(&conn)?;
     if cur_ver.is_none() {
