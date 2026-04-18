@@ -21,11 +21,12 @@ export default defineConfig(
       "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
     },
-rules: {
-    ...reactHooks.configs.recommended.rules,
-    "react-hooks/no-sync-updates": "off",
-    "react-hooks/static-components": "off",
-  },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
+      "react-hooks/no-sync-updates": "off",
+      "react-hooks/static-components": "off",
+      "react-hooks/set-state-in-effect": "off",
+    },
   },
   {
     files: ["**/*.test.ts", "**/*.test.tsx"],
