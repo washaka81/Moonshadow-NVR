@@ -54,7 +54,8 @@ impl Dir {
                         nix::Error::UnknownErrno
                     }
                 })
-            }).map_err(|_| nix::Error::EINVAL)??;
+            })
+            .map_err(|_| nix::Error::EINVAL)??;
         }
         let fd = nix::fcntl::open(path, OFlag::O_DIRECTORY | OFlag::O_RDONLY, Mode::empty())?;
         Ok(Dir(fd))

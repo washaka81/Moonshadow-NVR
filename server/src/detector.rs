@@ -59,9 +59,9 @@ impl Detector {
             "AI mode: {:?}, hardware acceleration: {}, optimize for device: {}",
             ai_mode, hardware_acceleration, optimize_for_device
         );
-        
+
         let _ = ort::init().with_name("moonshadow").commit();
-        
+
         let eps = [
             ort::ep::TensorRT::default().build(),
             ort::ep::CUDA::default().build(),
@@ -70,21 +70,75 @@ impl Detector {
         ];
 
         let detection_model = Session::builder()
-            .map_err(|e| err!(Unknown, msg("failed to build session"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+            .map_err(|e| {
+                err!(
+                    Unknown,
+                    msg("failed to build session"),
+                    source(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string()
+                    ))
+                )
+            })?
             .with_execution_providers(eps.clone())
-            .map_err(|e| err!(Unknown, msg("failed to set execution providers"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+            .map_err(|e| {
+                err!(
+                    Unknown,
+                    msg("failed to set execution providers"),
+                    source(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string()
+                    ))
+                )
+            })?
             .commit_from_file(detection_model_path)
-            .map_err(|e| err!(Unknown, msg("failed to load detection model"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+            .map_err(|e| {
+                err!(
+                    Unknown,
+                    msg("failed to load detection model"),
+                    source(std::io::Error::new(
+                        std::io::ErrorKind::Other,
+                        e.to_string()
+                    ))
+                )
+            })?;
 
         let reid_model = if let Some(path) = reid_model_path {
             info!("loading ReID AI model from {:?}", path);
             Some(std::sync::Mutex::new(
                 Session::builder()
-                    .map_err(|e| err!(Unknown, msg("failed to build session"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to build session"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?
                     .with_execution_providers(eps.clone())
-                    .map_err(|e| err!(Unknown, msg("failed to set execution providers"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to set execution providers"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?
                     .commit_from_file(path)
-                    .map_err(|e| err!(Unknown, msg("failed to load ReID model"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to load ReID model"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?,
             ))
         } else {
             None
@@ -94,11 +148,38 @@ impl Detector {
             info!("loading LPR AI model from {:?}", path);
             Some(std::sync::Mutex::new(
                 Session::builder()
-                    .map_err(|e| err!(Unknown, msg("failed to build session"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to build session"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?
                     .with_execution_providers(eps.clone())
-                    .map_err(|e| err!(Unknown, msg("failed to set execution providers"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to set execution providers"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?
                     .commit_from_file(path)
-                    .map_err(|e| err!(Unknown, msg("failed to load LPR model"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?
+                    .map_err(|e| {
+                        err!(
+                            Unknown,
+                            msg("failed to load LPR model"),
+                            source(std::io::Error::new(
+                                std::io::ErrorKind::Other,
+                                e.to_string()
+                            ))
+                        )
+                    })?,
             ))
         } else {
             None
@@ -145,20 +226,53 @@ impl Detector {
         }
 
         info!("Using ORT ONNX backend for detection (auto-accelerated)");
-        
-        let tensor = Tensor::from_array(input).map_err(|e| err!(Unknown, msg("failed to create input tensor"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
-        
-        let mut guard = self.detection_model.lock().unwrap();
-        let result = guard.run(inputs![tensor])
-            .map_err(|e| err!(Unknown, msg("failed to run inference"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
 
-        let (shape, data) = result[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| err!(Unknown, msg("failed to get output array"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
-            
+        let tensor = Tensor::from_array(input).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to create input tensor"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
+
+        let mut guard = self.detection_model.lock().unwrap();
+        let result = guard.run(inputs![tensor]).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to run inference"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
+
+        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to get output array"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
+
         let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| err!(Unknown, msg("invalid shape"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
-        
+        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
+            err!(
+                Unknown,
+                msg("invalid shape"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
+
         let mut detections = Vec::new();
         let num_anchors = output.shape()[2];
 
@@ -221,17 +335,50 @@ impl Detector {
             input[[0, 2, y as usize, x as usize]] = rgb[2] as f32 / 255.0;
         }
 
-        let tensor = Tensor::from_array(input).map_err(|e| err!(Unknown, msg("failed to create input tensor"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let tensor = Tensor::from_array(input).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to create input tensor"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
         let mut guard = model.lock().unwrap();
-        let result = guard.run(inputs![tensor])
-            .map_err(|e| err!(Unknown, msg("failed to run ReID inference"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let result = guard.run(inputs![tensor]).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to run ReID inference"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
 
-        let (shape, data) = result[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| err!(Unknown, msg("failed to get ReID output array"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to get ReID output array"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
 
         let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| err!(Unknown, msg("invalid shape"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
+            err!(
+                Unknown,
+                msg("invalid shape"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
         let embedding: Vec<f32> = output.iter().cloned().collect();
         Ok(embedding)
     }
@@ -247,20 +394,54 @@ impl Detector {
         for (x, y, rgb) in resized.pixels() {
             input[[0, 0, y as usize, x as usize]] = (rgb[2] as f32 - 127.5) * 0.0078125; // B
             input[[0, 1, y as usize, x as usize]] = (rgb[1] as f32 - 127.5) * 0.0078125; // G
-            input[[0, 2, y as usize, x as usize]] = (rgb[0] as f32 - 127.5) * 0.0078125; // R
+            input[[0, 2, y as usize, x as usize]] = (rgb[0] as f32 - 127.5) * 0.0078125;
+            // R
         }
 
-        let tensor = Tensor::from_array(input).map_err(|e| err!(Unknown, msg("failed to create input tensor"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let tensor = Tensor::from_array(input).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to create input tensor"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
         let mut guard = model.lock().unwrap();
-        let result = guard.run(inputs![tensor])
-            .map_err(|e| err!(Unknown, msg("failed to run LPR inference"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let result = guard.run(inputs![tensor]).map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to run LPR inference"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
 
-        let (shape, data) = result[0]
-            .try_extract_tensor::<f32>()
-            .map_err(|e| err!(Unknown, msg("failed to get LPR output array"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to get LPR output array"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
 
         let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| err!(Unknown, msg("invalid shape"), source(std::io::Error::new(std::io::ErrorKind::Other, e.to_string()))))?;
+        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
+            err!(
+                Unknown,
+                msg("invalid shape"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    e.to_string()
+                ))
+            )
+        })?;
 
         info!("LPR output shape: {:?}", output.shape());
         let shape = output.shape();
@@ -277,7 +458,14 @@ impl Detector {
         } else if shape.len() == 2 {
             (shape[0], shape[1], false)
         } else {
-            bail!(Unknown, msg("unexpected LPR output shape"), source(std::io::Error::new(std::io::ErrorKind::Other, format!("{:?}", shape))));
+            bail!(
+                Unknown,
+                msg("unexpected LPR output shape"),
+                source(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    format!("{:?}", shape)
+                ))
+            );
         };
 
         // Skip batch dimension for flat indexing
@@ -360,7 +548,10 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
             let process_start = std::time::Instant::now();
             info!(
                 "Processing frame {} (#{}) of size {} at time {}",
-                frame_count, processed_count, data.len(), time_90k
+                frame_count,
+                processed_count,
+                data.len(),
+                time_90k
             );
 
             match self.decode_h264_to_image(&data) {
@@ -411,7 +602,11 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                                 .await;
 
                             let total_time = process_start.elapsed();
-                            info!("Frame {} total processing time: {:.2}ms", frame_count, total_time.as_secs_f64() * 1000.0);
+                            info!(
+                                "Frame {} total processing time: {:.2}ms",
+                                frame_count,
+                                total_time.as_secs_f64() * 1000.0
+                            );
                         }
                         Err(e) => {
                             info!("Error en detección: {}", e);
@@ -771,10 +966,16 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
 
 /// Decodes LPR model output using CTC decoding.
 /// Extracted from `read_plate` for testability.
-fn decode_lpr_output(output: &[f32], seq_len: usize, num_classes: usize, transposed: bool, total_elements: usize) -> String {
+fn decode_lpr_output(
+    output: &[f32],
+    seq_len: usize,
+    num_classes: usize,
+    transposed: bool,
+    total_elements: usize,
+) -> String {
     let blank_class = 67;
     let mut plate_chars = Vec::new();
-    
+
     for i in 0..seq_len {
         let mut max_prob = f32::NEG_INFINITY;
         let mut max_idx = 0;
@@ -808,7 +1009,7 @@ fn decode_lpr_output(output: &[f32], seq_len: usize, num_classes: usize, transpo
             plate_chars.push(ch);
         }
     }
-    
+
     let mut plate = String::new();
     let mut prev_char = None;
     for &ch in &plate_chars {
@@ -937,12 +1138,12 @@ mod tests {
         // Class mapping: 31-40 = '0'-'9', 41-66 = 'A'-'Z'
         // A=41, B=42, 9=40, H=41+7=48, Y=41+24=65, Z=41+25=66
         let chars = [
-            (0, 41),  // 'A'
-            (1, 42),  // 'B'
-            (2, 40),  // '9'
-            (3, 48),  // 'H'
-            (4, 65),  // 'Y'
-            (5, 66),  // 'Z'
+            (0, 41), // 'A'
+            (1, 42), // 'B'
+            (2, 40), // '9'
+            (3, 48), // 'H'
+            (4, 65), // 'Y'
+            (5, 66), // 'Z'
         ];
 
         for (timestep, class_idx) in chars.iter() {

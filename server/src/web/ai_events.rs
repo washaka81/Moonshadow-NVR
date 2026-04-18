@@ -6,11 +6,11 @@
 use crate::json;
 use crate::web::{serve_json, Caller, ResponseResult};
 use base::err;
+use core::borrow::Borrow;
 use http::Request;
+use std::str::FromStr;
 use std::sync::Arc;
 use url::form_urlencoded;
-use core::borrow::Borrow;
-use std::str::FromStr;
 
 pub async fn ai_events(
     req: Request<hyper::body::Incoming>,

@@ -10,10 +10,10 @@ use uuid::Uuid;
 /// A decoded request path.
 #[derive(Debug, Eq, PartialEq)]
 pub(super) enum Path {
-    TopLevel,                                         // "/api/"
-    Request,                                          // "/api/request"
-    InitSegment(i32, bool),                           // "/api/init/<id>.mp4{.txt}"
-    Camera(Uuid),                                     // "/api/cameras/<uuid>/"
+    TopLevel,               // "/api/"
+    Request,                // "/api/request"
+    InitSegment(i32, bool), // "/api/init/<id>.mp4{.txt}"
+    Camera(Uuid),           // "/api/cameras/<uuid>/"
     Cameras,
     CamerasAutodetect,
     Signals,                                          // "/api/signals"

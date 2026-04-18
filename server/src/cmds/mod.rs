@@ -62,7 +62,10 @@ fn open_dir(db_dir: &Path, mode: OpenMode) -> Result<db::fs::Dir, Error> {
 
 /// Locks and opens the database.
 /// The returned `dir::Fd` holds the lock and should be kept open as long as the `Connection` is.
-pub fn open_conn(db_dir: &Path, mode: OpenMode) -> Result<(db::fs::Dir, rusqlite::Connection), Error> {
+pub fn open_conn(
+    db_dir: &Path,
+    mode: OpenMode,
+) -> Result<(db::fs::Dir, rusqlite::Connection), Error> {
     let dir = open_dir(db_dir, mode)?;
     let db_path = db_dir.join("db");
     info!(
@@ -117,20 +120,23 @@ mod tests {
         );
     }
 
-#[test]
-fn create_dir_error_msg() {
-    // Test that error messages include helpful context when directory creation fails.
-    // We test with a path that's likely to fail (e.g., under /proc or read-only location)
-    // but this is platform-dependent, so we just verify the error formatting works.
-    let tmpdir = tempfile::Builder::new()
-        .prefix("moonshadow-nvr-test")
-        .tempdir()
-        .unwrap();
-    let mut test_dir = tmpdir.path().to_path_buf();
-    test_dir.push("test_db");
-    
-    // Create should succeed in a temp directory
-    let result = open_dir(&test_dir, OpenMode::Create);
-    assert!(result.is_ok(), "Should be able to create dir in temp location");
-}
+    #[test]
+    fn create_dir_error_msg() {
+        // Test that error messages include helpful context when directory creation fails.
+        // We test with a path that's likely to fail (e.g., under /proc or read-only location)
+        // but this is platform-dependent, so we just verify the error formatting works.
+        let tmpdir = tempfile::Builder::new()
+            .prefix("moonshadow-nvr-test")
+            .tempdir()
+            .unwrap();
+        let mut test_dir = tmpdir.path().to_path_buf();
+        test_dir.push("test_db");
+
+        // Create should succeed in a temp directory
+        let result = open_dir(&test_dir, OpenMode::Create);
+        assert!(
+            result.is_ok(),
+            "Should be able to create dir in temp location"
+        );
+    }
 }

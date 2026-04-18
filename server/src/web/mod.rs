@@ -463,7 +463,12 @@ impl Service {
             .keys()
             .next()
             .copied()
-            .ok_or_else(|| err!(FailedPrecondition, msg("no sample file directories defined")))?;
+            .ok_or_else(|| {
+                err!(
+                    FailedPrecondition,
+                    msg("no sample file directories defined")
+                )
+            })?;
 
         let change = self.camera_subset_to_change(req.camera, dir_id);
         db.add_camera(change)?;
@@ -493,7 +498,12 @@ impl Service {
             .keys()
             .next()
             .copied()
-            .ok_or_else(|| err!(FailedPrecondition, msg("no sample file directories defined")))?;
+            .ok_or_else(|| {
+                err!(
+                    FailedPrecondition,
+                    msg("no sample file directories defined")
+                )
+            })?;
 
         let change = self.camera_subset_to_change(req.update, dir_id);
         db.update_camera(camera_id, change)?;
@@ -538,7 +548,7 @@ impl Service {
 
         let mut main_url = None;
         let mut sub_url = None;
-        
+
         let auth_str = match (&req.username, &req.password) {
             (Some(u), Some(p)) if !u.is_empty() => format!("{}:{}@", u, p),
             _ => String::new(),
@@ -548,8 +558,10 @@ impl Service {
         let addr = format!("{}:554", req.ip);
         let port_open = match tokio::time::timeout(
             std::time::Duration::from_secs(2),
-            tokio::net::TcpStream::connect(&addr)
-        ).await {
+            tokio::net::TcpStream::connect(&addr),
+        )
+        .await
+        {
             Ok(Ok(_)) => true,
             _ => false,
         };
@@ -576,8 +588,13 @@ impl Service {
                 if let Ok(url) = url::Url::parse(&url_str) {
                     if let Ok(Ok(_)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
-                        retina::client::Session::describe(url, retina::client::SessionOptions::default())
-                    ).await {
+                        retina::client::Session::describe(
+                            url,
+                            retina::client::SessionOptions::default(),
+                        ),
+                    )
+                    .await
+                    {
                         main_url = Some(url_str.replace(&auth_str, "")); // Return without auth in string, UI adds it to the config
                         break;
                     }
@@ -589,15 +606,20 @@ impl Service {
                 if let Ok(url) = url::Url::parse(&url_str) {
                     if let Ok(Ok(_)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
-                        retina::client::Session::describe(url, retina::client::SessionOptions::default())
-                    ).await {
+                        retina::client::Session::describe(
+                            url,
+                            retina::client::SessionOptions::default(),
+                        ),
+                    )
+                    .await
+                    {
                         sub_url = Some(url_str.replace(&auth_str, ""));
                         break;
                     }
                 }
             }
         }
-        
+
         // Fallbacks if nothing detected or port closed
         if main_url.is_none() {
             main_url = Some(format!("rtsp://{}:554/stream1", req.ip));
@@ -606,15 +628,9 @@ impl Service {
             sub_url = Some(format!("rtsp://{}:554/stream2", req.ip));
         }
 
-        let resp = json::AutodetectResponse {
-            main_url,
-            sub_url,
-        };
+        let resp = json::AutodetectResponse { main_url, sub_url };
 
-        serve_json(
-            &http::Request::new(()),
-            &resp,
-        )
+        serve_json(&http::Request::new(()), &resp)
     }
 
     fn camera_subset_to_change(&self, c: json::CameraSubset, dir_id: i32) -> db::CameraChange {

@@ -289,16 +289,16 @@ mod tests {
         std::fs::File::create(&rec3)?;
         std::fs::File::create(&garbage)?;
 
-    for (ver, fresh_sql) in &[
-        (1, None), // v0 schema outdated; skip comparison
-        (2, None), // transitional; don't compare schemas.
-        (3, Some(include_str!("v3.sql"))),
-        (4, None), // transitional; don't compare schemas.
-        (5, Some(include_str!("v5.sql"))),
-        (6, Some(include_str!("v6.sql"))),
-        (7, None), // v7 schema not available; skip comparison
-        (8, Some(include_str!("../schema.sql"))),
-    ] {
+        for (ver, fresh_sql) in &[
+            (1, None), // v0 schema outdated; skip comparison
+            (2, None), // transitional; don't compare schemas.
+            (3, Some(include_str!("v3.sql"))),
+            (4, None), // transitional; don't compare schemas.
+            (5, Some(include_str!("v5.sql"))),
+            (6, Some(include_str!("v6.sql"))),
+            (7, None), // v7 schema not available; skip comparison
+            (8, Some(include_str!("../schema.sql"))),
+        ] {
             upgrade(
                 &Args {
                     sample_file_dir: Some(tmpdir.path()),
