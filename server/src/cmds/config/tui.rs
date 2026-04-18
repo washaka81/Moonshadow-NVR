@@ -7,7 +7,6 @@
 use crate::cmds::open_conn;
 use crate::cmds::OpenMode;
 use base::clock;
-use base::err;
 use base::Error;
 use bpaf::Bpaf;
 use crossterm::{
@@ -20,9 +19,8 @@ use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style, Stylize},
-    symbols::border,
     text::{Line, Span},
-    widgets::{Block, Borders, List, ListItem, ListState, Paragraph, Scrollbar, ScrollbarState},
+    widgets::{Block, Borders, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
 };
 use std::io;
@@ -33,7 +31,8 @@ use std::time::Duration;
 #[derive(Clone, Debug)]
 pub struct CameraCard {
     pub id: i32,
-    pub uuid: String,
+    #[allow(dead_code)]
+    uuid: String,
     pub short_name: String,
     pub description: String,
     pub status: CameraStatus,
