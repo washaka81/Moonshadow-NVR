@@ -58,7 +58,7 @@ pub fn run(args: Args) -> Result<i32, Error> {
     Ok(0)
 }
 
-fn run_interactive_cli(db: Arc<db::Database>, db_dir: PathBuf) -> Result<(), Error> {
+fn run_interactive_cli(db: Arc<db::Database>, _db_dir: PathBuf) -> Result<(), Error> {
     let theme = ColorfulTheme::default();
 
     loop {
@@ -83,9 +83,7 @@ fn run_interactive_cli(db: Arc<db::Database>, db_dir: PathBuf) -> Result<(), Err
 
         match selection {
             0 => {
-                tui::run(tui::Args {
-                    db_dir: db_dir.clone(),
-                })?;
+                tui::run_tui_camera_menu(&db)?;
             }
             1 => cameras::run_camera_ui(&db)?,
             2 => manage_directories(&db)?,
