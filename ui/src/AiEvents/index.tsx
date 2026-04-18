@@ -1,3 +1,7 @@
+// This file is part of Moonshadow NVR, a security camera network video recorder.
+// Copyright (C) 2025 Moonshadow NVR Contributors; see AUTHORS and LICENSE.txt.
+// SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
+
 import Container from "@mui/material/Container";
 import Typography from "@mui/material/Typography";
 import React, { useEffect, useState, useCallback } from "react";
