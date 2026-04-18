@@ -16,10 +16,13 @@ export default defineConfig(
   ...tseslint.configs.recommended,
   react.configs.flat.recommended,
   react.configs.flat["jsx-runtime"],
-  reactHooks.configs["recommended-latest"],
   {
     plugins: {
+      "react-hooks": reactHooks,
       "react-refresh": reactRefresh,
+    },
+    rules: {
+      ...reactHooks.configs.recommended.rules,
     },
   },
   {
