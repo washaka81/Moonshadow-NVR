@@ -98,7 +98,15 @@ export default function AiEventsActivity({
           AI Events
         </Typography>
 
-        <Box sx={{ display: 'flex', gap: 2, mb: 3, alignItems: 'center', flexWrap: 'wrap' }}>
+        <Box
+          sx={{
+            display: "flex",
+            gap: 2,
+            mb: 3,
+            alignItems: "center",
+            flexWrap: "wrap",
+          }}
+        >
           <FormControl size="small" sx={{ minWidth: 150 }}>
             <InputLabel>Type</InputLabel>
             <Select
@@ -106,14 +114,16 @@ export default function AiEventsActivity({
               label="Type"
               onChange={(e) => setTypeFilter(e.target.value)}
             >
-              <MenuItem value=""><em>All</em></MenuItem>
+              <MenuItem value="">
+                <em>All</em>
+              </MenuItem>
               <MenuItem value="plate">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <DirectionsCarIcon fontSize="small" /> Plate
                 </Box>
               </MenuItem>
               <MenuItem value="person_reid">
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
                   <PersonIcon fontSize="small" /> Person ReID
                 </Box>
               </MenuItem>
@@ -162,14 +172,25 @@ export default function AiEventsActivity({
                 <TableRow key={idx} hover>
                   <TableCell>
                     <Tooltip title={`Raw: ${event.time_90k}`}>
-                      <span>{formatTime90k(event.time_90k, Intl.DateTimeFormat().resolvedOptions().timeZone)}</span>
+                      <span>
+                        {formatTime90k(
+                          event.time_90k,
+                          Intl.DateTimeFormat().resolvedOptions().timeZone,
+                        )}
+                      </span>
                     </Tooltip>
                   </TableCell>
                   <TableCell>{event.camera_id}</TableCell>
-                  <TableCell>{renderTypeChip(event.type_, event.value)}</TableCell>
+                  <TableCell>
+                    {renderTypeChip(event.type_, event.value)}
+                  </TableCell>
                   <TableCell>
                     {event.type_ === "plate" ? (
-                      <Typography variant="body2" fontFamily="monospace" fontSize="1.1em">
+                      <Typography
+                        variant="body2"
+                        fontFamily="monospace"
+                        fontSize="1.1em"
+                      >
                         {event.value}
                       </Typography>
                     ) : (

@@ -71,8 +71,8 @@ class MoonshadowErrorBoundary extends React.Component<Props, State> {
           <h1>Error</h1>
 
           <p>
-            Sorry! You've found a bug in Moonshadow NVR. We need a good bug report
-            to get it fixed. Can you help?
+            Sorry! You've found a bug in Moonshadow NVR. We need a good bug
+            report to get it fixed. Can you help?
           </p>
 
           <h2>How to report a bug</h2>

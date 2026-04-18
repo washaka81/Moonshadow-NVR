@@ -61,9 +61,9 @@ const Inner = ({ csrf }: { csrf?: string }) => {
     try {
       const url = new URL(ip);
       ip = url.hostname;
-} catch {
-  // Not a valid URL, assume it's an IP.
-}
+    } catch {
+      // Not a valid URL, assume it's an IP.
+    }
     if (!ip) {
       snackbars.enqueue({
         message: "Please enter an ONVIF Base URL or IP address first.",

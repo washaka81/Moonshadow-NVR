@@ -186,7 +186,15 @@ const Row = ({
     <TableCell align="right">
       {bitrate}
       {aiEvents && aiEvents.length > 0 && (
-        <div style={{ marginTop: "4px", display: "flex", gap: "2px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <div
+          style={{
+            marginTop: "4px",
+            display: "flex",
+            gap: "2px",
+            flexWrap: "wrap",
+            justifyContent: "flex-end",
+          }}
+        >
           {aiEvents.map((event, idx) => (
             <Tooltip
               key={idx}
@@ -194,8 +202,8 @@ const Row = ({
                 event.type_ === "plate"
                   ? `Plate: ${event.value}`
                   : event.type_ === "person_reid"
-                  ? `Person: ${event.value}`
-                  : `${event.type_}: ${event.value}`
+                    ? `Person: ${event.value}`
+                    : `${event.type_}: ${event.value}`
               }
             >
               <Chip
@@ -211,8 +219,8 @@ const Row = ({
                   event.type_ === "plate"
                     ? event.value
                     : event.type_ === "person_reid"
-                    ? event.value.replace("person_", "P")
-                    : event.type_
+                      ? event.value.replace("person_", "P")
+                      : event.type_
                 }
                 sx={{
                   height: "20px",
@@ -220,8 +228,8 @@ const Row = ({
                   ...(event.type_ === "plate"
                     ? { backgroundColor: "#e3f2fd", color: "#1565c0" }
                     : event.type_ === "person_reid"
-                    ? { backgroundColor: "#fce4ec", color: "#c2185b" }
-                    : { backgroundColor: "#f3e5f5", color: "#7b1fa2" }),
+                      ? { backgroundColor: "#fce4ec", color: "#c2185b" }
+                      : { backgroundColor: "#f3e5f5", color: "#7b1fa2" }),
                 }}
               />
             </Tooltip>
@@ -312,7 +320,12 @@ const VideoList = ({
     };
     if (range90k !== null) {
       const timerId = setTimeout(
-        () => setState({ range90k, response: { status: "skeleton" }, aiEvents: [] }),
+        () =>
+          setState({
+            range90k,
+            response: { status: "skeleton" },
+            aiEvents: [],
+          }),
         1000,
       );
       doFetch(abort.signal, timerId, range90k);
@@ -352,9 +365,12 @@ const VideoList = ({
     const aiEvents = state.aiEvents;
 
     // Helper to find AI events within a recording's time range
-    const findEventsForRecording = (startTime90k: number, endTime90k: number) => {
+    const findEventsForRecording = (
+      startTime90k: number,
+      endTime90k: number,
+    ) => {
       return aiEvents.filter(
-        (e) => e.time_90k >= startTime90k && e.time_90k < endTime90k
+        (e) => e.time_90k >= startTime90k && e.time_90k < endTime90k,
       );
     };
 
@@ -368,7 +384,10 @@ const VideoList = ({
         ? Math.min(r.endTime90k, state.range90k[1])
         : r.endTime90k;
 
-      const recordingAiEvents = findEventsForRecording(r.startTime90k, r.endTime90k);
+      const recordingAiEvents = findEventsForRecording(
+        r.startTime90k,
+        r.endTime90k,
+      );
 
       return (
         <Row
@@ -382,7 +401,9 @@ const VideoList = ({
           fps={frameRateFmt.format(r.videoSamples / durationSec)}
           storage={`${sizeFmt.format(r.sampleFileBytes / 1048576)} MiB`}
           bitrate={`${sizeFmt.format(rate)} Mbps`}
-          aiEvents={recordingAiEvents.length > 0 ? recordingAiEvents : undefined}
+          aiEvents={
+            recordingAiEvents.length > 0 ? recordingAiEvents : undefined
+          }
         />
       );
     });

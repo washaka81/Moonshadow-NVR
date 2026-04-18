@@ -33,23 +33,23 @@ interface SnackbarProviderProps {
   children: React.ReactNode;
 }
 
-export interface MySnackbarProps
-  extends Omit<
-    SnackbarProps,
-    "key" |
-    "anchorOrigin" |
-    "open" |
-    "handleClosed" |
-    "TransitionProps" |
-    "message" |
-    "actions"
-  > {
+export interface MySnackbarProps extends Omit<
+  SnackbarProps,
+  | "key"
+  | "anchorOrigin"
+  | "open"
+  | "handleClosed"
+  | "TransitionProps"
+  | "message"
+  | "actions"
+> {
   key?: React.Key;
   message: string;
   severity?: AlertProps["severity"];
 }
 
-type MySnackbarPropsWithRequiredKey = Omit<MySnackbarProps, "key"> & Required<Pick<MySnackbarProps, "key">>;
+type MySnackbarPropsWithRequiredKey = Omit<MySnackbarProps, "key"> &
+  Required<Pick<MySnackbarProps, "key">>;
 interface Enqueued extends MySnackbarPropsWithRequiredKey {
   open: boolean;
 }

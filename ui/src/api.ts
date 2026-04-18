@@ -134,17 +134,17 @@ async function json<T>(
 ): Promise<FetchResult<T>> {
   const fetchRes = await myfetch(url, init);
   if (fetchRes.status !== "success") {
-return fetchRes;
-}
-let body;
-try {
-  body = await fetchRes.response.json();
-} catch (e) {
-  if (e instanceof Error && e.name === "AbortError") {
-    return { status: "aborted" };
+    return fetchRes;
   }
-  throw e;
-}
+  let body;
+  try {
+    body = await fetchRes.response.json();
+  } catch (e) {
+    if (e instanceof Error && e.name === "AbortError") {
+      return { status: "aborted" };
+    }
+    throw e;
+  }
   return {
     status: "success",
     response: body,

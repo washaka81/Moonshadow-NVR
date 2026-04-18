@@ -64,9 +64,8 @@ export default function DeleteDialog({
     <Dialog open={cameraToDelete !== undefined}>
       <DialogTitle>Delete camera {cameraToDelete?.shortName}</DialogTitle>
       <DialogContent>
-        This will permanently delete the given camera.
-        Only cameras with no recordings can be deleted.
-        There's no undo!
+        This will permanently delete the given camera. Only cameras with no
+        recordings can be deleted. There's no undo!
       </DialogContent>
       <DialogActions>
         <Button onClick={onClose} disabled={req !== undefined}>

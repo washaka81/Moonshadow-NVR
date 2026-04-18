@@ -10,10 +10,7 @@ const target = process.env.PROXY_TARGET ?? "http://localhost:8080/";
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [
-    react(),
-    viteCompression(),
-  ],
+  plugins: [react(), viteCompression()],
   server: {
     proxy: {
       "/api": {
