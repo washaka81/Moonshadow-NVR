@@ -2,99 +2,229 @@
 // Copyright (C) 2017-2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-//! Modern interactive user configuration panel.
+//! Interactive CLI user configuration with dialoguer.
 
+use base::err;
 use base::Error;
-use console::style;
+use bpaf::Bpaf;
+use console::{pad_str, Alignment};
+use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
+use std::path::PathBuf;
 use std::sync::Arc;
 
-use cursive::{
-    direction::Orientation,
-    event::Key,
-    traits::*,
-    view::Nameable,
-    views::{Checkbox, Dialog, EditView, LinearLayout, Panel, SelectView, TextView},
-    Cursive,
-};
+use crate::cmds::open_conn;
+use crate::cmds::OpenMode;
+use base::clock;
 
-/// Builds the main user configuration panel.
-pub fn build_user_panel(db: Arc<db::Database>) -> impl cursive::view::View {
-    let panel = Panel::new(build_user_list_view(db.clone())).title("👥 User Configuration");
+const PC_PURPLE: &str = "\x1b[38;2;191;219;216m";
+const PC_GREEN: &str = "\x1b[38:2:166:227:161m";
+const PC_BLUE: &str = "\x1b[38:2:137:180:250m";
+const PC_PINK: &str = "\x1b[38:2:205:127:151m";
+const PC_RESET: &str = "\x1b[0m";
 
-    panel.with_name("users_panel")
+fn pc(s: &str) -> String {
+    format!("{}{}", PC_PURPLE, s)
 }
 
-/// Builds the user list view.
-fn build_user_list_view(db: Arc<db::Database>) -> impl cursive::view::View {
-    let mut layout = LinearLayout::new(Orientation::Vertical);
-
-    // User list
-    layout.add_child(
-        SelectView::<i32>::new()
-            .on_submit(move |s, user_id: &i32| {
-                show_user_detail(s, *user_id, db.clone());
-            })
-            .with_name("user_list")
-            .scrollable()
-            .full_screen(),
-    );
-
-    // Action buttons
-    let buttons = LinearLayout::new(Orientation::Horizontal)
-        .child(cursive::views::Button::new("➕ Add User", move |s| {
-            show_add_user_dialog(s, db.clone());
-        }))
-        .child(cursive::views::Button::new("✏️ Edit", move |s| {
-            edit_selected_user(s, db.clone());
-        }))
-        .child(cursive::views::Button::new("🗑️ Delete", move |s| {
-            delete_selected_user(s, db.clone());
-        }))
-        .child(cursive::views::Button::new("🔄 Refresh", move |s| {
-            refresh_user_list(s, db.clone());
-        }));
-
-    layout.add_child(buttons);
-
-    // Load initial data
-    refresh_user_list_impl(&mut layout, db);
-
-    LinearLayout::new(Orientation::Vertical)
-        .child(layout)
-        .full_screen()
+fn gr(s: &str) -> String {
+    format!("{}{}", PC_GREEN, s)
 }
 
-/// Refreshes the user list from database.
-fn refresh_user_list(s: &mut Cursive, db: Arc<db::Database>) {
-    // This function is not implemented correctly yet
-    // For now, do nothing
+fn pk(s: &str) -> String {
+    format!("{}{}", PC_PINK, s)
 }
 
-fn refresh_user_list_impl(layout: &mut LinearLayout, db: Arc<db::Database>) {
+fn bl(s: &str) -> String {
+    format!("{}{}", PC_BLUE, s)
+}
+
+#[derive(Clone, Debug)]
+pub struct UserCard {
+    pub id: i32,
+    pub username: String,
+    pub permissions: db::Permissions,
+}
+
+#[derive(Bpaf, Debug)]
+#[bpaf(command("users"))]
+#[allow(dead_code)]
+pub struct Args {
+    #[bpaf(external(crate::parse_db_dir))]
+    db_dir: PathBuf,
+}
+
+#[allow(dead_code)]
+pub fn run(args: Args) -> Result<i32, Error> {
+    let (_db_dir, mut conn) = open_conn(&args.db_dir, OpenMode::ReadWrite)?;
+
+    let cur_ver = db::get_schema_version(&conn)?;
+    if cur_ver.is_none() {
+        println!("{}Initializing database...", pc("🗄️ "));
+        conn.execute_batch(
+            r#"
+pragma journal_mode = delete;
+pragma page_size = 16384;
+vacuum;
+pragma journal_mode = wal;
+"#,
+        )?;
+        db::init(&mut conn)?;
+    }
+
+    let db = Arc::new(db::Database::new(clock::RealClocks {}, conn, true)?);
+
+    println!("{}Moonshadow NVR - User Management", pc("👥 "));
+    run_user_ui(&db)?;
+
+    Ok(0)
+}
+
+pub fn run_user_ui(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    loop {
+        print!("\x1B[2J\x1B[1;1H");
+
+        let users = load_users(db);
+
+        print_header();
+
+        if users.is_empty() {
+            print_empty_state();
+        } else {
+            print_table(&users);
+        }
+
+        println!();
+        println!("{}Controls: {}q{}=quit | {}a{}=add | {}r{}=refresh | {}e{}=edit | {}d{}=delete | [num]=view",
+            bl("► "), pk("q"), PC_RESET,
+            pk("a"), PC_RESET,
+            pk("r"), PC_RESET,
+            pk("e"), PC_RESET,
+            pk("d"), PC_RESET
+        );
+        println!();
+
+        let input: String = Input::with_theme(&theme)
+            .allow_empty(true)
+            .with_prompt("Enter command")
+            .interact_text()
+            .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+        let input = input.trim().to_lowercase();
+
+        match input.as_str() {
+            "q" | "quit" => break,
+            "a" | "add" => {
+                add_user_interactive(db)?;
+            }
+            "r" | "refresh" => {}
+            "e" | "edit" => {
+                if !users.is_empty() {
+                    edit_user_interactive(db, &users)?;
+                }
+            }
+            "d" | "delete" => {
+                if !users.is_empty() {
+                    delete_user_interactive(db, &users)?;
+                }
+            }
+            _ => {
+                if let Ok(num) = input.parse::<usize>() {
+                    let idx = num.saturating_sub(1);
+                    if idx < users.len() {
+                        show_user_detail(db, users[idx].id)?;
+                    }
+                }
+            }
+        }
+    }
+
+    println!("{}Goodbye!", gr("👋 "));
+    Ok(())
+}
+
+fn load_users(db: &Arc<db::Database>) -> Vec<UserCard> {
     let l = db.lock();
     let users = l.users_by_id();
-
-    let mut select = SelectView::<i32>::new().on_submit(move |s, user_id: &i32| {
-        show_user_detail(s, *user_id, db.clone());
-    });
+    let mut result: Vec<UserCard> = Vec::new();
 
     for (id, user) in users {
-        let perms = format_permissions_summary(&user.permissions);
-        let label = format!("👤 {} (ID: {}) - {}", user.username, user.id, perms);
-        select.add_item(label, *id);
+        result.push(UserCard {
+            id: *id,
+            username: user.username.clone(),
+            permissions: user.permissions.clone(),
+        });
     }
 
-    if users.is_empty() {
-        select.add_item("(No users configured)", -1);
-    }
-
-    if let Some(mut select_view) = layout.find_name::<SelectView<i32>>("user_list") {
-        *select_view = select;
-    }
-    drop(l);
+    result.sort_by(|a, b| a.id.cmp(&b.id));
+    result
 }
 
-/// Formats a summary of permissions.
+fn print_header() {
+    println!(
+        "{}╔══════════════════════════════════════════════════════════════════════════════╗",
+        PC_PURPLE
+    );
+    println!(
+        "║{} 👥 Moonshadow NVR - User Manager {} ║",
+        PC_BLUE, PC_RESET
+    );
+    println!(
+        "{}╚══════════════════════════════════════════════════════════════════════════════╝",
+        PC_PURPLE
+    );
+    println!();
+}
+
+fn print_empty_state() {
+    print!("{}", PC_PINK);
+    println!(" ┌─────────────────────────────────────────────────────────────────────────────┐");
+    println!(" │ 👥 No users configured                                                      │");
+    print!("{}", PC_RESET);
+    println!(
+        " │ Press {}a{} to add your first user                                              │",
+        pk("a"),
+        PC_RESET
+    );
+    println!(
+        " │ or press {}q{} to return to the main menu                                       │",
+        pk("q"),
+        PC_RESET
+    );
+    println!(" └─────────────────────────────────────────────────────────────────────────────┘");
+    print!("{}", PC_RESET);
+    println!();
+}
+
+fn print_table(users: &[UserCard]) {
+    print!("{}", PC_BLUE);
+    println!(" ┌─────┬──────────────────────┬─────────────────────────────────────────────┐");
+    println!(
+        " │ {:^3} │ {:^20} │ {:^40} │",
+        pc("#"),
+        pc("Username"),
+        pc("Permissions")
+    );
+    println!(" ├─────┼──────────────────────┼─────────────────────────────────────────────┤");
+
+    for (idx, user) in users.iter().enumerate() {
+        let perms = format_permissions_summary(&user.permissions);
+        let id_str = format!("{}", idx + 1);
+
+        println!(
+            " │ {:^3} │ {:<20} │ {:<40} │",
+            bl(&id_str),
+            bl(&user.username),
+            gr(&perms)
+        );
+    }
+
+    println!(" └─────┴──────────────────────┴─────────────────────────────────────────────┘");
+    println!("{}", PC_RESET);
+    println!();
+}
+
 fn format_permissions_summary(perms: &db::Permissions) -> String {
     let mut parts = Vec::new();
     if perms.admin_users {
@@ -103,6 +233,12 @@ fn format_permissions_summary(perms: &db::Permissions) -> String {
     if perms.view_video {
         parts.push("View");
     }
+    if perms.read_camera_configs {
+        parts.push("ReadCam");
+    }
+    if perms.update_signals {
+        parts.push("UpdSig");
+    }
     if parts.is_empty() {
         "None".to_string()
     } else {
@@ -110,118 +246,144 @@ fn format_permissions_summary(perms: &db::Permissions) -> String {
     }
 }
 
-/// Gets the currently selected user ID.
-fn get_selected_user_id(s: &mut Cursive) -> Option<i32> {
-    s.find_name::<SelectView<i32>>("user_list")
-        .and_then(|select| select.selection().map(|arc| *arc))
-        .filter(|id| *id >= 0)
-}
+fn show_user_detail(db: &Arc<db::Database>, user_id: i32) -> Result<(), Error> {
+    let l = db.lock();
+    let user = match l.users_by_id().get(&user_id) {
+        Some(u) => u.clone(),
+        None => {
+            println!("{}User not found!", pk("⚠️ "));
+            return Ok(());
+        }
+    };
+    drop(l);
 
-/// Shows the add user dialog.
-fn show_add_user_dialog(s: &mut Cursive, db: Arc<db::Database>) {
-    let mut layout = LinearLayout::new(Orientation::Vertical);
-
-    layout.add_child(TextView::new("=== Add New User ===\n"));
-
-    let username_edit = EditView::new()
-        .with_prompt("Username: ")
-        .with_name("username");
-
-    layout.add_child(username_edit);
-
-    let password_edit = EditView::new()
-        .secret()
-        .with_prompt("Password: ")
-        .with_name("password");
-
-    layout.add_child(password_edit);
-
-    let confirm_edit = EditView::new()
-        .secret()
-        .with_prompt("Confirm: ")
-        .with_name("confirm_password");
-
-    layout.add_child(confirm_edit);
-
-    layout.add_child(TextView::new("\n=== Default Permissions ==="));
-
-    let view_video = Checkbox::new().with_name("perm_view_video");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(view_video)
-            .child(TextView::new(" View Video")),
+    println!();
+    println!("{}User Details: {}", pc("👤 "), bl(&user.username));
+    println!("{}ID: {}", pc("🆔 "), bl(&user_id.to_string()));
+    println!("{}Permissions:", pc("🔐 "));
+    println!(
+        "  View Video: {}",
+        if user.permissions.view_video {
+            gr("✅")
+        } else {
+            pk("❌")
+        }
     );
-
-    let admin_users = Checkbox::new().with_name("perm_admin");
-
-    layout.add_child(
-        LinearLayout::new(Orientation::Horizontal)
-            .child(admin_users)
-            .child(TextView::new(" Admin (Manage Users)")),
+    println!(
+        "  Admin Users: {}",
+        if user.permissions.admin_users {
+            gr("✅")
+        } else {
+            pk("❌")
+        }
     );
+    println!(
+        "  Read Camera Configs: {}",
+        if user.permissions.read_camera_configs {
+            gr("✅")
+        } else {
+            pk("❌")
+        }
+    );
+    println!(
+        "  Update Signals: {}",
+        if user.permissions.update_signals {
+            gr("✅")
+        } else {
+            pk("❌")
+        }
+    );
+    println!();
+    println!(
+        "{}Controls: {}p{}=change password | {}d{}=delete | {}q{}=back",
+        bl("► "),
+        pk("p"),
+        PC_RESET,
+        pk("d"),
+        PC_RESET,
+        pk("q"),
+        PC_RESET
+    );
+    println!();
 
-    let db_clone = db.clone();
-    let dialog = Dialog::new()
-        .title("➕ Add New User")
-        .content(layout)
-        .button("💾 Create", move |s| {
-            if create_user(s, &db_clone) {
-                s.pop_layer();
-                refresh_user_list(s, db_clone.clone());
+    let theme = ColorfulTheme::default();
+    loop {
+        let input: String = Input::with_theme(&theme)
+            .allow_empty(true)
+            .with_prompt("Enter command")
+            .interact_text()
+            .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+        match input.trim() {
+            "p" | "password" => {
+                change_password_interactive(db, user_id)?;
+                break;
             }
-        })
-        .button("Cancel", |s| {
-            s.pop_layer();
-        });
+            "d" | "delete" => {
+                delete_user(db, user_id)?;
+                break;
+            }
+            "q" | "quit" | "" => break,
+            _ => {}
+        }
+    }
 
-    s.add_layer(dialog);
+    Ok(())
 }
 
-/// Creates a new user from the dialog form.
-fn create_user(s: &mut Cursive, db: &Arc<db::Database>) -> bool {
-    let username = if let Some(edit) = s.find_name::<EditView>("username") {
-        edit.get_content().to_string()
-    } else {
-        return false;
-    };
+fn add_user_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
 
-    let password = if let Some(edit) = s.find_name::<EditView>("password") {
-        edit.get_content().to_string()
-    } else {
-        return false;
-    };
+    println!();
+    println!("{}Add New User", pc("➕ "));
 
-    let confirm = if let Some(edit) = s.find_name::<EditView>("confirm_password") {
-        edit.get_content().to_string()
-    } else {
-        return false;
-    };
+    let username: String = Input::with_theme(&theme)
+        .with_prompt("Username (required)")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
 
-    if username.is_empty() {
-        show_error_dialog(s, "Username cannot be empty.");
-        return false;
-    }
+    let password: String = Input::with_theme(&theme)
+        .with_prompt("Password (required)")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let confirm: String = Input::with_theme(&theme)
+        .with_prompt("Confirm password")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
 
     if password != confirm {
-        show_error_dialog(s, "Passwords do not match.");
-        return false;
+        println!("{}Passwords do not match.", pk("❌ "));
+        return Ok(());
     }
 
-    if password.is_empty() {
-        show_error_dialog(s, "Password cannot be empty.");
-        return false;
+    println!();
+    println!("{}Permissions:", pc("🔐 "));
+    let view_video = Confirm::with_theme(&theme)
+        .with_prompt("View Video permission?")
+        .default(true)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    let admin_users = Confirm::with_theme(&theme)
+        .with_prompt("Admin Users permission?")
+        .default(false)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    let save = Confirm::with_theme(&theme)
+        .with_prompt("Save user?")
+        .default(true)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    if !save {
+        println!("{}Cancelled.", pk("⚠️ "));
+        return Ok(());
     }
-
-    let view_video = s
-        .find_name::<Checkbox>("perm_view_video")
-        .map(|c| c.is_checked())
-        .unwrap_or(true);
-
-    let admin_users = s
-        .find_name::<Checkbox>("perm_admin")
-        .map(|c| c.is_checked())
-        .unwrap_or(false);
 
     let mut change = db::UserChange::add_user(username);
     change.set_password(password.into());
@@ -230,139 +392,126 @@ fn create_user(s: &mut Cursive, db: &Arc<db::Database>) -> bool {
 
     match db.lock().apply_user_change(change) {
         Ok(_) => {
-            println!("{}", style("User added successfully!").green().bold());
-            true
+            println!("{}User added successfully!", gr("✅ "));
         }
         Err(e) => {
-            show_error_dialog(s, &format!("Failed to add user: {}", e));
-            false
+            println!("{}Failed to add user: {}", pk("❌ "), e);
         }
     }
+
+    Ok(())
 }
 
-/// Shows the user detail/edit dialog.
-fn show_user_detail(s: &mut Cursive, user_id: i32, db: Arc<db::Database>) {
-    if user_id < 0 {
-        return;
+fn edit_user_interactive(db: &Arc<db::Database>, users: &[UserCard]) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    println!();
+    println!("{}Select user to edit:", pc("✏️ "));
+
+    let mut options: Vec<String> = users.iter().map(|u| format!("👤 {}", u.username)).collect();
+    options.push("↩️ Back".to_string());
+
+    let selection = Select::with_theme(&theme)
+        .with_prompt("Select user")
+        .items(&options)
+        .default(0)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    if selection == options.len() - 1 {
+        return Ok(());
     }
 
-    let l = db.lock();
-    let user = match l.users_by_id().get(&user_id) {
-        Some(u) => u.clone(),
-        None => return,
-    };
-    drop(l);
+    let user_id = users[selection].id;
+    show_user_detail(db, user_id)?;
 
-    let mut layout = LinearLayout::new(Orientation::Vertical);
-
-    layout.add_child(TextView::new(format!("👤 User: {}", user.username)));
-    layout.add_child(TextView::new(format!("🆔 ID: {}", user.id)));
-    layout.add_child(TextView::new(""));
-    layout.add_child(TextView::new("=== Permissions ==="));
-    layout.add_child(TextView::new(format!(
-        "  View Video: {}",
-        if user.permissions.view_video {
-            "✅"
-        } else {
-            "❌"
-        }
-    )));
-    layout.add_child(TextView::new(format!(
-        "  Admin Users: {}",
-        if user.permissions.admin_users {
-            "✅"
-        } else {
-            "❌"
-        }
-    )));
-    layout.add_child(TextView::new(format!(
-        "  Read Camera Configs: {}",
-        if user.permissions.read_camera_configs {
-            "✅"
-        } else {
-            "❌"
-        }
-    )));
-    layout.add_child(TextView::new(format!(
-        "  Update Signals: {}",
-        if user.permissions.update_signals {
-            "✅"
-        } else {
-            "❌"
-        }
-    )));
-    layout.add_child(TextView::new(""));
-
-    // Password change section
-    layout.add_child(TextView::new("=== Change Password ==="));
-
-    let new_password_edit = EditView::new()
-        .secret()
-        .with_prompt("New Password: ")
-        .with_name("new_password");
-
-    layout.add_child(new_password_edit);
-
-    let confirm_edit = EditView::new()
-        .secret()
-        .with_prompt("Confirm: ")
-        .with_name("confirm_new_password");
-
-    layout.add_child(confirm_edit);
-
-    let db_clone = db.clone();
-    let dialog = Dialog::new()
-        .title("User Details")
-        .content(layout)
-        .button("💾 Change Password", move |s| {
-            if change_user_password(s, user_id, &db_clone) {
-                s.pop_layer();
-                refresh_user_list(s, db_clone.clone());
-            }
-        })
-        .button("🗑️ Delete", move |s| {
-            if confirm_delete_user(s, user_id, &db) {
-                s.pop_layer();
-                refresh_user_list(s, db.clone());
-            }
-        })
-        .button("↩️ Close", |s| {
-            s.pop_layer();
-        });
-
-    s.add_layer(dialog);
+    Ok(())
 }
 
-/// Changes a user password from the dialog form.
-fn change_user_password(s: &mut Cursive, user_id: i32, db: &Arc<db::Database>) -> bool {
-    let new_password = if let Some(edit) = s.find_name::<EditView>("new_password") {
-        edit.get_content().to_string()
-    } else {
-        return false;
-    };
+fn delete_user_interactive(db: &Arc<db::Database>, users: &[UserCard]) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
 
-    let confirm = if let Some(edit) = s.find_name::<EditView>("confirm_new_password") {
-        edit.get_content().to_string()
-    } else {
-        return false;
-    };
+    println!();
+    println!("{}Select user to delete:", pk("🗑️ "));
 
-    if new_password.is_empty() {
-        show_error_dialog(s, "Password cannot be empty.");
-        return false;
+    let mut options: Vec<String> = users.iter().map(|u| format!("👤 {}", u.username)).collect();
+    options.push("↩️ Back".to_string());
+
+    let selection = Select::with_theme(&theme)
+        .with_prompt("Select user")
+        .items(&options)
+        .default(0)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    if selection == options.len() - 1 {
+        return Ok(());
     }
+
+    let user_id = users[selection].id;
+    delete_user(db, user_id)?;
+
+    Ok(())
+}
+
+fn delete_user(db: &Arc<db::Database>, user_id: i32) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    let confirm = Confirm::with_theme(&theme)
+        .with_prompt(format!(
+            "Delete user ID {}? This cannot be undone!",
+            user_id
+        ))
+        .default(false)
+        .interact()
+        .map_err(|e| err!(InvalidArgument, msg("Dialog error: {}", e)))?;
+
+    if !confirm {
+        println!("{}Cancelled.", pk("⚠️ "));
+        return Ok(());
+    }
+
+    match db.lock().delete_user(user_id) {
+        Ok(_) => {
+            println!("{}User deleted successfully!", gr("✅ "));
+        }
+        Err(e) => {
+            println!("{}Failed to delete user: {}", pk("❌ "), e);
+        }
+    }
+
+    Ok(())
+}
+
+fn change_password_interactive(db: &Arc<db::Database>, user_id: i32) -> Result<(), Error> {
+    let theme = ColorfulTheme::default();
+
+    println!();
+    println!("{}Change Password", pc("🔐 "));
+
+    let new_password: String = Input::with_theme(&theme)
+        .with_prompt("New password")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+    let confirm: String = Input::with_theme(&theme)
+        .with_prompt("Confirm password")
+        .allow_empty(false)
+        .interact_text()
+        .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
 
     if new_password != confirm {
-        show_error_dialog(s, "Passwords do not match.");
-        return false;
+        println!("{}Passwords do not match.", pk("❌ "));
+        return Ok(());
     }
 
     let mut l = db.lock();
     let user = match l.users_by_id().get(&user_id) {
         Some(u) => u.clone(),
         None => {
-            show_error_dialog(s, "User not found.");
-            return false;
+            println!("{}User not found.", pk("⚠️ "));
+            return Ok(());
         }
     };
 
@@ -371,85 +520,16 @@ fn change_user_password(s: &mut Cursive, user_id: i32, db: &Arc<db::Database>) -
 
     match l.apply_user_change(change) {
         Ok(_) => {
-            println!("{}", style("Password updated successfully.").green().bold());
-            true
+            println!("{}Password updated successfully.", gr("✅ "));
         }
         Err(e) => {
-            show_error_dialog(s, &format!("Failed to update password: {}", e));
-            false
+            println!("{}Failed to update password: {}", pk("❌ "), e);
         }
     }
-}
-
-/// Edits the currently selected user.
-fn edit_selected_user(s: &mut Cursive, db: Arc<db::Database>) {
-    if let Some(user_id) = get_selected_user_id(s) {
-        show_user_detail(s, user_id, db);
-    }
-}
-
-/// Deletes the currently selected user.
-fn delete_selected_user(s: &mut Cursive, db: Arc<db::Database>) {
-    if let Some(user_id) = get_selected_user_id(s) {
-        confirm_delete_user(s, user_id, &db);
-    }
-}
-
-/// Shows confirmation dialog before deleting a user.
-fn confirm_delete_user(s: &mut Cursive, user_id: i32, db: &Arc<db::Database>) -> bool {
-    let db_clone = db.clone();
-    let dialog = Dialog::new()
-        .title("⚠️ Confirm Delete")
-        .content(TextView::new(
-            "Are you sure you want to delete this user?\nThis action cannot be undone!",
-        ))
-        .button("🗑️ Delete", move |s| {
-            match db_clone.lock().delete_user(user_id) {
-                Ok(_) => {
-                    s.pop_layer();
-                    println!("{}", style("User deleted successfully.").green());
-                }
-                Err(e) => {
-                    show_error_dialog(s, &format!("Delete failed: {}", e));
-                }
-            }
-        })
-        .button("Cancel", |s| {
-            s.pop_layer();
-        });
-
-    s.add_layer(dialog);
-    false
-}
-
-/// Shows an error dialog with the given message.
-fn show_error_dialog(s: &mut Cursive, message: &str) {
-    let dialog = Dialog::new()
-        .title("❌ Error")
-        .content(TextView::new(message))
-        .button("OK", |s| {
-            s.pop_layer();
-        });
-    s.add_layer(dialog);
-}
-
-/// Legacy wizard function for backward compatibility.
-pub fn run_wizard(db: &Arc<db::Database>) -> Result<(), Error> {
-    println!(
-        "{}",
-        style("Starting interactive user configuration...").cyan()
-    );
-    run_interactive(db)
-}
-
-fn run_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
-    let mut siv = cursive::default();
-    siv.set_user_data(db.clone());
-
-    let panel = build_user_panel(db.clone());
-    siv.add_fullscreen_layer(panel);
-
-    siv.run();
 
     Ok(())
+}
+
+pub fn run_wizard(db: &Arc<db::Database>) -> Result<(), Error> {
+    run_user_ui(db)
 }

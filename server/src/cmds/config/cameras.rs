@@ -11,9 +11,11 @@ use base::err;
 use base::Error;
 use bpaf::Bpaf;
 use console::{pad_str, Alignment};
+use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::time::Duration;
 
 const ITEMS_PER_PAGE: usize = 20;
 
@@ -75,11 +77,13 @@ impl CameraStatus {
 
 #[derive(Bpaf, Debug)]
 #[bpaf(command("cameras"))]
+#[allow(dead_code)]
 pub struct Args {
     #[bpaf(external(crate::parse_db_dir))]
     db_dir: PathBuf,
 }
 
+#[allow(dead_code)]
 pub fn run(args: Args) -> Result<i32, Error> {
     let (_db_dir, mut conn) = open_conn(&args.db_dir, OpenMode::ReadWrite)?;
 
@@ -152,7 +156,7 @@ pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
         if !search_query.is_empty() {
             println!("{}Search: {}{}", bl("🔍 "), yl(&search_query), PC_RESET);
         }
-        println!("{}Controls: {}q{}=quit | {}a{}=add | {}r{}=refresh | {}s{}=search | {}c{}=clear | {}n{}=next | {}p{}=prev | {}g{}=goto | [num]=view",
+        println!("{}Controls: {}q{}=quit | {}a{}=add | {}r{}=refresh | {}s{}=search | {}c{}=clear | {}n{}=next | {}p{}=prev | {}g{}=goto | [num]=view | {}↑↓{}=navigate",
             bl("► "), pk("q"), PC_RESET,
             pk("a"), PC_RESET,
             pk("r"), PC_RESET,
@@ -160,15 +164,31 @@ pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
             pk("c"), PC_RESET,
             pk("n"), PC_RESET,
             pk("p"), PC_RESET,
-            pk("g"), PC_RESET
+            pk("g"), PC_RESET,
+            pk("↑"), pk("↓")
         );
         println!();
 
-        print!("Enter command: ");
+        print!("Enter command (or ↑↓ to navigate): ");
         let input: String = Input::with_theme(&theme)
             .allow_empty(true)
             .interact_text()
             .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
+
+        if poll(Duration::from_millis(50)).map(|ready| ready && matches!(read(), Ok(Event::Key(k)) if k.code == KeyCode::Down && k.kind == KeyEventKind::Press)).unwrap_or(false) {
+            let _ = read();
+            if current_page < total_pages.saturating_sub(1) {
+                current_page += 1;
+            }
+            continue;
+        }
+        if poll(Duration::from_millis(50)).map(|ready| ready && matches!(read(), Ok(Event::Key(k)) if k.code == KeyCode::Up && k.kind == KeyEventKind::Press)).unwrap_or(false) {
+            let _ = read();
+            if current_page > 0 {
+                current_page -= 1;
+            }
+            continue;
+        }
 
         let input = input.trim();
 
