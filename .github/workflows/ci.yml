@@ -1,15 +1,12 @@
 name: CI
 on: [push, pull_request]
-
 defaults:
   run:
     shell: bash
-
 env:
   CARGO_TERM_COLOR: always
   MOONSHADOW_COLOR: always
   RUST_BACKTRACE: 1
-
 jobs:
   rust:
     name: Rust ${{ matrix.rust }}
