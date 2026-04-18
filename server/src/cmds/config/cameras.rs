@@ -381,6 +381,7 @@ fn print_pagination(current_page: usize, total_pages: usize, total_items: usize)
     println!();
 }
 
+#[allow(dead_code)]
 pub fn run_classic(db: &Arc<db::Database>) -> Result<(), Error> {
     let theme = ColorfulTheme::default();
 
