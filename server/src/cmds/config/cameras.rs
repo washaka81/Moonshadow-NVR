@@ -12,6 +12,7 @@ use base::Error;
 use bpaf::Bpaf;
 use console::{pad_str, Alignment};
 use crossterm::event::{poll, read, Event, KeyCode, KeyEventKind};
+use db::json::CameraConfig;
 use dialoguer::{theme::ColorfulTheme, Confirm, Input, Select};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -133,7 +134,7 @@ pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
                 .collect()
         };
 
-        let total_pages = (filtered.len() as usize + ITEMS_PER_PAGE - 1) / ITEMS_PER_PAGE;
+        let total_pages = (filtered.len() as usize).div_ceil(ITEMS_PER_PAGE);
         if total_pages == 0 {
             print_header();
             print_empty_state();
@@ -184,8 +185,8 @@ pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
         }
         if poll(Duration::from_millis(50)).map(|ready| ready && matches!(read(), Ok(Event::Key(k)) if k.code == KeyCode::Up && k.kind == KeyEventKind::Press)).unwrap_or(false) {
             let _ = read();
-            if current_page > 0 {
-                current_page -= 1;
+             if current_page > 0 {
+                 current_page = current_page.saturating_sub(1);
             }
             continue;
         }
@@ -229,7 +230,7 @@ pub fn run_camera_ui(db: &Arc<db::Database>) -> Result<(), Error> {
             }
             "p" | "prev" | "P" => {
                 if current_page > 0 {
-                    current_page -= 1;
+                    current_page = current_page.saturating_sub(1);
                 }
             }
             "g" | "goto" | "G" => {
@@ -355,8 +356,8 @@ fn print_table(cameras: &[CameraCard]) {
         println!(
             "  │ {:^3} │ {:20} │ {:40} │ {:^8} │ {:^6} │",
             bl(&id_str),
-            bl(&name.to_string()),
-            bl(&desc.to_string()),
+            bl(&name),
+            bl(&desc),
             status_str,
             gr(&format!("{}", cam.stream_count))
         );
@@ -503,7 +504,7 @@ fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
     };
 
     let short_name: String = Input::with_theme(&theme)
-        .with_prompt(&format!("Short name [{}]: ", short_name_default))
+        .with_prompt(format!("Short name [{}]: ", short_name_default))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
@@ -514,7 +515,7 @@ fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
     };
 
     let desc_input: String = Input::with_theme(&theme)
-        .with_prompt(&format!(
+        .with_prompt(format!(
             "Description [{}]: ",
             if description_default.is_empty() {
                 "(empty)"
@@ -590,11 +591,16 @@ fn add_camera_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
         return Ok(());
     }
 
-    let mut change = db::CameraChange::default();
-    change.short_name = short_name;
-    change.config.description = description.clone();
-    change.config.username = username;
-    change.config.password = password;
+    let change = db::CameraChange {
+        short_name,
+        config: CameraConfig {
+            description: description.clone(),
+            username,
+            password,
+            ..Default::default()
+        },
+        streams: Default::default(),
+    };
 
     let mut l = db.lock();
     match l.add_camera(change) {

@@ -302,6 +302,7 @@ fn make_listener(
     Ok(Listener::Tcp(tokio::net::TcpListener::from_std(listener)?))
 }
 
+#[allow(clippy::too_many_arguments)]
 async fn inner(
     read_only: bool,
     config: &ConfigFile,

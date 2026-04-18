@@ -554,17 +554,12 @@ impl Service {
             _ => String::new(),
         };
 
-        // First check if port 554 is open
-        let addr = format!("{}:554", req.ip);
-        let port_open = match tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            tokio::net::TcpStream::connect(&addr),
-        )
-        .await
-        {
-            Ok(Ok(_)) => true,
-            _ => false,
-        };
+// First check if port 554 is open
+let addr = format!("{}:554", req.ip);
+let port_open = matches!(
+    tokio::time::timeout(std::time::Duration::from_secs(2), tokio::net::TcpStream::connect(&addr)).await,
+    Ok(Ok(_))
+);
 
         if port_open {
             let paths_main = [
