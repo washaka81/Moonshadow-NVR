@@ -18,11 +18,11 @@ pub struct Environment<'a, C>
 where
     C: Clocks + Clone,
 {
-pub clocks: C,
-pub opener: &'a dyn stream::Opener,
-pub sample_entries: db::sample_entries::Handle,
-pub shutdown_rx: base::shutdown::Receiver,
-pub detection_tx: Option<tokio::sync::mpsc::Sender<DetectionMessage>>,
+    pub clocks: C,
+    pub opener: &'a dyn stream::Opener,
+    pub sample_entries: db::sample_entries::Handle,
+    pub shutdown_rx: base::shutdown::Receiver,
+    pub detection_tx: Option<tokio::sync::mpsc::Sender<DetectionMessage>>,
 }
 
 pub type DetectionMessage = (Vec<u8>, i32, i64, Arc<db::Stream>);
