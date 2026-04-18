@@ -246,7 +246,7 @@ class LiveCameraDriver {
     let raw;
     try {
       raw = new Uint8Array(await blob.arrayBuffer());
-    } catch {
+    } catch (e) {
       if (!(e instanceof DOMException)) {
         throw e;
       }
@@ -317,7 +317,7 @@ class LiveCameraDriver {
     if (part.mimeType !== buf.mimeType) {
       try {
         buf.srcBuf.changeType(part.mimeType);
-      } catch {
+      } catch (e) {
         this.error(
           `Failed to change MIME type (${buf.mimeType}->${part.mimeType}): ${e}`,
         );
@@ -345,7 +345,7 @@ class LiveCameraDriver {
 
     try {
       buf.srcBuf.appendBuffer(part.body);
-    } catch {
+    } catch (e) {
       if (!(e instanceof DOMException)) {
         throw e;
       }

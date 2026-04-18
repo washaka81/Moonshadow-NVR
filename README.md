@@ -5,6 +5,15 @@
 
 Moonshadow NVR is an intelligent, high-performance, and open-source Network Video Recorder. Based on the original Moonfire NVR by Scott Lamb, it has been evolved into a security system with built-in AI capabilities and hardware-accelerated computer vision.
 
+## 🔧 Latest CI Improvements (2026-04-17)
+
+The CI/CD pipeline has been fully stabilized with fixes across both Rust backend and TypeScript/React frontend:
+
+- **Rust Backend:** Fixed schema version mismatches in database upgrade tests, corrected formatting with `cargo fmt`, and resolved test assumptions in command modules.
+- **Frontend Configuration:** Migrated ESLint to Flat Config format (v9.39.4), resolving plugin incompatibilities with `react-hooks` and `minimatch`.
+- **Frontend Code:** Enforced deep imports for Material-UI to reduce bundle size and removed unused catch variables to satisfy linting rules.
+- **Compatibility:** Ensured builds pass across Node.js (20, 22, 24, 25) and Rust (stable, 1.91, nightly) matrices.
+
 ## 🚀 Key Evolutions in Moonshadow NVR
 
 ### 🧠 Intelligent AI Engine

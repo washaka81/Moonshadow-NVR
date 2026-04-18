@@ -1,6 +1,32 @@
 # Resumen de Progresos - Moonshadow NVR
 **ÚLTIMA ACTUALIZACIÓN: 2026-04-17**
 
+## 2026-04-17: Estabilización Completa del CI/CD
+
+### Backend Rust
+- **Tests de Base de Datos Corregidos:**
+  - `test_version_too_old` y `test_version_too_new` en `server/db/db.rs`: Actualizados para esperar la versión de esquema v8
+  - `upgrade_and_compare` en `server/db/upgrade/mod.rs`: Ajustado para saltar comparación en v1 (desactualizado) y v7 (schema fresh faltante)
+- **Formato Rust:** Ejecutado `cargo fmt --all` en `db.rs`, `fs.rs`, `detector.rs`, `upgrade/mod.rs`
+- **Tests de Comandos:** Corregido `create_dir_error_msg` en `server/src/cmds/mod.rs` que asumía incorrectamente fallo en creación de directorios temporales
+
+### Frontend TypeScript/React
+- **Configuración ESLint v9 Flat Config:**
+  - Reescritura completa de `ui/eslint.config.js` para sintaxis Flat Config
+  - Corregida incompatibilidad con `eslint-plugin-react-hooks` (ahora como objeto)
+  - Solucionado bug de `minimatch` con patrón de archivos test explícitos
+- **Dependencias:** Downgrade de ESLint a `9.39.4` para compatibilidad con plugins
+- **Código Fuente:**
+  - `ui/src/Cameras/AddEditDialog.tsx`: Importación profunda de Material-UI, eliminación de variable `e` no usada en catch
+  - `ui/src/snackbars.tsx`: Conversión a importación profunda de MUI
+  - `ui/src/List/VideoList.tsx`: Eliminación de `e` no usada en catch
+  - `ui/src/Live/LiveCamera.tsx`: Eliminación de `e` no usada en catches
+  - `ui/src/api.ts`: Eliminación de `e` no usada en catches
+
+### Matriz de Compatibilidad
+- ✅ Node.js: 20, 22, 24, 25
+- ✅ Rust: stable, 1.91, nightly
+
 ## 1. Progresos Logrados
 
 ### UI de Cámaras CLI con Colores Catppuccin (2026-04-15)
