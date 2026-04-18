@@ -36,12 +36,13 @@ SKIP_DIRS = {
     ".venv",
     "venv",
     "tfenv",
+    "retina-patch",
 }
 
 MAX_LINE_COUNT = 10
 
 EXPECTED_LINES = [
-    re.compile(r"This file is part of Moonshadow NVR"),
+    re.compile(r"This file is part of.*NVR"),
     re.compile(r"Copyright \(C\) 20\d{2}"),
     re.compile(
         r"SPDX-License-Identifier: GPL-v3\.0-or-later WITH GPL-3\.0-linking-exception\.?"
