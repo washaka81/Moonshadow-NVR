@@ -22,10 +22,8 @@ import { useSnackbars } from "../snackbars";
 import Typography from "@mui/material/Typography";
 import Divider from "@mui/material/Divider";
 import Grid from "@mui/material/Grid";
-import {
-  FormControl,
-  InputAdornment,
-} from "@mui/material";
+import FormControl from "@mui/material/FormControl";
+import InputAdornment from "@mui/material/InputAdornment";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
 import { LoadingButton } from "@mui/lab";
 
@@ -63,9 +61,9 @@ const Inner = ({ csrf }: { csrf?: string }) => {
     try {
       const url = new URL(ip);
       ip = url.hostname;
-    } catch (e) {
-      // Not a valid URL, assume it's an IP.
-    }
+} catch {
+  // Not a valid URL, assume it's an IP.
+}
     if (!ip) {
       snackbars.enqueue({
         message: "Please enter an ONVIF Base URL or IP address first.",

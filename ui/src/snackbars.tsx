@@ -21,7 +21,8 @@ import Snackbar, {
   SnackbarProps,
 } from "@mui/material/Snackbar";
 import React, { useContext } from "react";
-import { Alert, AlertProps } from "@mui/material";
+import Alert from "@mui/material/Alert";
+import type { AlertProps } from "@mui/material/Alert";
 
 interface SnackbarProviderProps {
   /**
