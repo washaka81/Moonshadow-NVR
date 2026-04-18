@@ -2537,35 +2537,35 @@ mod tests {
         assert!(e.msg().unwrap().starts_with("no such table"), "{}", e);
     }
 
-    #[test]
-    fn test_version_too_old() {
-        testutil::init();
-        let c = setup_conn();
-        c.execute_batch("delete from version; insert into version values (6, 0, '');")
-            .unwrap();
-        let e = Database::new(clock::RealClocks {}, c, false).err().unwrap();
-        assert!(
-            e.msg()
-                .unwrap()
-                .starts_with("database schema version 6 is too old (expected 7)"),
-            "got: {e:?}"
-        );
-    }
+#[test]
+fn test_version_too_old() {
+    testutil::init();
+    let c = setup_conn();
+    c.execute_batch("delete from version; insert into version values (7, 0, '');")
+        .unwrap();
+    let e = Database::new(clock::RealClocks {}, c, false).err().unwrap();
+    assert!(
+        e.msg()
+            .unwrap()
+            .starts_with("database schema version 7 is too old (expected 8)"),
+        "got: {e:?}"
+    );
+}
 
-    #[test]
-    fn test_version_too_new() {
-        testutil::init();
-        let c = setup_conn();
-        c.execute_batch("delete from version; insert into version values (8, 0, '');")
-            .unwrap();
-        let e = Database::new(clock::RealClocks {}, c, false).err().unwrap();
-        assert!(
-            e.msg()
-                .unwrap()
-                .starts_with("database schema version 8 is too new (expected 7)"),
-            "got: {e:?}"
-        );
-    }
+#[test]
+fn test_version_too_new() {
+    testutil::init();
+    let c = setup_conn();
+    c.execute_batch("delete from version; insert into version values (9, 0, '');")
+        .unwrap();
+    let e = Database::new(clock::RealClocks {}, c, false).err().unwrap();
+    assert!(
+        e.msg()
+            .unwrap()
+            .starts_with("database schema version 9 is too new (expected 8)"),
+        "got: {e:?}"
+    );
+}
 
     /// Basic test of running some queries on a fresh database.
     #[test]
