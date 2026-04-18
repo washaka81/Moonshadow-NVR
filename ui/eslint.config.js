@@ -23,7 +23,7 @@ export default defineConfig(
     },
   },
   {
-    files: ["**/*.test.{ts,tsx}"],
+    files: ["**/*.test.ts", "**/*.test.tsx"],
     ...vitest.configs.recommended,
   },
   {
