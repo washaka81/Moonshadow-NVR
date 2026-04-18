@@ -77,6 +77,8 @@ http = "1.1.0"
 http-serve = { version = "0.4.0-rc.1", features = ["dir"] }
 hyper = { version = "1.4.1", features = ["http1", "server"] }
 itertools = { workspace = true }
+ratatui = { version = "0.29", features = ["crossterm"] }
+crossterm = "0.28"
 jiff = { workspace = true, features = ["tz-system"] }
 libc = "0.2"
 log = { version = "0.4" }
@@ -115,7 +117,6 @@ ort = { version = "2.0.0-rc.12", features = ["cuda", "tensorrt", "openvino"] }
 ndarray = "0.17"
 dialoguer = "0.12.0"
 console = "0.16.3"
-crossterm = "0.27"
 
 [target.'cfg(target_os = "linux")'.dependencies]
 libsystemd = "0.7.0"
