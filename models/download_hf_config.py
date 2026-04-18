@@ -1,3 +1,7 @@
+# This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
+# Copyright (C) 2025 Moonshadow NVR Contributors.
+# SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
+
 from huggingface_hub import hf_hub_download, HfApi
 import json
 
