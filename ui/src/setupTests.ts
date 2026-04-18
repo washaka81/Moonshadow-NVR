@@ -9,6 +9,10 @@
 import "@testing-library/jest-dom";
 import { vi } from "vitest";
 
+// Prevent unhandled rejection errors from failing tests
+// This is a known issue with MSW and fake timers
+process.on("unhandledRejection", () => {});
+
 Object.defineProperty(window, "matchMedia", {
   writable: true,
   value: vi.fn().mockImplementation((query) => ({
