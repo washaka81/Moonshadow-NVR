@@ -7,14 +7,14 @@
 
 set -euo pipefail
 
-# --- Configuration ---
+# --- Configuration (Defaults) ---
 PROJECT_NAME="moonshadow-nvr"
-INSTALL_ROOT="/opt/$PROJECT_NAME"
+INSTALL_ROOT="${INSTALL_ROOT:-/opt/$PROJECT_NAME}"
 BIN_DIR="$INSTALL_ROOT/bin"
 MODEL_DIR="$INSTALL_ROOT/models"
 UI_DIR="$INSTALL_ROOT/ui"
-CONFIG_DIR="/etc/$PROJECT_NAME"
-DATA_DIR="/var/lib/$PROJECT_NAME"
+CONFIG_DIR="${CONFIG_DIR:-/etc/$PROJECT_NAME}"
+DATA_DIR="${DATA_DIR:-/var/lib/$PROJECT_NAME}"
 LOG_FILE="/var/log/${PROJECT_NAME}_install.log"
 
 # --- Colors ---
@@ -29,6 +29,10 @@ warn() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 error() { echo -e "${RED}[ERROR]${NC} $1" >&2; exit 1; }
 success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 
+# Pre-flight checks
+command -v curl >/dev/null 2>&1 || error "curl is required but not installed."
+command -v git >/dev/null 2>&1 || error "git is required but not installed."
+
 echo -e "${BLUE}============================================"
 echo "    Moonshadow NVR - System Installer"
 echo "============================================${NC}"
@@ -38,8 +42,15 @@ if [ "$EUID" -ne 0 ]; then
     error "Please run as root (sudo ./install.sh)"
 fi
 
+# Check disk space (minimum 2GB for build and models)
+FREE_KB=$(df -k . | awk 'NR==2 {print $4}')
+if [ "$FREE_KB" -lt 2097152 ]; then
+    warn "Less than 2GB of free disk space detected. Installation might fail."
+fi
+
 # Detect OS
 if [ -f /etc/os-release ]; then
+    # shellcheck disable=SC1091
     . /etc/os-release
     OS_ID=$ID
     OS_LIKE=${ID_LIKE:-""}
@@ -65,10 +76,8 @@ if [[ "$OS_ID" == "arch" || "$OS_LIKE" == *"arch"* || "$OS_ID" == "cachyos" ]]; 
     PKG_MGR="pacman"
     INSTALL_CMD="pacman -S --noconfirm --needed"
     UPDATE_CMD="pacman -Syu --noconfirm"
-    # Arch packages (development headers are usually included in the main package)
     PKGS="base-devel rust cargo nodejs npm git sqlite libva intel-media-driver ocl-icd intel-compute-runtime ncurses openssl pkgconf systemd alsa-lib ffmpeg protobuf vulkan-headers vulkan-icd-loader"
     
-    # Optional CUDA/NVIDIA support
     if lspci | grep -iq nvidia; then
         log "NVIDIA GPU detected, adding CUDA support packages..."
         PKGS="$PKGS cuda cudnn"
@@ -77,10 +86,8 @@ elif [[ "$OS_ID" == "debian" || "$OS_ID" == "ubuntu" || "$OS_LIKE" == *"debian"*
     PKG_MGR="apt"
     INSTALL_CMD="apt-get install -y"
     UPDATE_CMD="apt-get update"
-    # Debian/Ubuntu use -dev suffixes for headers
     PKGS="build-essential curl git nodejs npm sqlite3 libsqlite3-dev libva-dev intel-media-va-driver-non-free libssl-dev pkg-config systemd libsystemd-dev libasound2-dev ffmpeg libncurses-dev ocl-icd-libopencl1 intel-level-zero-gpu intel-opencl-icd protobuf-compiler libprotobuf-dev libvulkan-dev"
     
-    # Fallback if non-free driver is not available
     if ! apt-cache show intel-media-va-driver-non-free &>/dev/null; then
         warn "intel-media-va-driver-non-free not found, using standard intel-media-va-driver"
         PKGS=${PKGS/intel-media-va-driver-non-free/intel-media-va-driver}
@@ -89,7 +96,6 @@ elif [[ "$OS_ID" == "fedora" || "$OS_ID" == "rhel" || "$OS_LIKE" == *"fedora"* ]
     PKG_MGR="dnf"
     INSTALL_CMD="dnf install -y"
     UPDATE_CMD="dnf check-update || true"
-    # Fedora uses -devel suffixes
     PKGS="gcc gcc-c++ make curl git nodejs npm sqlite sqlite-devel libva-devel intel-media-driver openssl-devel pkgconf-pkg-config systemd-devel alsa-lib-devel ffmpeg ncurses-devel ocl-icd oneapi-level-zero intel-level-zero protobuf-compiler protobuf-devel vulkan-loader-devel"
 else
     error "Unsupported distribution: $OS_ID. Please install dependencies manually."
@@ -97,15 +103,16 @@ fi
 
 # 1. Update and Install Dependencies
 log "Updating system and installing dependencies via $PKG_MGR..."
-$UPDATE_CMD
-$INSTALL_CMD $PKGS
+$UPDATE_CMD || warn "System update failed, attempting to continue..."
+# shellcheck disable=SC2086
+$INSTALL_CMD $PKGS || error "Failed to install required packages."
 
 # 2. Rust Setup (ensure recent version)
 if ! command -v cargo &> /dev/null; then
     log "Rust not found. Installing via rustup..."
     curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
     # shellcheck source=/dev/null
-    source "$HOME/.cargo/env" || export PATH="$HOME/.cargo/bin:$PATH"
+    source "${HOME:-/root}/.cargo/env" || export PATH="${HOME:-/root}/.cargo/bin:$PATH"
 fi
 
 # 3. pnpm Setup (Recommended for UI)
@@ -117,7 +124,7 @@ fi
 # 4. Build UI
 log "Building Moonshadow UI..."
 if [[ -d "./ui" ]]; then
-    pushd ui
+    pushd ui > /dev/null
     if command -v pnpm &> /dev/null; then
         pnpm install
         pnpm run build
@@ -125,7 +132,7 @@ if [[ -d "./ui" ]]; then
         npm install
         npm run build
     fi
-    popd
+    popd > /dev/null
 else
     warn "UI directory not found, skipping UI build."
 fi
@@ -133,9 +140,9 @@ fi
 # 5. Build Server
 log "Building Moonshadow NVR Server..."
 if [[ -d "./server" ]]; then
-    pushd server
+    pushd server > /dev/null
     cargo build --release
-    popd
+    popd > /dev/null
 else
     error "Server directory not found!"
 fi
@@ -149,20 +156,21 @@ MTX_VER="v1.9.3"
 if [[ ! -f "$BIN_DIR/mediamtx" ]]; then
     log "Downloading MediaMTX $MTX_VER for $ARCH..."
     MTX_URL="https://github.com/bluenviron/mediamtx/releases/download/${MTX_VER}/mediamtx_${MTX_VER}_linux_${MTX_ARCH}.tar.gz"
-    if curl -L -o mediamtx.tar.gz "$MTX_URL"; then
-        tar -xzf mediamtx.tar.gz mediamtx
-        mv mediamtx "$BIN_DIR/"
-        rm mediamtx.tar.gz
+    TEMP_DIR=$(mktemp -d)
+    if curl -L -o "$TEMP_DIR/mediamtx.tar.gz" "$MTX_URL"; then
+        tar -xzf "$TEMP_DIR/mediamtx.tar.gz" -C "$TEMP_DIR" mediamtx
+        mv "$TEMP_DIR/mediamtx" "$BIN_DIR/"
         chmod +x "$BIN_DIR/mediamtx"
     else
         warn "Failed to download MediaMTX. You may need to install it manually."
     fi
+    rm -rf "$TEMP_DIR"
 fi
 
 # 8. Download default AI model if missing
 if [[ ! -f "$MODEL_DIR/yolov8n.onnx" ]]; then
     log "Downloading default YOLOv8n object detection model..."
-    curl -L -o "$MODEL_DIR/yolov8n.onnx" "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.onnx"
+    curl -L -o "$MODEL_DIR/yolov8n.onnx" "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.onnx" || warn "Failed to download default AI model."
 fi
 
 # 9. Install Binaries and Assets
@@ -189,9 +197,9 @@ fi
 
 # 12. Set Permissions
 log "Setting permissions..."
-chown -R moonshadow:moonshadow "$DATA_DIR"
-chown -R moonshadow:moonshadow "$CONFIG_DIR"
-chown -R moonshadow:moonshadow "$INSTALL_ROOT"
+chown -R moonshadow:moonshadow "$DATA_DIR" 2>/dev/null || true
+chown -R moonshadow:moonshadow "$CONFIG_DIR" 2>/dev/null || true
+chown -R moonshadow:moonshadow "$INSTALL_ROOT" 2>/dev/null || true
 
 # 13. Install systemd service
 log "Generating systemd service..."
@@ -218,13 +226,15 @@ WantedBy=multi-user.target
 EOF
 
 # Reload systemd
-systemctl daemon-reload
+if command -v systemctl >/dev/null 2>&1; then
+    systemctl daemon-reload
+fi
 
 echo ""
 success "Installation complete!"
 echo "============================================"
 echo -e "Next steps:"
-echo -e "1. Edit configuration: ${YELLOW}sudo nano $CONFIG_DIR/config.toml${NC}"
+echo -e "1. Edit configuration: ${YELLOW}sudo $INSTALL_ROOT/moonshadow-nvr config --db-dir $DATA_DIR/db${NC}"
 echo -e "2. Enable service:     ${YELLOW}sudo systemctl enable moonshadow-nvr${NC}"
 echo -e "3. Start service:      ${YELLOW}sudo systemctl start moonshadow-nvr${NC}"
 echo ""
