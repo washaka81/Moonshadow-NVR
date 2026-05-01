@@ -5,7 +5,7 @@
 dbDir = "/var/lib/moonshadow-nvr/db"
 
 # UI directory (static files for the web interface)
-uiDir = "/opt/moonshadow-nvr/ui/dist"
+uiDir = "/opt/moonshadow-nvr/ui"
 
 # Bind settings - listen on all interfaces
 [[binds]]

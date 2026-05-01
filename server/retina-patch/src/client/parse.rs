@@ -627,10 +627,28 @@ pub(crate) fn parse_play(
             // https://datatracker.ietf.org/doc/html/rfc2326#section-14.3
             Some(&mut presentation.streams[0])
         } else {
-            presentation
+            let mut matched_stream = presentation
                 .streams
                 .iter_mut()
-                .find(|s| matches!(&s.control, Some(u) if u == &url))
+                .find(|s| matches!(&s.control, Some(u) if u == &url));
+
+            // Fallback for malformed URLs (e.g. nested URLs like
+            // rtsp://.../rtsp://:0/streamid=0 used by some cameras)
+            if matched_stream.is_none() {
+                if let Some(url_last_segment) = url.path_segments().and_then(|mut s| s.next_back()) {
+                    matched_stream = presentation.streams.iter_mut().find(|s| {
+                        if let Some(control_url) = &s.control {
+                            if let Some(control_last_segment) =
+                                control_url.path_segments().and_then(|mut s| s.next_back())
+                            {
+                                return url_last_segment == control_last_segment;
+                            }
+                        }
+                        false
+                    });
+                }
+            }
+            matched_stream
         };
         let stream = match stream {
             Some(s) => s,

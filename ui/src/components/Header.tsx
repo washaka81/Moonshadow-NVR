@@ -49,7 +49,7 @@ export default function Header({
     <>
       <AppBar position="sticky">
         <Toolbar>
-          {loginState === "logged-in" && (
+          {loginState !== "server-requires-login" && (
             <IconButton
               size="large"
               edge="start"

@@ -225,18 +225,51 @@ StandardError=append:/var/log/moonshadow-nvr.log
 WantedBy=multi-user.target
 EOF
 
+# 13.5 Install mediamtx systemd service
+if [[ -f "$BIN_DIR/mediamtx" ]]; then
+    log "Generating mediamtx systemd service..."
+    cat > /etc/systemd/system/mediamtx.service << EOF
+[Unit]
+Description=MediaMTX RTSP Server
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=$INSTALL_ROOT
+ExecStart=$BIN_DIR/mediamtx
+Restart=on-failure
+User=moonshadow
+Group=moonshadow
+
+[Install]
+WantedBy=multi-user.target
+EOF
+fi
+
 # Reload systemd
 if command -v systemctl >/dev/null 2>&1; then
     systemctl daemon-reload
 fi
 
+# 14. Initialize database and start services
+log "Finalizing installation..."
+sudo -u moonshadow "$INSTALL_ROOT/moonshadow-nvr" init --db-dir "$DATA_DIR/db" || warn "Database already initialized or initialization skipped."
+
+if command -v systemctl >/dev/null 2>&1; then
+    log "Enabling and starting services..."
+    if [[ -f "/etc/systemd/system/mediamtx.service" ]]; then
+        systemctl enable --now mediamtx || warn "Failed to start mediamtx."
+    fi
+    systemctl enable --now moonshadow-nvr || warn "Failed to start moonshadow-nvr. Check logs with: journalctl -u moonshadow-nvr"
+fi
+
 echo ""
-success "Installation complete!"
+success "Installation complete and service started!"
 echo "============================================"
 echo -e "Next steps:"
-echo -e "1. Edit configuration: ${YELLOW}sudo $INSTALL_ROOT/moonshadow-nvr config --db-dir $DATA_DIR/db${NC}"
-echo -e "2. Enable service:     ${YELLOW}sudo systemctl enable moonshadow-nvr${NC}"
-echo -e "3. Start service:      ${YELLOW}sudo systemctl start moonshadow-nvr${NC}"
+echo -e "1. Edit configuration: ${YELLOW}sudo nano $CONFIG_DIR/config.toml${NC}"
+echo -e "2. Check status:       ${YELLOW}sudo systemctl status moonshadow-nvr${NC}"
+echo -e "3. View logs:          ${YELLOW}sudo journalctl -u moonshadow-nvr -f${NC}"
 echo ""
 echo -e "Web Interface: ${BLUE}http://localhost:8080${NC}"
 echo "============================================"
