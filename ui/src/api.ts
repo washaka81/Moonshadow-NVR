@@ -468,10 +468,7 @@ export interface StreamProbeResponse {
 }
 
 /** Probes a specific stream URL. */
-export async function streamProbe(
-  req: StreamProbeRequest,
-  init: RequestInit,
-) {
+export async function streamProbe(req: StreamProbeRequest, init: RequestInit) {
   return await json<StreamProbeResponse>("/api/stream-probe", {
     method: "POST",
     headers: {

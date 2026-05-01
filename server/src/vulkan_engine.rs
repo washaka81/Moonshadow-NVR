@@ -3,24 +3,30 @@
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 use std::sync::Arc;
+use tracing::info;
 use vulkano::buffer::{Buffer, BufferCreateInfo, BufferUsage};
-use vulkano::command_buffer::allocator::{StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo};
-use vulkano::command_buffer::{AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo};
+use vulkano::command_buffer::allocator::{
+    StandardCommandBufferAllocator, StandardCommandBufferAllocatorCreateInfo,
+};
+use vulkano::command_buffer::{
+    AutoCommandBufferBuilder, CommandBufferUsage, CopyBufferToImageInfo,
+};
 use vulkano::descriptor_set::allocator::StandardDescriptorSetAllocator;
 use vulkano::descriptor_set::{PersistentDescriptorSet, WriteDescriptorSet};
 use vulkano::device::physical::PhysicalDeviceType;
 use vulkano::device::{Device, DeviceCreateInfo, Queue, QueueCreateInfo, QueueFlags};
+use vulkano::format::Format;
+use vulkano::image::view::ImageView;
+use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
 use vulkano::instance::{Instance, InstanceCreateInfo};
-use vulkano::memory::allocator::{StandardMemoryAllocator, AllocationCreateInfo, MemoryTypeFilter};
+use vulkano::memory::allocator::{AllocationCreateInfo, MemoryTypeFilter, StandardMemoryAllocator};
 use vulkano::pipeline::compute::ComputePipelineCreateInfo;
 use vulkano::pipeline::layout::PipelineDescriptorSetLayoutCreateInfo;
-use vulkano::pipeline::{ComputePipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo};
+use vulkano::pipeline::{
+    ComputePipeline, Pipeline, PipelineBindPoint, PipelineLayout, PipelineShaderStageCreateInfo,
+};
 use vulkano::sync::{self, GpuFuture};
 use vulkano::VulkanLibrary;
-use vulkano::format::Format;
-use vulkano::image::{Image, ImageCreateInfo, ImageType, ImageUsage};
-use vulkano::image::view::ImageView;
-use tracing::info;
 
 pub struct VulkanEngine {
     device: Arc<Device>,
@@ -80,7 +86,7 @@ mod shaders {
 impl VulkanEngine {
     pub fn new() -> Option<Self> {
         info!("--- VULKAN ENGINE: Initializing iGPU Parallel Compute ---");
-        
+
         let library = VulkanLibrary::new().ok()?;
         let instance = Instance::new(library, InstanceCreateInfo::default()).ok()?;
 
@@ -88,18 +94,22 @@ impl VulkanEngine {
             .enumerate_physical_devices()
             .ok()?
             .filter(|p| {
-                p.properties().device_type == PhysicalDeviceType::IntegratedGpu ||
-                p.properties().device_type == PhysicalDeviceType::DiscreteGpu
+                p.properties().device_type == PhysicalDeviceType::IntegratedGpu
+                    || p.properties().device_type == PhysicalDeviceType::DiscreteGpu
             })
             .next()?;
 
-        info!("--- VULKAN ENGINE: Using Device: {} ---", physical_device.properties().device_name);
+        info!(
+            "--- VULKAN ENGINE: Using Device: {} ---",
+            physical_device.properties().device_name
+        );
 
         let queue_family_index = physical_device
             .queue_family_properties()
             .iter()
             .enumerate()
-            .position(|(_i, q)| q.queue_flags.contains(QueueFlags::COMPUTE))? as u32;
+            .position(|(_i, q)| q.queue_flags.contains(QueueFlags::COMPUTE))?
+            as u32;
 
         let (device, mut queues) = Device::new(
             physical_device,
@@ -110,7 +120,8 @@ impl VulkanEngine {
                 }],
                 ..Default::default()
             },
-        ).ok()?;
+        )
+        .ok()?;
 
         let queue = queues.next()?;
         let memory_allocator = Arc::new(StandardMemoryAllocator::new_default(device.clone()));
@@ -118,7 +129,10 @@ impl VulkanEngine {
             device.clone(),
             StandardCommandBufferAllocatorCreateInfo::default(),
         ));
-        let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(device.clone(), Default::default()));
+        let descriptor_set_allocator = Arc::new(StandardDescriptorSetAllocator::new(
+            device.clone(),
+            Default::default(),
+        ));
 
         let shader = shaders::load(device.clone()).ok()?;
         let entry_point = shader.entry_point("main").unwrap();
@@ -129,13 +143,15 @@ impl VulkanEngine {
             PipelineDescriptorSetLayoutCreateInfo::from_stages([&stage])
                 .into_pipeline_layout_create_info(device.clone())
                 .ok()?,
-        ).ok()?;
+        )
+        .ok()?;
 
         let pipeline = ComputePipeline::new(
             device.clone(),
             None,
             ComputePipelineCreateInfo::stage_layout(stage, layout),
-        ).ok()?;
+        )
+        .ok()?;
 
         Some(Self {
             device,
@@ -147,7 +163,14 @@ impl VulkanEngine {
         })
     }
 
-    pub fn preprocess(&self, rgba_data: &[u8], width: u32, height: u32, target_w: u32, target_h: u32) -> Option<Vec<f32>> {
+    pub fn preprocess(
+        &self,
+        rgba_data: &[u8],
+        width: u32,
+        height: u32,
+        target_w: u32,
+        target_h: u32,
+    ) -> Option<Vec<f32>> {
         let image = Image::new(
             self.memory_allocator.clone(),
             ImageCreateInfo {
@@ -161,7 +184,8 @@ impl VulkanEngine {
                 memory_type_filter: MemoryTypeFilter::PREFER_DEVICE,
                 ..Default::default()
             },
-        ).ok()?;
+        )
+        .ok()?;
 
         let staging_buffer = Buffer::from_iter(
             self.memory_allocator.clone(),
@@ -170,11 +194,13 @@ impl VulkanEngine {
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_SEQUENTIAL_WRITE,
                 ..Default::default()
             },
             rgba_data.iter().cloned(),
-        ).ok()?;
+        )
+        .ok()?;
 
         let view = ImageView::new_default(image.clone()).ok()?;
 
@@ -186,11 +212,13 @@ impl VulkanEngine {
                 ..Default::default()
             },
             AllocationCreateInfo {
-                memory_type_filter: MemoryTypeFilter::PREFER_HOST | MemoryTypeFilter::HOST_RANDOM_ACCESS,
+                memory_type_filter: MemoryTypeFilter::PREFER_HOST
+                    | MemoryTypeFilter::HOST_RANDOM_ACCESS,
                 ..Default::default()
             },
             (0..output_size).map(|_| 0.0f32),
-        ).ok()?;
+        )
+        .ok()?;
 
         let layout = self.pipeline.layout().set_layouts().get(0).unwrap();
         let descriptor_set = PersistentDescriptorSet::new(
@@ -201,13 +229,15 @@ impl VulkanEngine {
                 WriteDescriptorSet::buffer(1, output_buffer.clone()),
             ],
             [],
-        ).ok()?;
+        )
+        .ok()?;
 
         let mut builder = AutoCommandBufferBuilder::primary(
             &self.command_buffer_allocator,
             self.queue.queue_family_index(),
             CommandBufferUsage::OneTimeSubmit,
-        ).ok()?;
+        )
+        .ok()?;
 
         let push_constants = shaders::PushConstants {
             width,
@@ -217,23 +247,32 @@ impl VulkanEngine {
         };
 
         builder
-            .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(staging_buffer, image.clone()))
+            .copy_buffer_to_image(CopyBufferToImageInfo::buffer_image(
+                staging_buffer,
+                image.clone(),
+            ))
             .ok()?
-            .bind_pipeline_compute(self.pipeline.clone()).ok()?
+            .bind_pipeline_compute(self.pipeline.clone())
+            .ok()?
             .bind_descriptor_sets(
                 PipelineBindPoint::Compute,
                 self.pipeline.layout().clone(),
                 0,
                 descriptor_set,
-            ).ok()?
-            .push_constants(self.pipeline.layout().clone(), 0, push_constants).ok()?
-            .dispatch([ (target_w + 7) / 8, (target_h + 7) / 8, 1]).ok()?;
+            )
+            .ok()?
+            .push_constants(self.pipeline.layout().clone(), 0, push_constants)
+            .ok()?
+            .dispatch([(target_w + 7) / 8, (target_h + 7) / 8, 1])
+            .ok()?;
 
         let command_buffer = builder.build().ok()?;
 
         let future = sync::now(self.device.clone())
-            .then_execute(self.queue.clone(), command_buffer).ok()?
-            .then_signal_fence_and_flush().ok()?;
+            .then_execute(self.queue.clone(), command_buffer)
+            .ok()?
+            .then_signal_fence_and_flush()
+            .ok()?;
 
         future.wait(None).ok()?;
 

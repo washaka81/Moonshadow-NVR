@@ -1,4 +1,7 @@
 #!/bin/bash
+# This file is part of Moonshadow NVR.
+# Copyright (C) 2025 The Moonshadow NVR Authors.
+# SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 # Moonshadow NVR - Stop Server and Services
 # Author: Alejandro Fonda <alejandro.fonda@gmail.com>
 

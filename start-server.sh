@@ -1,4 +1,7 @@
 #!/bin/bash
+# This file is part of Moonshadow NVR.
+# Copyright (C) 2025 The Moonshadow NVR Authors.
+# SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 # Moonshadow NVR - Start Server with AI and LPR
 # Author: Alejandro Fonda <alejandro.fonda@gmail.com>
 

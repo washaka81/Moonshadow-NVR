@@ -28,33 +28,56 @@ interface Props {
 
 function MoonshadowMenu(props: Props) {
   const { mode, setMode } = useColorScheme();
-  const [accountMenuAnchor, setAccountMenuAnchor] = React.useState<null | HTMLElement>(null);
-  const [themeMenuAnchor, setThemeMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [accountMenuAnchor, setAccountMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
+  const [themeMenuAnchor, setThemeMenuAnchor] =
+    React.useState<null | HTMLElement>(null);
 
-  const handleAccountMenu = (event: React.MouseEvent<HTMLElement>) => { setAccountMenuAnchor(event.currentTarget); };
-  const handleThemeMenu = (event: React.MouseEvent<HTMLElement>) => { setThemeMenuAnchor(event.currentTarget); };
-  
-  const handleClose = () => { 
-    setAccountMenuAnchor(null); 
-    setThemeMenuAnchor(null); 
+  const handleAccountMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setAccountMenuAnchor(event.currentTarget);
+  };
+  const handleThemeMenu = (event: React.MouseEvent<HTMLElement>) => {
+    setThemeMenuAnchor(event.currentTarget);
   };
 
-  const handleLogout = () => { handleClose(); props.logout(); };
-  const handleChangePassword = () => { handleClose(); props.changePassword(); };
-  
+  const handleClose = () => {
+    setAccountMenuAnchor(null);
+    setThemeMenuAnchor(null);
+  };
+
+  const handleLogout = () => {
+    handleClose();
+    props.logout();
+  };
+  const handleChangePassword = () => {
+    handleClose();
+    props.changePassword();
+  };
+
   const handleSetTheme = (newMode: "light" | "dark" | "system") => {
     setMode(newMode);
     handleClose();
   };
 
   return (
-    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
       {props.activityMenuPart}
-      
+
       {/* Theme Switcher Button */}
       <Tooltip title="Switch Theme">
-        <IconButton onClick={handleThemeMenu} color="inherit" size="small" sx={{ opacity: 0.8 }}>
-          {mode === "light" ? <Brightness7 fontSize="small" /> : mode === "dark" ? <Brightness2 fontSize="small" /> : <SettingsBrightness fontSize="small" />}
+        <IconButton
+          onClick={handleThemeMenu}
+          color="inherit"
+          size="small"
+          sx={{ opacity: 0.8 }}
+        >
+          {mode === "light" ? (
+            <Brightness7 fontSize="small" />
+          ) : mode === "dark" ? (
+            <Brightness2 fontSize="small" />
+          ) : (
+            <SettingsBrightness fontSize="small" />
+          )}
         </IconButton>
       </Tooltip>
       <Menu
@@ -64,26 +87,37 @@ function MoonshadowMenu(props: Props) {
         disableScrollLock
       >
         <MenuItem onClick={() => handleSetTheme("light")}>
-          <ListItemIcon><Brightness7 fontSize="small" /></ListItemIcon>
+          <ListItemIcon>
+            <Brightness7 fontSize="small" />
+          </ListItemIcon>
           <ListItemText>Light</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => handleSetTheme("dark")}>
-          <ListItemIcon><Brightness2 fontSize="small" /></ListItemIcon>
+          <ListItemIcon>
+            <Brightness2 fontSize="small" />
+          </ListItemIcon>
           <ListItemText>Dark</ListItemText>
         </MenuItem>
         <MenuItem onClick={() => handleSetTheme("system")}>
-          <ListItemIcon><SettingsBrightness fontSize="small" /></ListItemIcon>
+          <ListItemIcon>
+            <SettingsBrightness fontSize="small" />
+          </ListItemIcon>
           <ListItemText>System (Auto)</ListItemText>
         </MenuItem>
       </Menu>
 
       {props.loginState !== "logged-in" ? (
-        <Button 
+        <Button
           variant="outlined"
-          color="inherit" 
-          size="small" 
-          onClick={props.requestLogin} 
-          sx={{ textTransform: 'none', borderColor: 'rgba(255,255,255,0.2)', px: 2, height: 32 }}
+          color="inherit"
+          size="small"
+          onClick={props.requestLogin}
+          sx={{
+            textTransform: "none",
+            borderColor: "rgba(255,255,255,0.2)",
+            px: 2,
+            height: 32,
+          }}
         >
           Login
         </Button>
@@ -100,8 +134,15 @@ function MoonshadowMenu(props: Props) {
             transformOrigin={{ vertical: "top", horizontal: "right" }}
             disableScrollLock
           >
-            <MenuItem onClick={handleChangePassword} sx={{ fontSize: '0.85rem' }}>Change Password</MenuItem>
-            <MenuItem onClick={handleLogout} sx={{ fontSize: '0.85rem' }}>Logout</MenuItem>
+            <MenuItem
+              onClick={handleChangePassword}
+              sx={{ fontSize: "0.85rem" }}
+            >
+              Change Password
+            </MenuItem>
+            <MenuItem onClick={handleLogout} sx={{ fontSize: "0.85rem" }}>
+              Logout
+            </MenuItem>
           </Menu>
         </>
       )}

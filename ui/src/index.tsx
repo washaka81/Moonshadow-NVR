@@ -51,12 +51,19 @@ const theme = createTheme({
     MuiButton: {
       defaultProps: { disableElevation: true },
       styleOverrides: {
-        root: { borderColor: "rgba(255,255,255,0.2)", "&:hover": { borderColor: "#ffffff" } },
+        root: {
+          borderColor: "rgba(255,255,255,0.2)",
+          "&:hover": { borderColor: "#ffffff" },
+        },
       },
     },
     MuiPaper: {
       styleOverrides: {
-        root: { backgroundImage: "none", border: "1px solid rgba(255,255,255,0.05)", boxShadow: "none" },
+        root: {
+          backgroundImage: "none",
+          border: "1px solid rgba(255,255,255,0.05)",
+          boxShadow: "none",
+        },
       },
     },
   },

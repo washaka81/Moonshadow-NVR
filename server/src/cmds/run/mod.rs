@@ -336,18 +336,24 @@ async fn inner(
 
     for (id, camera) in l.cameras_by_id() {
         let id = *id;
-        info!("Camera #{}: {} - {}", id, camera.short_name, camera.config.description);
-        let streams = l.streams_by_id().values().filter(|s| {
-            s.inner.lock().camera_id == id
-        });
+        info!(
+            "Camera #{}: {} - {}",
+            id, camera.short_name, camera.config.description
+        );
+        let streams = l
+            .streams_by_id()
+            .values()
+            .filter(|s| s.inner.lock().camera_id == id);
         for stream in streams {
             let stream_inner = stream.inner.lock();
             if let Some(url) = &stream_inner.config.url {
-                info!("  Stream {:?}: {} ({}), retain: {} bytes",
+                info!(
+                    "  Stream {:?}: {} ({}), retain: {} bytes",
                     stream_inner.type_,
                     url,
                     stream_inner.config.rtsp_transport,
-                    stream_inner.config.retain_bytes);
+                    stream_inner.config.retain_bytes
+                );
             } else {
                 info!("  Stream {:?}: disabled", stream_inner.type_);
             }
@@ -388,14 +394,16 @@ async fn inner(
                         // Assign this directory to all streams that don't have one
                         let streams_to_update: Vec<i32> = {
                             let l = db.lock();
-                            l.streams_by_id().values()
+                            l.streams_by_id()
+                                .values()
                                 .filter(|s| s.inner.lock().sample_file_dir.is_none())
                                 .map(|s| s.inner.lock().id)
                                 .collect()
                         };
                         for stream_id in streams_to_update {
                             let mut l = db.lock();
-                            l.set_stream_sample_file_dir(stream_id, Some(dir_id)).unwrap();
+                            l.set_stream_sample_file_dir(stream_id, Some(dir_id))
+                                .unwrap();
                         }
                     }
                     Err(e) => info!("Failed to add directory: {}", e),
@@ -417,7 +425,7 @@ async fn inner(
             AiMode::High => crate::detector::AiMode::High,
             AiMode::Auto => crate::detector::AiMode::Auto,
         };
-        
+
         let (vulkan_pre, ov_repair) = {
             let l = db.lock();
             let cfg = l.global_config();
@@ -463,9 +471,11 @@ async fn inner(
         tokio::spawn(async move {
             loop {
                 let mut streamers = tokio::task::JoinSet::new();
-                let mut session_groups_by_camera: FastHashMap<i32, Arc<retina::client::SessionGroup>> =
-                    FastHashMap::default();
-                
+                let mut session_groups_by_camera: FastHashMap<
+                    i32,
+                    Arc<retina::client::SessionGroup>,
+                > = FastHashMap::default();
+
                 {
                     // Start up streams.
                     let l = db.lock();
@@ -490,7 +500,8 @@ async fn inner(
                             continue;
                         }
                         let camera = l.cameras_by_id().get(&locked.camera_id).unwrap();
-                        let rotate_offset_sec = streamer::ROTATE_INTERVAL_SEC * i as i64 / streams_count as i64;
+                        let rotate_offset_sec =
+                            streamer::ROTATE_INTERVAL_SEC * i as i64 / streams_count as i64;
                         let session_group = session_groups_by_camera
                             .entry(camera.id)
                             .or_insert_with(|| {
@@ -507,7 +518,8 @@ async fn inner(
                             streamer::ROTATE_INTERVAL_SEC,
                         ) {
                             Ok(mut streamer) => {
-                                let span = tracing::info_span!("streamer", stream = streamer.short_name());
+                                let span =
+                                    tracing::info_span!("streamer", stream = streamer.short_name());
                                 streamers
                                     .build_task()
                                     .name(&format!("s-{}", streamer.short_name()))

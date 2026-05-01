@@ -714,23 +714,36 @@ impl LockedDatabase {
     }
 
     /// Updates a stream's sample file directory.
-    pub fn set_stream_sample_file_dir(&mut self, stream_id: i32, dir_id: Option<i32>) -> Result<(), Error> {
-        let stream = self.streams_by_id.get(&stream_id).ok_or_else(|| err!(NotFound, msg("no such stream {stream_id}")))?;
+    pub fn set_stream_sample_file_dir(
+        &mut self,
+        stream_id: i32,
+        dir_id: Option<i32>,
+    ) -> Result<(), Error> {
+        let stream = self
+            .streams_by_id
+            .get(&stream_id)
+            .ok_or_else(|| err!(NotFound, msg("no such stream {stream_id}")))?;
         let mut stream_locked = stream.inner.lock();
         let dir = if let Some(id) = dir_id {
-            Some(self.sample_file_dirs_by_id.get(&id).ok_or_else(|| err!(NotFound, msg("no such sample file dir {id}")))? .clone())
+            Some(
+                self.sample_file_dirs_by_id
+                    .get(&id)
+                    .ok_or_else(|| err!(NotFound, msg("no such sample file dir {id}")))?
+                    .clone(),
+            )
         } else {
             None
         };
-        
+
         let mut conn = self.conn.borrow_mut();
         let tx = conn.transaction()?;
         {
-            let mut stmt = tx.prepare_cached("update stream set sample_file_dir_id = ? where id = ?")?;
+            let mut stmt =
+                tx.prepare_cached("update stream set sample_file_dir_id = ? where id = ?")?;
             stmt.execute(params![dir_id, stream_id])?;
         }
         tx.commit()?;
-        
+
         stream_locked.sample_file_dir = dir;
         Ok(())
     }
@@ -2164,7 +2177,7 @@ impl<C: Clocks + Clone> Database<C> {
         l.uuid = db_uuid;
         l.auth = auth::State::init(&l.conn.borrow())?;
         l.signal = signal::State::init(&l.conn.borrow(), &config)?;
-        
+
         l.sample_file_dirs_by_id.clear();
         l.cameras_by_id.clear();
         l.cameras_by_uuid.clear();
@@ -2445,10 +2458,14 @@ impl<C: Clocks + Clone> DatabaseGuard<'_, C> {
         video_link: &str,
     ) -> Result<(), Error> {
         let sql = "INSERT INTO ai_event (camera_id, timestamp_90k, event_type, payload, video_link) VALUES (?, ?, ?, ?, ?)";
-        self.db.conn.borrow().execute(
-            sql,
-            rusqlite::params![camera_id, time_90k, event_type, payload, video_link],
-        ).map_err(|e| err!(Unknown, msg("failed to insert ai event"), source(e)))?;
+        self.db
+            .conn
+            .borrow()
+            .execute(
+                sql,
+                rusqlite::params![camera_id, time_90k, event_type, payload, video_link],
+            )
+            .map_err(|e| err!(Unknown, msg("failed to insert ai event"), source(e)))?;
         Ok(())
     }
 
@@ -2462,22 +2479,31 @@ impl<C: Clocks + Clone> DatabaseGuard<'_, C> {
 
     pub fn set_global_config(&mut self, config: crate::json::GlobalConfig) -> Result<(), Error> {
         let conn = self.db.conn.borrow();
-        conn.execute(
-            "update meta set config = ?",
-            rusqlite::params![config],
-        ).map_err(|e| err!(Unknown, msg("fail update global config"), source(e)))?;
+        conn.execute("update meta set config = ?", rusqlite::params![config])
+            .map_err(|e| err!(Unknown, msg("fail update global config"), source(e)))?;
         Ok(())
     }
 
-    pub fn execute_raw_query<F, T>(&self, sql: &str, params: &[&dyn rusqlite::ToSql], mut f: F) -> Result<Vec<T>, Error>
+    pub fn execute_raw_query<F, T>(
+        &self,
+        sql: &str,
+        params: &[&dyn rusqlite::ToSql],
+        mut f: F,
+    ) -> Result<Vec<T>, Error>
     where
         F: FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
     {
         let conn = self.conn.borrow();
-        let mut stmt = conn.prepare(sql).map_err(|e| err!(Unknown, msg("fail prep"), source(e)))?;
-        let rows = stmt.query_map(params, |row| f(row)).map_err(|e| err!(Unknown, msg("fail query"), source(e)))?;
+        let mut stmt = conn
+            .prepare(sql)
+            .map_err(|e| err!(Unknown, msg("fail prep"), source(e)))?;
+        let rows = stmt
+            .query_map(params, |row| f(row))
+            .map_err(|e| err!(Unknown, msg("fail query"), source(e)))?;
         let mut res = Vec::new();
-        for e in rows.flatten() { res.push(e); }
+        for e in rows.flatten() {
+            res.push(e);
+        }
         Ok(res)
     }
 }

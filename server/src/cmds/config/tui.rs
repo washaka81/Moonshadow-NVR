@@ -14,7 +14,7 @@ use crossterm::{
 use db::json::CameraConfig;
 use ratatui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout, Rect, Alignment},
+    layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     widgets::{Block, Borders, Clear, List, ListItem, ListState, Paragraph},
     Frame, Terminal,
@@ -32,9 +32,17 @@ pub struct CameraCard {
 }
 
 #[derive(Clone)]
-struct TextInput { content: String, cursor_position: usize }
+struct TextInput {
+    content: String,
+    cursor_position: usize,
+}
 impl TextInput {
-    fn new(initial: String) -> Self { Self { cursor_position: initial.len(), content: initial } }
+    fn new(initial: String) -> Self {
+        Self {
+            cursor_position: initial.len(),
+            content: initial,
+        }
+    }
     fn insert_char(&mut self, c: char) {
         self.content.insert(self.cursor_position, c);
         self.cursor_position += c.len_utf8();
@@ -48,63 +56,100 @@ impl TextInput {
             }
         }
     }
-    fn clear(&mut self) { self.content.clear(); self.cursor_position = 0; }
-    fn get_content(&self) -> &str { &self.content }
+    fn clear(&mut self) {
+        self.content.clear();
+        self.cursor_position = 0;
+    }
+    fn get_content(&self) -> &str {
+        &self.content
+    }
 }
 
 #[derive(Bpaf, Debug)]
 #[bpaf(command("config-tui"))]
 #[allow(dead_code)]
-pub struct Args { #[bpaf(external(crate::parse_db_dir))] pub db_dir: PathBuf }
+pub struct Args {
+    #[bpaf(external(crate::parse_db_dir))]
+    pub db_dir: PathBuf,
+}
 
 pub fn run_main_menu(db: &Arc<db::Database>, db_dir: &Path) -> Result<(), Error> {
-    let rt = tokio::runtime::Builder::new_current_thread().enable_all().build().map_err(io::Error::other)?;
+    let rt = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(io::Error::other)?;
     rt.block_on(async {
         enable_raw_mode()?;
         let mut stdout = io::stdout();
         execute!(stdout, EnterAlternateScreen, EnableMouseCapture)?;
         let backend = CrosstermBackend::new(stdout);
         let mut terminal = Terminal::new(backend)?;
-        while event::poll(Duration::from_millis(0))? { let _ = event::read()?; }
+        while event::poll(Duration::from_millis(0))? {
+            let _ = event::read()?;
+        }
         let result = run_main_menu_app(&mut terminal, db, db_dir).await;
         disable_raw_mode()?;
-        execute!(terminal.backend_mut(), LeaveAlternateScreen, DisableMouseCapture)?;
+        execute!(
+            terminal.backend_mut(),
+            LeaveAlternateScreen,
+            DisableMouseCapture
+        )?;
         terminal.show_cursor()?;
-        if let Err(e) = result { eprintln!("Error: {}", e); }
+        if let Err(e) = result {
+            eprintln!("Error: {}", e);
+        }
         Ok(())
     })
 }
 
-async fn run_main_menu_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, db: &Arc<db::Database>, db_dir: &Path) -> io::Result<()> {
+async fn run_main_menu_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    db: &Arc<db::Database>,
+    db_dir: &Path,
+) -> io::Result<()> {
     let mut state = MainMenuState::default();
     loop {
         terminal.draw(|f| render_main_menu_screen(f, &mut state))?;
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    if !state.status_msg.is_empty() { state.status_msg.clear(); continue; }
+                    if !state.status_msg.is_empty() {
+                        state.status_msg.clear();
+                        continue;
+                    }
                     if state.confirm_reset {
                         match key.code {
-                            KeyCode::Char('y') | KeyCode::Char('s') => { 
+                            KeyCode::Char('y') | KeyCode::Char('s') => {
                                 state.status_msg = perform_factory_reset(db, db_dir).await;
                                 state.confirm_reset = false;
                             }
-                            _ => { state.confirm_reset = false; }
+                            _ => {
+                                state.confirm_reset = false;
+                            }
                         }
                         continue;
                     }
                     if state.show_export || state.show_import {
                         match key.code {
-                            KeyCode::Esc => { state.show_export = false; state.show_import = false; state.input.clear(); }
+                            KeyCode::Esc => {
+                                state.show_export = false;
+                                state.show_import = false;
+                                state.input.clear();
+                            }
                             KeyCode::Char(c) => state.input.insert_char(c),
                             KeyCode::Backspace => state.input.backspace(),
                             KeyCode::Enter => {
                                 let filename = state.input.get_content().to_string();
                                 if !filename.is_empty() {
-                                    if state.show_export { state.status_msg = perform_export(&filename, db_dir); }
-                                    else { state.status_msg = perform_import(&filename, db_dir); }
+                                    if state.show_export {
+                                        state.status_msg = perform_export(&filename, db_dir);
+                                    } else {
+                                        state.status_msg = perform_import(&filename, db_dir);
+                                    }
                                 }
-                                state.show_export = false; state.show_import = false; state.input.clear();
+                                state.show_export = false;
+                                state.show_import = false;
+                                state.input.clear();
                             }
                             _ => {}
                         }
@@ -112,16 +157,46 @@ async fn run_main_menu_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>
                     }
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => break,
-                        KeyCode::Down | KeyCode::Char('j') => state.selected = (state.selected + 1) % 8,
-                        KeyCode::Up | KeyCode::Char('k') => state.selected = if state.selected > 0 { state.selected - 1 } else { 7 },
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            state.selected = (state.selected + 1) % 8
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            state.selected = if state.selected > 0 {
+                                state.selected - 1
+                            } else {
+                                7
+                            }
+                        }
                         KeyCode::Enter => match state.selected {
-                            0 => { let _ = run_cameras_app(terminal, db).await; }
-                            1 => { let _ = crate::cmds::config::dirs_tui::run_dirs_menu_shared(terminal, db).await; }
-                            2 => { let _ = crate::cmds::config::users_tui::run_users_menu_shared(terminal, db).await; }
-                            3 => { let _ = run_hardware_app(terminal, db).await; }
-                            4 => { state.input = TextInput::new("backup.sql".to_string()); state.show_export = true; }
-                            5 => { state.input = TextInput::new(String::new()); state.show_import = true; }
-                            6 => { state.confirm_reset = true; }
+                            0 => {
+                                let _ = run_cameras_app(terminal, db).await;
+                            }
+                            1 => {
+                                let _ = crate::cmds::config::dirs_tui::run_dirs_menu_shared(
+                                    terminal, db,
+                                )
+                                .await;
+                            }
+                            2 => {
+                                let _ = crate::cmds::config::users_tui::run_users_menu_shared(
+                                    terminal, db,
+                                )
+                                .await;
+                            }
+                            3 => {
+                                let _ = run_hardware_app(terminal, db).await;
+                            }
+                            4 => {
+                                state.input = TextInput::new("backup.sql".to_string());
+                                state.show_export = true;
+                            }
+                            5 => {
+                                state.input = TextInput::new(String::new());
+                                state.show_import = true;
+                            }
+                            6 => {
+                                state.confirm_reset = true;
+                            }
                             7 => break,
                             _ => {}
                         },
@@ -137,9 +212,12 @@ async fn run_main_menu_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>
 async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String {
     let video_dirs: Vec<PathBuf> = {
         let l = db.lock();
-        l.sample_file_dirs_by_id().values().map(|d| d.pool().path().to_path_buf()).collect()
+        l.sample_file_dirs_by_id()
+            .values()
+            .map(|d| d.pool().path().to_path_buf())
+            .collect()
     };
-    
+
     // 1. Delete all video files
     for dir in video_dirs {
         let dir: PathBuf = dir;
@@ -151,9 +229,16 @@ async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String 
 
     // 2. Reset database (delete and re-init)
     let db_path = db_dir.join("db");
-    
-    let cmd = format!("rm -f {}* && target/debug/moonshadow-nvr init", db_path.display());
-    match std::process::Command::new("sh").arg("-c").arg(&cmd).status() {
+
+    let cmd = format!(
+        "rm -f {}* && target/debug/moonshadow-nvr init",
+        db_path.display()
+    );
+    match std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .status()
+    {
         Ok(s) if s.success() => "✅ System Reset Successful. Restart NVR.".to_string(),
         _ => "❌ Reset failed. Database might be busy.".to_string(),
     }
@@ -162,65 +247,97 @@ async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String 
 fn perform_export(filename: &str, db_dir: &Path) -> String {
     let db_path = db_dir.join("db");
     let cmd = format!("sqlite3 {} .dump > {}", db_path.display(), filename);
-    match std::process::Command::new("sh").arg("-c").arg(&cmd).status() {
+    match std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .status()
+    {
         Ok(s) if s.success() => format!("✅ Database exported to {}", filename),
         _ => "❌ Export failed. Is sqlite3 installed?".to_string(),
     }
 }
 
 fn perform_import(filename: &str, db_dir: &Path) -> String {
-    if !Path::new(filename).exists() { return format!("❌ Error: File {} not found", filename); }
+    if !Path::new(filename).exists() {
+        return format!("❌ Error: File {} not found", filename);
+    }
     let db_path = db_dir.join("db");
-    let cmd = format!("rm -f {} && sqlite3 {} < {}", db_path.display(), db_path.display(), filename);
-    match std::process::Command::new("sh").arg("-c").arg(&cmd).status() {
+    let cmd = format!(
+        "rm -f {} && sqlite3 {} < {}",
+        db_path.display(),
+        db_path.display(),
+        filename
+    );
+    match std::process::Command::new("sh")
+        .arg("-c")
+        .arg(&cmd)
+        .status()
+    {
         Ok(s) if s.success() => "✅ Database imported successfully".to_string(),
         _ => "❌ Critical error during import".to_string(),
     }
 }
 
-async fn run_hardware_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, db: &Arc<db::Database>) -> io::Result<()> {
+async fn run_hardware_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    db: &Arc<db::Database>,
+) -> io::Result<()> {
     let mut hw_state = HardwareState::new(db);
     loop {
         terminal.draw(|f| render_hardware_screen(f, &mut hw_state))?;
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    if !hw_state.status_msg.is_empty() { hw_state.status_msg.clear(); continue; }
+                    if !hw_state.status_msg.is_empty() {
+                        hw_state.status_msg.clear();
+                        continue;
+                    }
                     match key.code {
                         KeyCode::Esc | KeyCode::Char('q') => break,
-                        KeyCode::Down | KeyCode::Char('j') => hw_state.selected = (hw_state.selected + 1) % 6,
-                        KeyCode::Up | KeyCode::Char('k') => hw_state.selected = if hw_state.selected > 0 { hw_state.selected - 1 } else { 5 },
-                        KeyCode::Char(' ') | KeyCode::Enter => {
-                            match hw_state.selected {
-                                0 => hw_state.accel = !hw_state.accel,
-                                1 => hw_state.vulkan_pre = !hw_state.vulkan_pre,
-                                2 => hw_state.ov_repair = !hw_state.ov_repair,
-                                3 => {
-                                    hw_state.ai_mode = match hw_state.ai_mode.as_str() {
-                                        "low" => "medium".to_string(),
-                                        "medium" => "high".to_string(),
-                                        _ => "low".to_string(),
-                                    };
-                                }
-                                5 => {
-                                    let mut l = db.lock();
-                                    let mut cfg = l.global_config().clone();
-                                    cfg.hardware_acceleration = hw_state.accel;
-                                    cfg.vulkan_preprocessing = hw_state.vulkan_pre;
-                                    cfg.openvino_repair = hw_state.ov_repair;
-                                    cfg.ai_mode = hw_state.ai_mode.clone();
-                                    cfg.model_path = hw_state.model.get_content().to_string();
-                                    if let Err(e) = l.set_global_config(cfg) {
-                                        hw_state.status_msg = format!("❌ Error: {}", e);
-                                    } else {
-                                        hw_state.status_msg = "✅ Global configuration saved".to_string();
-                                    }
-                                }
-                                _ => {}
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            hw_state.selected = (hw_state.selected + 1) % 6
+                        }
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            hw_state.selected = if hw_state.selected > 0 {
+                                hw_state.selected - 1
+                            } else {
+                                5
                             }
                         }
-                        KeyCode::Char(c) if hw_state.selected == 4 => { hw_state.model.insert_char(c); }
-                        KeyCode::Backspace if hw_state.selected == 4 => { hw_state.model.backspace(); }
+                        KeyCode::Char(' ') | KeyCode::Enter => match hw_state.selected {
+                            0 => hw_state.accel = !hw_state.accel,
+                            1 => hw_state.vulkan_pre = !hw_state.vulkan_pre,
+                            2 => hw_state.ov_repair = !hw_state.ov_repair,
+                            3 => {
+                                hw_state.ai_mode = match hw_state.ai_mode.as_str() {
+                                    "low" => "medium".to_string(),
+                                    "medium" => "high".to_string(),
+                                    _ => "low".to_string(),
+                                };
+                            }
+                            5 => {
+                                let mut l = db.lock();
+                                let mut cfg = l.global_config().clone();
+                                cfg.hardware_acceleration = hw_state.accel;
+                                cfg.vulkan_preprocessing = hw_state.vulkan_pre;
+                                cfg.openvino_repair = hw_state.ov_repair;
+                                cfg.ai_mode = hw_state.ai_mode.clone();
+                                cfg.model_path = hw_state.model.get_content().to_string();
+                                if let Err(e) = l.set_global_config(cfg) {
+                                    hw_state.status_msg = format!("❌ Error: {}", e);
+                                } else {
+                                    hw_state.status_msg =
+                                        "✅ Global configuration saved".to_string();
+                                }
+                            }
+                            _ => {}
+                        },
+                        KeyCode::Char(c) if hw_state.selected == 4 => {
+                            hw_state.model.insert_char(c);
+                        }
+                        KeyCode::Backspace if hw_state.selected == 4 => {
+                            hw_state.model.backspace();
+                        }
                         _ => {}
                     }
                 }
@@ -230,118 +347,331 @@ async fn run_hardware_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
     Ok(())
 }
 
-struct HardwareState { selected: usize, accel: bool, vulkan_pre: bool, ov_repair: bool, ai_mode: String, model: TextInput, status_msg: String }
+struct HardwareState {
+    selected: usize,
+    accel: bool,
+    vulkan_pre: bool,
+    ov_repair: bool,
+    ai_mode: String,
+    model: TextInput,
+    status_msg: String,
+}
 impl HardwareState {
     fn new(db: &Arc<db::Database>) -> Self {
         let l = db.lock();
         let cfg = l.global_config();
-        Self { 
-            selected: 0, 
-            accel: cfg.hardware_acceleration, 
+        Self {
+            selected: 0,
+            accel: cfg.hardware_acceleration,
             vulkan_pre: cfg.vulkan_preprocessing,
             ov_repair: cfg.openvino_repair,
-            ai_mode: if cfg.ai_mode.is_empty() { "medium".to_string() } else { cfg.ai_mode.clone() }, 
-            model: TextInput::new(if cfg.model_path.is_empty() { "yolov8n.onnx".to_string() } else { cfg.model_path.clone() }),
-            status_msg: String::new()
+            ai_mode: if cfg.ai_mode.is_empty() {
+                "medium".to_string()
+            } else {
+                cfg.ai_mode.clone()
+            },
+            model: TextInput::new(if cfg.model_path.is_empty() {
+                "yolov8n.onnx".to_string()
+            } else {
+                cfg.model_path.clone()
+            }),
+            status_msg: String::new(),
         }
     }
 }
 
 fn render_hardware_screen(frame: &mut Frame, state: &mut HardwareState) {
-    let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)]).split(frame.area());
-    frame.render_widget(Block::default().borders(Borders::ALL).title(" Hardware & AI Configuration ").border_style(Style::default().fg(Color::Cyan)), chunks[0]);
-    
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .split(frame.area());
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Hardware & AI Configuration ")
+            .border_style(Style::default().fg(Color::Cyan)),
+        chunks[0],
+    );
+
     let options = [
-        format!("  Hardware Accel (OpenVINO Native): [{}]", if state.accel { "X" } else { " " }),
-        format!("  Vulkan Pre-processing (iGPU Parallel): [{}]", if state.vulkan_pre { "X" } else { " " }),
-        format!("  Repair OpenVINO Bridge (Auto-fix): [{}]", if state.ov_repair { "X" } else { " " }),
+        format!(
+            "  Hardware Accel (OpenVINO Native): [{}]",
+            if state.accel { "X" } else { " " }
+        ),
+        format!(
+            "  Vulkan Pre-processing (iGPU Parallel): [{}]",
+            if state.vulkan_pre { "X" } else { " " }
+        ),
+        format!(
+            "  Repair OpenVINO Bridge (Auto-fix): [{}]",
+            if state.ov_repair { "X" } else { " " }
+        ),
         format!("  AI Processing Mode: < {} >", state.ai_mode),
         format!("  Model Path: {}", state.model.get_content()),
         "  💾 Save and Back".to_string(),
     ];
 
-    let items: Vec<ListItem> = options.iter().enumerate().map(|(i, t)| {
-        let style = if i == state.selected { Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD).bg(Color::Rgb(49, 48, 60)) } else { Style::default() };
-        ListItem::new(t.as_str()).style(style)
-    }).collect();
+    let items: Vec<ListItem> = options
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let style = if i == state.selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+                    .bg(Color::Rgb(49, 48, 60))
+            } else {
+                Style::default()
+            };
+            ListItem::new(t.as_str()).style(style)
+        })
+        .collect();
 
-    frame.render_widget(List::new(items).block(Block::default().borders(Borders::ALL).title(" Settings ")), chunks[1]);
+    frame.render_widget(
+        List::new(items).block(Block::default().borders(Borders::ALL).title(" Settings ")),
+        chunks[1],
+    );
     if !state.status_msg.is_empty() {
-        let area = centered_rect(50, 20, frame.area()); frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg)).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Yellow))), area);
+        let area = centered_rect(50, 20, frame.area());
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow)),
+                ),
+            area,
+        );
     }
-    frame.render_widget(Paragraph::new("↑↓ Navigate | Space/Enter Toggle/Select | q/Esc Back").block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray))).style(Style::default().fg(Color::DarkGray)), chunks[2]);
+    frame.render_widget(
+        Paragraph::new("↑↓ Navigate | Space/Enter Toggle/Select | q/Esc Back")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[2],
+    );
 }
 
-struct MainMenuState { selected: usize, show_export: bool, show_import: bool, confirm_reset: bool, input: TextInput, status_msg: String }
-impl Default for MainMenuState { fn default() -> Self { Self { selected: 0, show_export: false, show_import: false, confirm_reset: false, input: TextInput::new(String::new()), status_msg: String::new() } } }
+struct MainMenuState {
+    selected: usize,
+    show_export: bool,
+    show_import: bool,
+    confirm_reset: bool,
+    input: TextInput,
+    status_msg: String,
+}
+impl Default for MainMenuState {
+    fn default() -> Self {
+        Self {
+            selected: 0,
+            show_export: false,
+            show_import: false,
+            confirm_reset: false,
+            input: TextInput::new(String::new()),
+            status_msg: String::new(),
+        }
+    }
+}
 
 fn render_main_menu_screen(frame: &mut Frame, state: &mut MainMenuState) {
-    let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)]).split(frame.area());
-    frame.render_widget(Block::default().borders(Borders::ALL).title(" Moonshadow NVR Manager ").border_style(Style::default().fg(Color::Cyan)), chunks[0]);
-    let options = [ "📷 Manage Cameras", "📂 Manage Directories", "👥 Manage Users", "⚡ Hardware & AI", "📤 Export Database", "📥 Import Database", "🔥 Factory Reset", "🚪 Exit" ];
-    let items: Vec<ListItem> = options.iter().enumerate().map(|(i, t)| {
-        let style = if i == state.selected { Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD).bg(Color::Rgb(49, 48, 60)) } else { Style::default() };
-        ListItem::new(format!("  {}", t)).style(style)
-    }).collect();
-    frame.render_stateful_widget(List::new(items).block(Block::default().borders(Borders::ALL).title(" Main Menu ")), chunks[1], &mut ListState::default().with_selected(Some(state.selected)));
-    frame.render_widget(Paragraph::new("↑↓ Navigate | Enter Select | q/Esc Exit").block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray))).style(Style::default().fg(Color::DarkGray)), chunks[2]);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .split(frame.area());
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Moonshadow NVR Manager ")
+            .border_style(Style::default().fg(Color::Cyan)),
+        chunks[0],
+    );
+    let options = [
+        "📷 Manage Cameras",
+        "📂 Manage Directories",
+        "👥 Manage Users",
+        "⚡ Hardware & AI",
+        "📤 Export Database",
+        "📥 Import Database",
+        "🔥 Factory Reset",
+        "🚪 Exit",
+    ];
+    let items: Vec<ListItem> = options
+        .iter()
+        .enumerate()
+        .map(|(i, t)| {
+            let style = if i == state.selected {
+                Style::default()
+                    .fg(Color::Yellow)
+                    .add_modifier(Modifier::BOLD)
+                    .bg(Color::Rgb(49, 48, 60))
+            } else {
+                Style::default()
+            };
+            ListItem::new(format!("  {}", t)).style(style)
+        })
+        .collect();
+    frame.render_stateful_widget(
+        List::new(items).block(Block::default().borders(Borders::ALL).title(" Main Menu ")),
+        chunks[1],
+        &mut ListState::default().with_selected(Some(state.selected)),
+    );
+    frame.render_widget(
+        Paragraph::new("↑↓ Navigate | Enter Select | q/Esc Exit")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[2],
+    );
     if state.show_export || state.show_import {
-        let area = centered_rect(60, 20, frame.area()); frame.render_widget(Clear, area);
-        let b = Block::default().borders(Borders::ALL).title(if state.show_export { " Export SQL " } else { " Import SQL " }).border_style(Style::default().fg(Color::Yellow));
+        let area = centered_rect(60, 20, frame.area());
+        frame.render_widget(Clear, area);
+        let b = Block::default()
+            .borders(Borders::ALL)
+            .title(if state.show_export {
+                " Export SQL "
+            } else {
+                " Import SQL "
+            })
+            .border_style(Style::default().fg(Color::Yellow));
         frame.render_widget(Paragraph::new(state.input.get_content()).block(b), area);
         frame.set_cursor_position((area.x + state.input.cursor_position as u16 + 1, area.y + 1));
     }
     if state.confirm_reset {
-        let area = centered_rect(50, 20, frame.area()); frame.render_widget(Clear, area);
+        let area = centered_rect(50, 20, frame.area());
+        frame.render_widget(Clear, area);
         frame.render_widget(Paragraph::new("\n⚠️ FACTORY RESET ⚠️\n\nDelete ALL videos and database?\n\n[y/s] CONFIRM | [Any] Cancel").alignment(Alignment::Center).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Red))), area);
     }
     if !state.status_msg.is_empty() {
-        let area = centered_rect(50, 20, frame.area()); frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg)).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Green))), area);
+        let area = centered_rect(50, 20, frame.area());
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Green)),
+                ),
+            area,
+        );
     }
 }
 
-pub async fn run_cameras_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>, db: &Arc<db::Database>) -> io::Result<()> {
+pub async fn run_cameras_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+    db: &Arc<db::Database>,
+) -> io::Result<()> {
     let mut state = AppState::new(db.clone());
     loop {
         terminal.draw(|f| ui(f, &mut state))?;
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
-                    if !state.status_msg.is_empty() { state.status_msg.clear(); continue; }
+                    if !state.status_msg.is_empty() {
+                        state.status_msg.clear();
+                        continue;
+                    }
                     if state.confirm_delete.is_some() {
                         match key.code {
-                            KeyCode::Char('y') | KeyCode::Char('s') | KeyCode::Enter => { if let Some(id) = state.confirm_delete { { let mut l = db.lock(); let _ = l.delete_camera(id); } state.refresh(db.clone()); } state.confirm_delete = None; }
+                            KeyCode::Char('y') | KeyCode::Char('s') | KeyCode::Enter => {
+                                if let Some(id) = state.confirm_delete {
+                                    {
+                                        let mut l = db.lock();
+                                        let _ = l.delete_camera(id);
+                                    }
+                                    state.refresh(db.clone());
+                                }
+                                state.confirm_delete = None;
+                            }
                             KeyCode::Char('n') | KeyCode::Esc => state.confirm_delete = None,
                             _ => {}
                         }
                         continue;
                     }
                     if state.show_add_menu || state.edit_camera.is_some() {
-                        if key.code == KeyCode::Esc { state.show_add_menu = false; state.edit_camera = None; }
-                        else { handle_camera_input(&key, &mut state, db)?; }
+                        if key.code == KeyCode::Esc {
+                            state.show_add_menu = false;
+                            state.edit_camera = None;
+                        } else {
+                            handle_camera_input(&key, &mut state, db)?;
+                        }
                         continue;
                     }
                     match key.code {
                         KeyCode::Esc | KeyCode::Char('q') => break,
                         KeyCode::Down | KeyCode::Char('j') => state.next(),
                         KeyCode::Up | KeyCode::Char('k') => state.previous(),
-                        KeyCode::Char('a') => { state.clear_menu_inputs(); state.show_add_menu = true; }
-                        KeyCode::Char('e') => if let Some(cam) = state.get_selected_camera().cloned() {
+                        KeyCode::Char('a') => {
                             state.clear_menu_inputs();
-                            state.menu_input = TextInput::new(cam.short_name.clone());
-                            state.menu_input2 = TextInput::new(cam.description.clone());
-                            let l = db.lock();
-                            if let Some(c) = l.cameras_by_id().get(&cam.id) {
-                                state.menu_input3 = TextInput::new(c.config.username.clone());
-                                state.menu_input4 = TextInput::new(c.config.password.clone());
-                                if let Some(s_id) = c.streams[0] { if let Some(s) = l.streams_by_id().get(&s_id) { state.menu_input5 = TextInput::new(s.inner.lock().config.url.as_ref().map(|u| u.to_string()).unwrap_or_default()); state.menu_input7 = TextInput::new((s.inner.lock().config.retain_bytes / 1024 / 1024 / 1024).to_string()); } }
-                                if let Some(s_id) = c.streams[1] { if let Some(s) = l.streams_by_id().get(&s_id) { state.menu_input6 = TextInput::new(s.inner.lock().config.url.as_ref().map(|u| u.to_string()).unwrap_or_default()); } }
-                            }
-                            state.edit_camera = Some(cam);
+                            state.show_add_menu = true;
                         }
-                        KeyCode::Char('d') => if let Some(c) = state.get_selected_camera() { state.confirm_delete = Some(c.id); }
+                        KeyCode::Char('e') => {
+                            if let Some(cam) = state.get_selected_camera().cloned() {
+                                state.clear_menu_inputs();
+                                state.menu_input = TextInput::new(cam.short_name.clone());
+                                state.menu_input2 = TextInput::new(cam.description.clone());
+                                let l = db.lock();
+                                if let Some(c) = l.cameras_by_id().get(&cam.id) {
+                                    state.menu_input3 = TextInput::new(c.config.username.clone());
+                                    state.menu_input4 = TextInput::new(c.config.password.clone());
+                                    if let Some(s_id) = c.streams[0] {
+                                        if let Some(s) = l.streams_by_id().get(&s_id) {
+                                            state.menu_input5 = TextInput::new(
+                                                s.inner
+                                                    .lock()
+                                                    .config
+                                                    .url
+                                                    .as_ref()
+                                                    .map(|u| u.to_string())
+                                                    .unwrap_or_default(),
+                                            );
+                                            state.menu_input7 = TextInput::new(
+                                                (s.inner.lock().config.retain_bytes
+                                                    / 1024
+                                                    / 1024
+                                                    / 1024)
+                                                    .to_string(),
+                                            );
+                                        }
+                                    }
+                                    if let Some(s_id) = c.streams[1] {
+                                        if let Some(s) = l.streams_by_id().get(&s_id) {
+                                            state.menu_input6 = TextInput::new(
+                                                s.inner
+                                                    .lock()
+                                                    .config
+                                                    .url
+                                                    .as_ref()
+                                                    .map(|u| u.to_string())
+                                                    .unwrap_or_default(),
+                                            );
+                                        }
+                                    }
+                                }
+                                state.edit_camera = Some(cam);
+                            }
+                        }
+                        KeyCode::Char('d') => {
+                            if let Some(c) = state.get_selected_camera() {
+                                state.confirm_delete = Some(c.id);
+                            }
+                        }
                         KeyCode::Char('r') => state.refresh(db.clone()),
                         _ => {}
                     }
@@ -352,16 +682,40 @@ pub async fn run_cameras_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout
     Ok(())
 }
 
-fn handle_camera_input(key: &event::KeyEvent, state: &mut AppState, db: &Arc<db::Database>) -> io::Result<()> {
+fn handle_camera_input(
+    key: &event::KeyEvent,
+    state: &mut AppState,
+    db: &Arc<db::Database>,
+) -> io::Result<()> {
     match key.code {
         KeyCode::Tab => state.menu_tab = (state.menu_tab + 1) % 7,
-        KeyCode::Char(c) => match state.menu_tab { 0 => state.menu_input.insert_char(c), 1 => state.menu_input2.insert_char(c), 2 => state.menu_input3.insert_char(c), 3 => state.menu_input4.insert_char(c), 4 => state.menu_input5.insert_char(c), 5 => state.menu_input6.insert_char(c), 6 => state.menu_input7.insert_char(c), _ => {} },
-        KeyCode::Backspace => match state.menu_tab { 0 => state.menu_input.backspace(), 1 => state.menu_input2.backspace(), 2 => state.menu_input3.backspace(), 3 => state.menu_input4.backspace(), 4 => state.menu_input5.backspace(), 5 => state.menu_input6.backspace(), 6 => state.menu_input7.backspace(), _ => {} },
+        KeyCode::Char(c) => match state.menu_tab {
+            0 => state.menu_input.insert_char(c),
+            1 => state.menu_input2.insert_char(c),
+            2 => state.menu_input3.insert_char(c),
+            3 => state.menu_input4.insert_char(c),
+            4 => state.menu_input5.insert_char(c),
+            5 => state.menu_input6.insert_char(c),
+            6 => state.menu_input7.insert_char(c),
+            _ => {}
+        },
+        KeyCode::Backspace => match state.menu_tab {
+            0 => state.menu_input.backspace(),
+            1 => state.menu_input2.backspace(),
+            2 => state.menu_input3.backspace(),
+            3 => state.menu_input4.backspace(),
+            4 => state.menu_input5.backspace(),
+            5 => state.menu_input6.backspace(),
+            6 => state.menu_input7.backspace(),
+            _ => {}
+        },
         KeyCode::Enter => {
             let mut l = db.lock();
             let first_dir_id = l.sample_file_dirs_by_id().keys().next().copied();
             if first_dir_id.is_none() {
-                state.status_msg = "⚠️ Warning: No storage pools configured. Recordings will not be saved.".to_string();
+                state.status_msg =
+                    "⚠️ Warning: No storage pools configured. Recordings will not be saved."
+                        .to_string();
                 return Ok(());
             }
             let retain_gb: u64 = state.menu_input7.get_content().parse().unwrap_or(0);
@@ -370,15 +724,28 @@ fn handle_camera_input(key: &event::KeyEvent, state: &mut AppState, db: &Arc<db:
             if state.show_add_menu {
                 let name = state.menu_input.get_content().to_string();
                 if !name.is_empty() {
-                    let mut ch = db::CameraChange { short_name: name, config: CameraConfig { description: state.menu_input2.get_content().to_string(), username: state.menu_input3.get_content().to_string(), password: state.menu_input4.get_content().to_string(), ..Default::default() }, ..Default::default() };
-                    if let Ok(u) = url::Url::parse(state.menu_input5.get_content()) { 
-                        ch.streams[0].config.url = Some(u); ch.streams[0].config.mode = "record".to_owned(); 
-                        ch.streams[0].config.rtsp_transport = "tcp".to_owned(); ch.streams[0].sample_file_dir_id = first_dir_id;
+                    let mut ch = db::CameraChange {
+                        short_name: name,
+                        config: CameraConfig {
+                            description: state.menu_input2.get_content().to_string(),
+                            username: state.menu_input3.get_content().to_string(),
+                            password: state.menu_input4.get_content().to_string(),
+                            ..Default::default()
+                        },
+                        ..Default::default()
+                    };
+                    if let Ok(u) = url::Url::parse(state.menu_input5.get_content()) {
+                        ch.streams[0].config.url = Some(u);
+                        ch.streams[0].config.mode = "record".to_owned();
+                        ch.streams[0].config.rtsp_transport = "tcp".to_owned();
+                        ch.streams[0].sample_file_dir_id = first_dir_id;
                         ch.streams[0].config.retain_bytes = retain_bytes;
                     }
-                    if let Ok(u) = url::Url::parse(state.menu_input6.get_content()) { 
-                        ch.streams[1].config.url = Some(u); ch.streams[1].config.mode = "record".to_owned(); 
-                        ch.streams[1].config.rtsp_transport = "tcp".to_owned(); ch.streams[1].sample_file_dir_id = first_dir_id;
+                    if let Ok(u) = url::Url::parse(state.menu_input6.get_content()) {
+                        ch.streams[1].config.url = Some(u);
+                        ch.streams[1].config.mode = "record".to_owned();
+                        ch.streams[1].config.rtsp_transport = "tcp".to_owned();
+                        ch.streams[1].sample_file_dir_id = first_dir_id;
                         ch.streams[1].config.retain_bytes = retain_bytes;
                     }
                     if let Err(e) = l.add_camera(ch) {
@@ -393,28 +760,44 @@ fn handle_camera_input(key: &event::KeyEvent, state: &mut AppState, db: &Arc<db:
                     ch.config.username = state.menu_input3.get_content().to_string();
                     ch.config.password = state.menu_input4.get_content().to_string();
                     let u1 = state.menu_input5.get_content();
-                    if !u1.is_empty() { 
-                        if let Ok(u) = url::Url::parse(u1) { 
-                            ch.streams[0].config.url = Some(u); ch.streams[0].config.mode = "record".to_owned(); 
-                            ch.streams[0].config.rtsp_transport = "tcp".to_owned(); ch.streams[0].sample_file_dir_id = first_dir_id; 
+                    if !u1.is_empty() {
+                        if let Ok(u) = url::Url::parse(u1) {
+                            ch.streams[0].config.url = Some(u);
+                            ch.streams[0].config.mode = "record".to_owned();
+                            ch.streams[0].config.rtsp_transport = "tcp".to_owned();
+                            ch.streams[0].sample_file_dir_id = first_dir_id;
                             ch.streams[0].config.retain_bytes = retain_bytes;
                         }
-                    } else { ch.streams[0].config.url = None; ch.streams[0].config.mode = String::new(); ch.streams[0].sample_file_dir_id = None; }
+                    } else {
+                        ch.streams[0].config.url = None;
+                        ch.streams[0].config.mode = String::new();
+                        ch.streams[0].sample_file_dir_id = None;
+                    }
                     let u2 = state.menu_input6.get_content();
-                    if !u2.is_empty() { 
-                        if let Ok(u) = url::Url::parse(u2) { 
-                            ch.streams[1].config.url = Some(u); ch.streams[1].config.mode = "record".to_owned(); 
-                            ch.streams[1].config.rtsp_transport = "tcp".to_owned(); ch.streams[1].sample_file_dir_id = first_dir_id; 
+                    if !u2.is_empty() {
+                        if let Ok(u) = url::Url::parse(u2) {
+                            ch.streams[1].config.url = Some(u);
+                            ch.streams[1].config.mode = "record".to_owned();
+                            ch.streams[1].config.rtsp_transport = "tcp".to_owned();
+                            ch.streams[1].sample_file_dir_id = first_dir_id;
                             ch.streams[1].config.retain_bytes = retain_bytes;
                         }
-                    } else { ch.streams[1].config.url = None; ch.streams[1].config.mode = String::new(); ch.streams[1].sample_file_dir_id = None; }
+                    } else {
+                        ch.streams[1].config.url = None;
+                        ch.streams[1].config.mode = String::new();
+                        ch.streams[1].sample_file_dir_id = None;
+                    }
                     if let Err(e) = l.update_camera(cam.id, ch) {
                         state.status_msg = format!("❌ Error updating camera: {}", e);
                         return Ok(());
                     }
                 }
             }
-            drop(l); state.refresh(db.clone()); state.show_add_menu = false; state.edit_camera = None; state.clear_menu_inputs();
+            drop(l);
+            state.refresh(db.clone());
+            state.show_add_menu = false;
+            state.edit_camera = None;
+            state.clear_menu_inputs();
             state.status_msg = "✅ Saved successfully".to_string();
         }
         _ => {}
@@ -422,62 +805,206 @@ fn handle_camera_input(key: &event::KeyEvent, state: &mut AppState, db: &Arc<db:
     Ok(())
 }
 
-struct AppState { 
-    items: Vec<CameraCard>, 
-    list_state: ListState, 
-    show_add_menu: bool, 
-    edit_camera: Option<CameraCard>, 
-    confirm_delete: Option<i32>, 
-    menu_tab: usize, 
-    menu_input: TextInput, 
-    menu_input2: TextInput, 
-    menu_input3: TextInput, 
-    menu_input4: TextInput, 
-    menu_input5: TextInput, 
-    menu_input6: TextInput, 
+struct AppState {
+    items: Vec<CameraCard>,
+    list_state: ListState,
+    show_add_menu: bool,
+    edit_camera: Option<CameraCard>,
+    confirm_delete: Option<i32>,
+    menu_tab: usize,
+    menu_input: TextInput,
+    menu_input2: TextInput,
+    menu_input3: TextInput,
+    menu_input4: TextInput,
+    menu_input5: TextInput,
+    menu_input6: TextInput,
     menu_input7: TextInput,
-    status_msg: String
+    status_msg: String,
 }
 impl AppState {
-    fn new(db: Arc<db::Database>) -> Self { let items = load_cameras(&db); Self { items, list_state: ListState::default().with_selected(Some(0)), show_add_menu: false, edit_camera: None, confirm_delete: None, menu_tab: 0, menu_input: TextInput::new(String::new()), menu_input2: TextInput::new(String::new()), menu_input3: TextInput::new(String::new()), menu_input4: TextInput::new(String::new()), menu_input5: TextInput::new(String::new()), menu_input6: TextInput::new(String::new()), menu_input7: TextInput::new("10".to_string()), status_msg: String::new() } }
-    fn refresh(&mut self, db: Arc<db::Database>) { self.items = load_cameras(&db); }
-    fn clear_menu_inputs(&mut self) { self.menu_input.clear(); self.menu_input2.clear(); self.menu_input3.clear(); self.menu_input4.clear(); self.menu_input5.clear(); self.menu_input6.clear(); self.menu_input7 = TextInput::new("10".to_string()); self.menu_tab = 0; }
-    fn next(&mut self) { if let Some(i) = self.list_state.selected() { if i < self.items.len().saturating_sub(1) { self.list_state.select(Some(i+1)); } } }
-    fn previous(&mut self) { if let Some(i) = self.list_state.selected() { if i > 0 { self.list_state.select(Some(i-1)); } } }
-    fn get_selected_camera(&self) -> Option<&CameraCard> { self.list_state.selected().and_then(|i| self.items.get(i)) }
+    fn new(db: Arc<db::Database>) -> Self {
+        let items = load_cameras(&db);
+        Self {
+            items,
+            list_state: ListState::default().with_selected(Some(0)),
+            show_add_menu: false,
+            edit_camera: None,
+            confirm_delete: None,
+            menu_tab: 0,
+            menu_input: TextInput::new(String::new()),
+            menu_input2: TextInput::new(String::new()),
+            menu_input3: TextInput::new(String::new()),
+            menu_input4: TextInput::new(String::new()),
+            menu_input5: TextInput::new(String::new()),
+            menu_input6: TextInput::new(String::new()),
+            menu_input7: TextInput::new("10".to_string()),
+            status_msg: String::new(),
+        }
+    }
+    fn refresh(&mut self, db: Arc<db::Database>) {
+        self.items = load_cameras(&db);
+    }
+    fn clear_menu_inputs(&mut self) {
+        self.menu_input.clear();
+        self.menu_input2.clear();
+        self.menu_input3.clear();
+        self.menu_input4.clear();
+        self.menu_input5.clear();
+        self.menu_input6.clear();
+        self.menu_input7 = TextInput::new("10".to_string());
+        self.menu_tab = 0;
+    }
+    fn next(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            if i < self.items.len().saturating_sub(1) {
+                self.list_state.select(Some(i + 1));
+            }
+        }
+    }
+    fn previous(&mut self) {
+        if let Some(i) = self.list_state.selected() {
+            if i > 0 {
+                self.list_state.select(Some(i - 1));
+            }
+        }
+    }
+    fn get_selected_camera(&self) -> Option<&CameraCard> {
+        self.list_state.selected().and_then(|i| self.items.get(i))
+    }
 }
 
 fn load_cameras(db: &Arc<db::Database>) -> Vec<CameraCard> {
-    let mut res = Vec::new(); let l = db.lock();
-    for (&id, cam) in l.cameras_by_id() { res.push(CameraCard { id, short_name: cam.short_name.clone(), description: cam.config.description.clone() }); }
-    res.sort_by(|a,b| a.short_name.cmp(&b.short_name)); res
+    let mut res = Vec::new();
+    let l = db.lock();
+    for (&id, cam) in l.cameras_by_id() {
+        res.push(CameraCard {
+            id,
+            short_name: cam.short_name.clone(),
+            description: cam.config.description.clone(),
+        });
+    }
+    res.sort_by(|a, b| a.short_name.cmp(&b.short_name));
+    res
 }
 
 fn ui(frame: &mut Frame, state: &mut AppState) {
-    let chunks = Layout::default().direction(Direction::Vertical).constraints([Constraint::Length(3), Constraint::Min(0), Constraint::Length(3)]).split(frame.area());
-    frame.render_widget(Block::default().borders(Borders::ALL).title(" Camera Management ").border_style(Style::default().fg(Color::Cyan)), chunks[0]);
-    let items: Vec<ListItem> = state.items.iter().enumerate().map(|(i, c)| {
-        let style = if Some(i) == state.list_state.selected() { Style::default().bg(Color::Rgb(49, 48, 60)).fg(Color::Yellow) } else { Style::default() };
-        ListItem::new(format!("  {} - {}", c.short_name, c.description)).style(style)
-    }).collect();
-    frame.render_stateful_widget(List::new(items).block(Block::default().borders(Borders::ALL).title(" Cameras ")), chunks[1], &mut state.list_state);
-    if state.show_add_menu || state.edit_camera.is_some() { render_camera_modal(frame, frame.area(), state); }
-    if state.confirm_delete.is_some() { render_camera_delete_modal(frame, frame.area()); }
-    if !state.status_msg.is_empty() {
-        let area = centered_rect(50, 20, frame.area()); frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg)).alignment(Alignment::Center).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Yellow))), area);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .split(frame.area());
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Camera Management ")
+            .border_style(Style::default().fg(Color::Cyan)),
+        chunks[0],
+    );
+    let items: Vec<ListItem> = state
+        .items
+        .iter()
+        .enumerate()
+        .map(|(i, c)| {
+            let style = if Some(i) == state.list_state.selected() {
+                Style::default()
+                    .bg(Color::Rgb(49, 48, 60))
+                    .fg(Color::Yellow)
+            } else {
+                Style::default()
+            };
+            ListItem::new(format!("  {} - {}", c.short_name, c.description)).style(style)
+        })
+        .collect();
+    frame.render_stateful_widget(
+        List::new(items).block(Block::default().borders(Borders::ALL).title(" Cameras ")),
+        chunks[1],
+        &mut state.list_state,
+    );
+    if state.show_add_menu || state.edit_camera.is_some() {
+        render_camera_modal(frame, frame.area(), state);
     }
-    frame.render_widget(Paragraph::new("↑↓/jk Navigate | [a] Add | [e] Edit | [d] Delete | [Esc] Back").block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::DarkGray))).style(Style::default().fg(Color::DarkGray)), chunks[2]);
+    if state.confirm_delete.is_some() {
+        render_camera_delete_modal(frame, frame.area());
+    }
+    if !state.status_msg.is_empty() {
+        let area = centered_rect(50, 20, frame.area());
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow)),
+                ),
+            area,
+        );
+    }
+    frame.render_widget(
+        Paragraph::new("↑↓/jk Navigate | [a] Add | [e] Edit | [d] Delete | [Esc] Back")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[2],
+    );
 }
 
 fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
-    let area = centered_rect(65, 85, area); frame.render_widget(Clear, area);
-    let chunks = Layout::default().direction(Direction::Vertical).margin(2).constraints([Constraint::Length(3),Constraint::Length(3),Constraint::Length(3),Constraint::Length(3),Constraint::Length(3),Constraint::Length(3),Constraint::Length(3)]).split(area);
-    let labels = ["Name", "Description", "RTSP Username", "RTSP Password", "Main URL", "Sub URL", "Retention (Gigabytes)"];
-    let inputs = [&state.menu_input, &state.menu_input2, &state.menu_input3, &state.menu_input4, &state.menu_input5, &state.menu_input6, &state.menu_input7];
-    frame.render_widget(Block::default().title(" Camera Configuration ").borders(Borders::ALL).border_style(Style::default().fg(Color::Yellow)), area);
+    let area = centered_rect(65, 85, area);
+    frame.render_widget(Clear, area);
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .margin(2)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+        ])
+        .split(area);
+    let labels = [
+        "Name",
+        "Description",
+        "RTSP Username",
+        "RTSP Password",
+        "Main URL",
+        "Sub URL",
+        "Retention (Gigabytes)",
+    ];
+    let inputs = [
+        &state.menu_input,
+        &state.menu_input2,
+        &state.menu_input3,
+        &state.menu_input4,
+        &state.menu_input5,
+        &state.menu_input6,
+        &state.menu_input7,
+    ];
+    frame.render_widget(
+        Block::default()
+            .title(" Camera Configuration ")
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Yellow)),
+        area,
+    );
     for i in 0..7 {
-        let b = Block::default().borders(Borders::ALL).title(labels[i]).border_style(if state.menu_tab == i { Style::default().fg(Color::Yellow) } else { Style::default() });
+        let b = Block::default()
+            .borders(Borders::ALL)
+            .title(labels[i])
+            .border_style(if state.menu_tab == i {
+                Style::default().fg(Color::Yellow)
+            } else {
+                Style::default()
+            });
         let display_content = if i == 3 {
             "*".repeat(inputs[i].get_content().chars().count())
         } else {
@@ -485,18 +1012,46 @@ fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
         };
         frame.render_widget(Paragraph::new(display_content).block(b), chunks[i]);
         if state.menu_tab == i {
-            let cursor_x = chunks[i].x + inputs[i].get_content()[..inputs[i].cursor_position].chars().count() as u16 + 1;
+            let cursor_x = chunks[i].x
+                + inputs[i].get_content()[..inputs[i].cursor_position]
+                    .chars()
+                    .count() as u16
+                + 1;
             frame.set_cursor_position((cursor_x, chunks[i].y + 1));
         }
     }
 }
 
 fn render_camera_delete_modal(frame: &mut Frame, area: Rect) {
-    let area = centered_rect(40, 20, area); frame.render_widget(Clear, area);
-    frame.render_widget(Paragraph::new("\nDelete this camera?\n\n[y/s] Yes | [n] No").alignment(Alignment::Center).block(Block::default().borders(Borders::ALL).border_style(Style::default().fg(Color::Red))), area);
+    let area = centered_rect(40, 20, area);
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new("\nDelete this camera?\n\n[y/s] Yes | [n] No")
+            .alignment(Alignment::Center)
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::Red)),
+            ),
+        area,
+    );
 }
 
 fn centered_rect(x: u16, y: u16, r: Rect) -> Rect {
-    let p_v = Layout::default().direction(Direction::Vertical).constraints([Constraint::Percentage((100-y)/2), Constraint::Percentage(y), Constraint::Percentage((100-y)/2)]).split(r);
-    Layout::default().direction(Direction::Horizontal).constraints([Constraint::Percentage((100-x)/2), Constraint::Percentage(x), Constraint::Percentage((100-x)/2)]).split(p_v[1])[1]
+    let p_v = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Percentage((100 - y) / 2),
+            Constraint::Percentage(y),
+            Constraint::Percentage((100 - y) / 2),
+        ])
+        .split(r);
+    Layout::default()
+        .direction(Direction::Horizontal)
+        .constraints([
+            Constraint::Percentage((100 - x) / 2),
+            Constraint::Percentage(x),
+            Constraint::Percentage((100 - x) / 2),
+        ])
+        .split(p_v[1])[1]
 }

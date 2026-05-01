@@ -56,7 +56,9 @@ export const MultiviewChooser = (props: MultiviewChooserProps) => {
       sx={{ color: "inherit", "& svg": { color: "inherit" } }}
     >
       {LAYOUTS.map((e, i) => (
-        <MenuItem key={e.className} value={i}>{e.name}</MenuItem>
+        <MenuItem key={e.className} value={i}>
+          {e.name}
+        </MenuItem>
       ))}
     </Select>
   );
@@ -69,8 +71,13 @@ export interface SelectOp {
   cameraIndex: number | null;
 }
 
-export function selectedReducer(old: SelectedCameras, op: SelectOp): SelectedCameras {
-  const selected = Array.isArray(old) ? [...old] : Array(MAX_CAMERAS).fill(null);
+export function selectedReducer(
+  old: SelectedCameras,
+  op: SelectOp,
+): SelectedCameras {
+  const selected = Array.isArray(old)
+    ? [...old]
+    : Array(MAX_CAMERAS).fill(null);
   if (op.cameraIndex !== null) {
     for (let i = 0; i < selected.length; i++) {
       if (selected[i] === op.cameraIndex) {
@@ -82,7 +89,10 @@ export function selectedReducer(old: SelectedCameras, op: SelectOp): SelectedCam
   return selected;
 }
 
-export const getInitialSelected = (searchParams: URLSearchParams, cameras: Camera[]): SelectedCameras => {
+export const getInitialSelected = (
+  searchParams: URLSearchParams,
+  cameras: Camera[],
+): SelectedCameras => {
   let result: SelectedCameras | null = null;
   try {
     const fromUrl = searchParams.get("cams");
@@ -118,50 +128,88 @@ export const getInitialSelected = (searchParams: URLSearchParams, cameras: Camer
   return Array(MAX_CAMERAS).fill(null);
 };
 
-
-const Multiview = ({ cameras, layoutIndex, selected, updateSelected, renderCamera }: MultiviewProps) => {
+const Multiview = ({
+  cameras,
+  layoutIndex,
+  selected,
+  updateSelected,
+  renderCamera,
+}: MultiviewProps) => {
   const outerRef = React.useRef<HTMLDivElement>(null);
-  
+
   const currentLayout = LAYOUTS[layoutIndex] || LAYOUTS[0];
 
-  const monoviews = (selected || Array(MAX_CAMERAS).fill(null)).slice(0, currentLayout.cameras).map((e, i) => {
-    const key = e ?? -1 - i;
-    return (
-      <Monoview
-        key={key}
-        cameras={cameras || []}
-        cameraIndex={e}
-        selectedIndex={i}
-        renderCamera={renderCamera}
-        updateSelected={updateSelected} // Pass the lifted updateSelected
-      />
-    );
-  });
+  const monoviews = (selected || Array(MAX_CAMERAS).fill(null))
+    .slice(0, currentLayout.cameras)
+    .map((e, i) => {
+      const key = e ?? -1 - i;
+      return (
+        <Monoview
+          key={key}
+          cameras={cameras || []}
+          cameraIndex={e}
+          selectedIndex={i}
+          renderCamera={renderCamera}
+          updateSelected={updateSelected} // Pass the lifted updateSelected
+        />
+      );
+    });
 
   return (
     <Box
       ref={outerRef}
       sx={{
-        flex: "1 0 0", color: "white", overflow: "hidden",
-        "& > .mid": { width: "100%", height: "100%", position: "relative", display: "inline-block" },
+        flex: "1 0 0",
+        color: "white",
+        overflow: "hidden",
+        "& > .mid": {
+          width: "100%",
+          height: "100%",
+          position: "relative",
+          display: "inline-block",
+        },
       }}
     >
       <div className="mid">
         <Box
           className={currentLayout.className}
           sx={{
-            position: "absolute", width: "100%", height: "100%",
-            backgroundColor: "#000", overflow: "hidden", display: "grid", gridGap: "1px",
+            position: "absolute",
+            width: "100%",
+            height: "100%",
+            backgroundColor: "#000",
+            overflow: "hidden",
+            display: "grid",
+            gridGap: "1px",
             "&.solo": { gridTemplateColumns: "100%", gridTemplateRows: "100%" },
             "&.dual": {
-              gridTemplateColumns: { xs: "100%", sm: "100%", md: "repeat(2, 50%)" },
+              gridTemplateColumns: {
+                xs: "100%",
+                sm: "100%",
+                md: "repeat(2, 50%)",
+              },
               gridTemplateRows: { xs: "50%", sm: "50%", md: "100%" },
             },
-            "&.two-by-two": { gridTemplateColumns: "repeat(2, 50%)", gridTemplateRows: "repeat(2, 50%)" },
-            "&.two-by-three": { gridTemplateColumns: "repeat(2, 50%)", gridTemplateRows: "repeat(3, 33.33%)" },
-            "&.three-by-two": { gridTemplateColumns: "repeat(3, 33.33%)", gridTemplateRows: "repeat(2, 50%)" },
-            "&.main-plus-five, &.three-by-three": { gridTemplateColumns: "repeat(3, 33.33%)", gridTemplateRows: "repeat(3, 33.33%)" },
-            "&.main-plus-five > div:nth-of-type(1)": { gridColumn: "span 2", gridRow: "span 2" },
+            "&.two-by-two": {
+              gridTemplateColumns: "repeat(2, 50%)",
+              gridTemplateRows: "repeat(2, 50%)",
+            },
+            "&.two-by-three": {
+              gridTemplateColumns: "repeat(2, 50%)",
+              gridTemplateRows: "repeat(3, 33.33%)",
+            },
+            "&.three-by-two": {
+              gridTemplateColumns: "repeat(3, 33.33%)",
+              gridTemplateRows: "repeat(2, 50%)",
+            },
+            "&.main-plus-five, &.three-by-three": {
+              gridTemplateColumns: "repeat(3, 33.33%)",
+              gridTemplateRows: "repeat(3, 33.33%)",
+            },
+            "&.main-plus-five > div:nth-of-type(1)": {
+              gridColumn: "span 2",
+              gridRow: "span 2",
+            },
           }}
         >
           {monoviews}
@@ -176,17 +224,28 @@ interface MonoviewProps {
   cameraIndex: number | null;
   selectedIndex: number; // The index of this monoview in the selected array
   updateSelected: (op: SelectOp) => void;
-  renderCamera: (camera: Camera | null, chooser: React.JSX.Element) => React.JSX.Element;
+  renderCamera: (
+    camera: Camera | null,
+    chooser: React.JSX.Element,
+  ) => React.JSX.Element;
 }
 
 const Monoview = (props: MonoviewProps) => {
   const handleChange = (event: SelectChangeEvent<string>) => {
-    const { target: { value } } = event;
-    props.updateSelected({ selectedIndex: props.selectedIndex, cameraIndex: value === "null" ? null : parseInt(value) });
+    const {
+      target: { value },
+    } = event;
+    props.updateSelected({
+      selectedIndex: props.selectedIndex,
+      cameraIndex: value === "null" ? null : parseInt(value),
+    });
   };
 
   const cameras = Array.isArray(props.cameras) ? props.cameras : [];
-  const selectedCamera = (props.cameraIndex !== null && cameras[props.cameraIndex]) ? cameras[props.cameraIndex] : null;
+  const selectedCamera =
+    props.cameraIndex !== null && cameras[props.cameraIndex]
+      ? cameras[props.cameraIndex]
+      : null;
 
   const chooser = (
     <Select
@@ -201,9 +260,13 @@ const Monoview = (props: MonoviewProps) => {
         "& svg": { color: "inherit" },
       }}
     >
-      <MenuItem value="null"><em>(none)</em></MenuItem>
+      <MenuItem value="null">
+        <em>(none)</em>
+      </MenuItem>
       {cameras.map((e, i) => (
-        <MenuItem key={i} value={i}>{e.shortName}</MenuItem>
+        <MenuItem key={i} value={i}>
+          {e.shortName}
+        </MenuItem>
       ))}
     </Select>
   );
@@ -216,7 +279,10 @@ const Monoview = (props: MonoviewProps) => {
     event.preventDefault();
     const droppedCameraId = event.dataTransfer.getData("cameraIndex");
     if (droppedCameraId) {
-      props.updateSelected({ selectedIndex: props.selectedIndex, cameraIndex: parseInt(droppedCameraId) });
+      props.updateSelected({
+        selectedIndex: props.selectedIndex,
+        cameraIndex: parseInt(droppedCameraId),
+      });
     }
   };
 
@@ -225,17 +291,22 @@ const Monoview = (props: MonoviewProps) => {
       onDragOver={handleDragOver}
       onDrop={handleDrop}
       sx={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
-        border: props.cameraIndex === null ? '2px dashed rgba(255,255,255,0.3)' : 'none',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
+        position: "relative",
+        width: "100%",
+        height: "100%",
+        border:
+          props.cameraIndex === null
+            ? "2px dashed rgba(255,255,255,0.3)"
+            : "none",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
       }}
     >
       {selectedCamera === null && (
-        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem' }}>Drop Camera Here</span>
+        <span style={{ color: "rgba(255,255,255,0.5)", fontSize: "1.2rem" }}>
+          Drop Camera Here
+        </span>
       )}
       {props.renderCamera(selectedCamera, chooser)}
     </Box>

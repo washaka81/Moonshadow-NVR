@@ -172,7 +172,13 @@ const Row = ({
   <TableRow {...rest}>
     <TableCell padding="checkbox">
       {onPlay && (
-        <IconButton size="small" onClick={(e) => { e.stopPropagation(); onPlay(); }}>
+        <IconButton
+          size="small"
+          onClick={(e) => {
+            e.stopPropagation();
+            onPlay();
+          }}
+        >
           <PlayArrowIcon fontSize="small" />
         </IconButton>
       )}
@@ -200,11 +206,23 @@ const Row = ({
       {storage}
     </TableCell>
     <TableCell align="right">
-      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "flex-end",
+          gap: 1,
+        }}
+      >
         {bitrate}
         {downloadUrl && (
           <Tooltip title="Download MP4">
-            <IconButton size="small" component="a" href={downloadUrl} onClick={(e) => e.stopPropagation()}>
+            <IconButton
+              size="small"
+              component="a"
+              href={downloadUrl}
+              onClick={(e) => e.stopPropagation()}
+            >
               <DownloadIcon fontSize="small" />
             </IconButton>
           </Tooltip>
@@ -220,12 +238,15 @@ const Row = ({
             justifyContent: "flex-end",
             maxHeight: "44px",
             overflow: "hidden",
-            width: "100%"
+            width: "100%",
           }}
         >
           {(() => {
-            const grouped = new Map<string, { type: string, value: string, count: number }>();
-            aiEvents.forEach(e => {
+            const grouped = new Map<
+              string,
+              { type: string; value: string; count: number }
+            >();
+            aiEvents.forEach((e) => {
               const key = `${e.type_}:${e.value}`;
               const existing = grouped.get(key);
               if (existing) {
@@ -237,31 +258,36 @@ const Row = ({
 
             const groupedList = Array.from(grouped.values());
             const displayList = groupedList.slice(0, 8);
-            const displayedCount = displayList.reduce((acc, curr) => acc + curr.count, 0);
+            const displayedCount = displayList.reduce(
+              (acc, curr) => acc + curr.count,
+              0,
+            );
 
             return (
               <>
                 {displayList.map((group, idx) => (
                   <Tooltip
                     key={idx}
-                    title={`${group.type === 'plate' ? 'Plate' : group.type === 'person_reid' ? 'Person' : group.type}: ${group.value}${group.count > 1 ? ` (Seen ${group.count} times)` : ''}`}
+                    title={`${group.type === "plate" ? "Plate" : group.type === "person_reid" ? "Person" : group.type}: ${group.value}${group.count > 1 ? ` (Seen ${group.count} times)` : ""}`}
                   >
                     <Chip
                       size="small"
                       icon={
                         group.type === "plate" ? (
-                          <DirectionsCarIcon sx={{ fontSize: '0.75rem !important' }} />
+                          <DirectionsCarIcon
+                            sx={{ fontSize: "0.75rem !important" }}
+                          />
                         ) : group.type === "person_reid" ? (
-                          <PersonIcon sx={{ fontSize: '0.75rem !important' }} />
+                          <PersonIcon sx={{ fontSize: "0.75rem !important" }} />
                         ) : undefined
                       }
-                      label={
-                        `${group.type === "plate"
+                      label={`${
+                        group.type === "plate"
                           ? group.value
                           : group.type === "person_reid"
                             ? group.value.replace("person_", "P")
-                            : group.type}${group.count > 1 ? ` x${group.count}` : ''}`
-                      }
+                            : group.type
+                      }${group.count > 1 ? ` x${group.count}` : ""}`}
                       sx={{
                         height: "18px",
                         fontSize: "0.65rem",
@@ -276,9 +302,17 @@ const Row = ({
                   </Tooltip>
                 ))}
                 {aiEvents.length > displayedCount && (
-                   <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', ml: 0.5, lineHeight: '18px' }}>
-                     +{aiEvents.length - displayedCount}
-                   </Typography>
+                  <Typography
+                    variant="caption"
+                    sx={{
+                      fontSize: "0.65rem",
+                      color: "text.secondary",
+                      ml: 0.5,
+                      lineHeight: "18px",
+                    }}
+                  >
+                    +{aiEvents.length - displayedCount}
+                  </Typography>
                 )}
               </>
             );
@@ -439,13 +473,14 @@ const VideoList = ({
         r.endTime90k,
       );
 
-      const downloadUrl = api.recordingUrl(
-        stream.camera.uuid,
-        stream.streamType,
-        r,
-        false, // timestampTrack
-        trimStartAndEnd ? state.range90k : undefined,
-      ) + ".mp4";
+      const downloadUrl =
+        api.recordingUrl(
+          stream.camera.uuid,
+          stream.streamType,
+          r,
+          false, // timestampTrack
+          trimStartAndEnd ? state.range90k : undefined,
+        ) + ".mp4";
 
       return (
         <Row
@@ -468,18 +503,42 @@ const VideoList = ({
       );
     });
   }
-return (
+  return (
     <TableBody>
-      <TableRow sx={{
-        position: 'sticky',
-        top: 36, // Main header height
-        zIndex: 1100,
-        backgroundColor: 'background.paper',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
-      }}>
-        <TableCell colSpan={7} className="streamHeader" sx={{ py: 0.75, fontWeight: 900, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
-          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-            <span style={{ fontSize: '0.8rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>{stream.camera.shortName} — {stream.streamType}</span>
+      <TableRow
+        sx={{
+          position: "sticky",
+          top: 36, // Main header height
+          zIndex: 1100,
+          backgroundColor: "background.paper",
+          boxShadow: "0 2px 4px rgba(0,0,0,0.2)",
+        }}
+      >
+        <TableCell
+          colSpan={7}
+          className="streamHeader"
+          sx={{
+            py: 0.75,
+            fontWeight: 900,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
+          >
+            <span
+              style={{
+                fontSize: "0.8rem",
+                letterSpacing: "0.5px",
+                textTransform: "uppercase",
+              }}
+            >
+              {stream.camera.shortName} — {stream.streamType}
+            </span>
           </Box>
         </TableCell>
       </TableRow>

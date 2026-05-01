@@ -44,7 +44,8 @@ function App() {
   useEffect(() => {
     const handleFsChange = () => setIsFullscreen(!!document.fullscreenElement);
     document.addEventListener("fullscreenchange", handleFsChange);
-    return () => document.removeEventListener("fullscreenchange", handleFsChange);
+    return () =>
+      document.removeEventListener("fullscreenchange", handleFsChange);
   }, []);
 
   const onLoginSuccess = () => {
@@ -55,9 +56,14 @@ function App() {
   const logout = async () => {
     const resp = await api.logout({ csrf: toplevel!.user!.session!.csrf }, {});
     switch (resp.status) {
-      case "success": needNewFetch(); break;
-      case "error": snackbars.enqueue({ message: "Logout failed: " + resp.message }); break;
-      default: break;
+      case "success":
+        needNewFetch();
+        break;
+      case "error":
+        snackbars.enqueue({ message: "Logout failed: " + resp.message });
+        break;
+      default:
+        break;
     }
   };
 
@@ -68,7 +74,11 @@ function App() {
       if (resp.status === "success") {
         setError(null);
         if (!isBackground) {
-          setLoginState(resp.response.user?.session === undefined ? "not-logged-in" : "logged-in");
+          setLoginState(
+            resp.response.user?.session === undefined
+              ? "not-logged-in"
+              : "logged-in",
+          );
         }
         setToplevel(resp.response);
         setTimeZoneName(resp.response.timeZoneName);
@@ -93,9 +103,21 @@ function App() {
     };
   }, [fetchSeq]);
 
-  const Frame = ({ activityMenuPart, children }: FrameProps): React.JSX.Element => {
+  const Frame = ({
+    activityMenuPart,
+    children,
+  }: FrameProps): React.JSX.Element => {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', height: '100vh', width: '100vw', overflow: 'hidden', bgcolor: 'background.default' }}>
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          height: "100vh",
+          width: "100vw",
+          overflow: "hidden",
+          bgcolor: "background.default",
+        }}
+      >
         {!isFullscreen && (
           <Header
             loginState={loginState}
@@ -108,8 +130,15 @@ function App() {
         )}
         <Login
           onSuccess={onLoginSuccess}
-          open={loginState === "server-requires-login" || loginState === "user-requested-login"}
-          handleClose={() => setLoginState((s) => s === "user-requested-login" ? "not-logged-in" : s)}
+          open={
+            loginState === "server-requires-login" ||
+            loginState === "user-requested-login"
+          }
+          handleClose={() =>
+            setLoginState((s) =>
+              s === "user-requested-login" ? "not-logged-in" : s,
+            )
+          }
         />
         {toplevel?.user !== undefined && (
           <ChangePassword
@@ -124,7 +153,15 @@ function App() {
             <pre>{error.message}</pre>
           </Container>
         )}
-        <Box sx={{ flex: 1, position: 'relative', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <Box
+          sx={{
+            flex: 1,
+            position: "relative",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
           {children}
         </Box>
       </Box>
@@ -135,7 +172,10 @@ function App() {
 
   return (
     <Routes>
-      <Route path="" element={<LiveActivity cameras={toplevel.cameras} Frame={Frame} />} />
+      <Route
+        path=""
+        element={<LiveActivity cameras={toplevel.cameras} Frame={Frame} />}
+      />
       <Route
         path="list"
         element={
@@ -148,7 +188,9 @@ function App() {
       />
       <Route
         path="users"
-        element={<UsersActivity Frame={Frame} csrf={toplevel!.user?.session?.csrf} />}
+        element={
+          <UsersActivity Frame={Frame} csrf={toplevel!.user?.session?.csrf} />
+        }
       />
       <Route path="ai-events" element={<AiEventsActivity Frame={Frame} />} />
       <Route
@@ -157,7 +199,13 @@ function App() {
       />
       <Route
         path="cameras"
-        element={<CamerasActivity toplevel={toplevel} Frame={Frame} refetch={needNewFetch} />}
+        element={
+          <CamerasActivity
+            toplevel={toplevel}
+            Frame={Frame}
+            refetch={needNewFetch}
+          />
+        }
       />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

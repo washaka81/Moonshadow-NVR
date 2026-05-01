@@ -19,9 +19,9 @@ mod mp4;
 mod slices;
 mod stream;
 mod streamer;
-mod web;
 mod vulkan_check;
 mod vulkan_engine;
+mod web;
 
 #[cfg(feature = "bundled-ui")]
 mod bundled_ui;

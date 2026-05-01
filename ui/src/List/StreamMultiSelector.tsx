@@ -71,39 +71,74 @@ const StreamMultiSelector = ({ toplevel, selected, setSelected }: Props) => {
 
   return (
     <Paper sx={{ p: 1.5, borderRadius: 2 }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, px: 0.5 }}>
-        <Typography variant="caption" sx={{ flex: 1, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
+      <Box sx={{ display: "flex", alignItems: "center", mb: 1, px: 0.5 }}>
+        <Typography
+          variant="caption"
+          sx={{
+            flex: 1,
+            fontWeight: 700,
+            color: "text.secondary",
+            textTransform: "uppercase",
+          }}
+        >
           Cameras
         </Typography>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <Typography 
-            variant="caption" 
+        <Box sx={{ display: "flex", gap: 2 }}>
+          <Typography
+            variant="caption"
             onClick={() => toggleType("main")}
-            sx={{ cursor: 'pointer', fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+            sx={{
+              cursor: "pointer",
+              fontWeight: 700,
+              color: "primary.main",
+              "&:hover": { textDecoration: "underline" },
+            }}
           >
             MAIN
           </Typography>
-          <Typography 
-            variant="caption" 
+          <Typography
+            variant="caption"
             onClick={() => toggleType("sub")}
-            sx={{ cursor: 'pointer', fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+            sx={{
+              cursor: "pointer",
+              fontWeight: 700,
+              color: "primary.main",
+              "&:hover": { textDecoration: "underline" },
+            }}
           >
             SUB
           </Typography>
         </Box>
       </Box>
       <Divider sx={{ mb: 1 }} />
-      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.5 }}>
         {toplevel.cameras.map((c) => (
-          <Box key={c.uuid} sx={{ display: 'flex', alignItems: 'center', py: 0.25, '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }, borderRadius: 1, px: 0.5 }}>
-            <Typography 
-              variant="body2" 
+          <Box
+            key={c.uuid}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              py: 0.25,
+              "&:hover": { bgcolor: "rgba(0,0,0,0.02)" },
+              borderRadius: 1,
+              px: 0.5,
+            }}
+          >
+            <Typography
+              variant="body2"
               onClick={() => toggleCamera(c)}
-              sx={{ flex: 1, cursor: 'pointer', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+              sx={{
+                flex: 1,
+                cursor: "pointer",
+                fontWeight: 500,
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
             >
               {c.shortName}
             </Typography>
-            <Box sx={{ display: 'flex', gap: 1 }}>
+            <Box sx={{ display: "flex", gap: 1 }}>
               {["main", "sub"].map((st) => {
                 const s = c.streams[st as StreamType];
                 return (

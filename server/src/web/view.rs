@@ -59,14 +59,16 @@ impl Service {
             for (key, value) in form_urlencoded::parse(q.as_bytes()) {
                 match &*key {
                     "startTime90k" => {
-                        req_start = Some(recording::Time::parse(&value).map_err(|_| {
-                            err!(InvalidArgument, msg("unparseable startTime90k"))
-                        })?);
+                        req_start =
+                            Some(recording::Time::parse(&value).map_err(|_| {
+                                err!(InvalidArgument, msg("unparseable startTime90k"))
+                            })?);
                     }
                     "endTime90k" => {
-                        req_end = Some(recording::Time::parse(&value).map_err(|_| {
-                            err!(InvalidArgument, msg("unparseable endTime90k"))
-                        })?);
+                        req_end =
+                            Some(recording::Time::parse(&value).map_err(|_| {
+                                err!(InvalidArgument, msg("unparseable endTime90k"))
+                            })?);
                     }
                     "s" => {
                         let s = Segments::from_str(&value).map_err(|()| {

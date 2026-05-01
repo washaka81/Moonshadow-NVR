@@ -134,12 +134,9 @@ const server = setupServer(
       }
     },
   ),
-  http.get<PathParams, DefaultBodyType, any>(
-    "/api/ai/events",
-    async () => {
-      return HttpResponse.json({ events: [] });
-    },
-  ),
+  http.get<PathParams, DefaultBodyType, any>("/api/ai/events", async () => {
+    return HttpResponse.json({ events: [] });
+  }),
 );
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
 afterEach(() => server.resetHandlers());

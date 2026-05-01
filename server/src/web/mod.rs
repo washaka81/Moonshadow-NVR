@@ -3,6 +3,7 @@
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
 pub mod accept;
+mod admin;
 mod ai_events;
 mod live;
 mod path;
@@ -12,7 +13,6 @@ mod static_file;
 mod users;
 mod view;
 mod websocket;
-mod admin;
 
 use self::accept::ConnData;
 use self::path::Path;
@@ -32,8 +32,8 @@ use http::{status::StatusCode, Request, Response};
 use hyper::body::Bytes;
 use std::net::IpAddr;
 use std::sync::Arc;
-use tracing::warn;
 use tracing::info;
+use tracing::warn;
 use tracing::Instrument;
 use url::form_urlencoded;
 use uuid::Uuid;
@@ -457,12 +457,20 @@ impl Service {
         )
     }
 
-    async fn sysinfo(&self, req: &Request<::hyper::body::Incoming>, caller: Result<Caller, Error>) -> ResponseResult {
+    async fn sysinfo(
+        &self,
+        req: &Request<::hyper::body::Incoming>,
+        caller: Result<Caller, Error>,
+    ) -> ResponseResult {
         let _caller = caller?;
         serve_json(req, &self::admin::get_sysinfo_json())
     }
 
-    async fn stream_probe(&self, req: Request<::hyper::body::Incoming>, caller: Caller) -> ResponseResult {
+    async fn stream_probe(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+    ) -> ResponseResult {
         if !caller.permissions.read_camera_configs {
             bail!(PermissionDenied, msg("read_camera_configs required"));
         }
@@ -470,20 +478,26 @@ impl Service {
         let req: json::StreamProbeRequest = parse_json_body(&body)?;
         require_csrf_if_session(&caller, req.csrf)?;
 
-        let url = url::Url::parse(&req.url).map_err(|e| err!(InvalidArgument, msg("invalid url"), source(e.to_string())))?;
-        
+        let url = url::Url::parse(&req.url)
+            .map_err(|e| err!(InvalidArgument, msg("invalid url"), source(e.to_string())))?;
+
         let session = tokio::time::timeout(
             std::time::Duration::from_secs(3),
-            retina::client::Session::describe(
-                url,
-                retina::client::SessionOptions::default(),
-            ),
+            retina::client::Session::describe(url, retina::client::SessionOptions::default()),
         )
         .await
         .map_err(|_| err!(DeadlineExceeded, msg("timeout describing stream")))?
-        .map_err(|e| err!(Unknown, msg("failed to describe stream"), source(e.to_string())))?;
+        .map_err(|e| {
+            err!(
+                Unknown,
+                msg("failed to describe stream"),
+                source(e.to_string())
+            )
+        })?;
 
-        let codec = session.streams().iter()
+        let codec = session
+            .streams()
+            .iter()
             .find(|s| s.media() == "video")
             .map(|s| s.encoding_name().to_string());
 
@@ -658,7 +672,9 @@ impl Service {
                     .await
                     {
                         main_url = Some(url_str.replace(&auth_str, ""));
-                        main_codec = session.streams().iter()
+                        main_codec = session
+                            .streams()
+                            .iter()
                             .find(|s| s.media() == "video")
                             .map(|s| s.encoding_name().to_string());
                         break;
@@ -679,7 +695,9 @@ impl Service {
                     .await
                     {
                         sub_url = Some(url_str.replace(&auth_str, ""));
-                        sub_codec = session.streams().iter()
+                        sub_codec = session
+                            .streams()
+                            .iter()
                             .find(|s| s.media() == "video")
                             .map(|s| s.encoding_name().to_string());
                         break;
@@ -696,7 +714,12 @@ impl Service {
             sub_url = Some(format!("rtsp://{}:554/stream2", req.ip));
         }
 
-        let resp = json::AutodetectResponse { main_url, main_codec, sub_url, sub_codec };
+        let resp = json::AutodetectResponse {
+            main_url,
+            main_codec,
+            sub_url,
+            sub_codec,
+        };
 
         serve_json(&http::Request::new(()), &resp)
     }
@@ -718,7 +741,12 @@ impl Service {
             msg: String,
         }
 
-        serve_json(&http::Request::new(()), &ReloadResponse { msg: "OK".to_string() })
+        serve_json(
+            &http::Request::new(()),
+            &ReloadResponse {
+                msg: "OK".to_string(),
+            },
+        )
     }
 
     fn camera_subset_to_change(&self, c: json::CameraSubset, dir_id: i32) -> db::CameraChange {

@@ -1,4 +1,7 @@
 #!/bin/bash
+# This file is part of Moonshadow NVR.
+# Copyright (C) 2025 The Moonshadow NVR Authors.
+# SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 # Moonshadow NVR - TUI Configuration Launcher
 # Author: Alejandro Fonda <alejandro.fonda@gmail.com>
 # Note: Requires an interactive terminal (not for headless/CI use)

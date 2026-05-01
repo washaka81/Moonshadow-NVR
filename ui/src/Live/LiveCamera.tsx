@@ -22,7 +22,9 @@ interface LiveCameraProps {
   chooser: React.JSX.Element;
 }
 
-interface BufferStateClosed { state: "closed"; }
+interface BufferStateClosed {
+  state: "closed";
+}
 interface BufferStateOpen {
   state: "open";
   srcBuf: SourceBuffer;
@@ -30,16 +32,34 @@ interface BufferStateOpen {
   mimeType: string;
   videoSampleEntryId: number;
 }
-interface BufferStateError { state: "error"; }
+interface BufferStateError {
+  state: "error";
+}
 type BufferState = BufferStateClosed | BufferStateOpen | BufferStateError;
 
-interface PlaybackStateNormal { state: "normal"; }
-interface PlaybackStateWaiting { state: "waiting"; }
-interface PlaybackStateError { state: "error"; message: ReactNode; }
-type PlaybackState = | PlaybackStateNormal | PlaybackStateWaiting | PlaybackStateError;
+interface PlaybackStateNormal {
+  state: "normal";
+}
+interface PlaybackStateWaiting {
+  state: "waiting";
+}
+interface PlaybackStateError {
+  state: "error";
+  message: ReactNode;
+}
+type PlaybackState =
+  | PlaybackStateNormal
+  | PlaybackStateWaiting
+  | PlaybackStateError;
 
-interface DroppedMessage { type: "dropped"; frames: number; }
-interface ErrorMessage { type: "error"; message: string; }
+interface DroppedMessage {
+  type: "dropped";
+  frames: number;
+}
+interface ErrorMessage {
+  type: "error";
+  message: string;
+}
 type Message = DroppedMessage | ErrorMessage;
 
 class LiveCameraDriver {
@@ -84,7 +104,9 @@ class LiveCameraDriver {
     this.queue = [];
   };
 
-  onMediaSourceOpen = () => { this.startStream("sourceopen"); };
+  onMediaSourceOpen = () => {
+    this.startStream("sourceopen");
+  };
 
   startStream = (reason: string) => {
     if (this.ws !== undefined) return;
@@ -98,7 +120,9 @@ class LiveCameraDriver {
     if (!streamType) {
       const details = [];
       if (!hasMain && !hasSub) details.push("No active streams configured");
-      this.error(`No stream available: ${details.join(", ")}. Check Camera Settings`);
+      this.error(
+        `No stream available: ${details.join(", ")}. Check Camera Settings`,
+      );
       return;
     }
     const loc = window.location;
@@ -110,7 +134,9 @@ class LiveCameraDriver {
       console.log(`[LiveCamera] WebSocket opened to ${streamType} stream`);
     });
     this.ws.addEventListener("close", (e) => {
-      console.log(`[LiveCamera] WebSocket closed: code=${e.code}, reason=${e.reason}`);
+      console.log(
+        `[LiveCamera] WebSocket closed: code=${e.code}, reason=${e.reason}`,
+      );
       this.error(`Connection closed (${e.code})`);
     });
     this.ws.addEventListener("error", (e) => {
@@ -154,7 +180,13 @@ class LiveCameraDriver {
   };
 
   processWsBlob = async (blob: Blob) => {
-    if (this.aborted || this.buf.state === "error" || this.src.readyState === "closed" || this.src.readyState === "ended") return;
+    if (
+      this.aborted ||
+      this.buf.state === "error" ||
+      this.src.readyState === "closed" ||
+      this.src.readyState === "ended"
+    )
+      return;
     try {
       const raw = new Uint8Array(await blob.arrayBuffer());
       const result = parsePart(raw);
@@ -172,29 +204,46 @@ class LiveCameraDriver {
         const srcBuf = this.src.addSourceBuffer(part.mimeType);
         srcBuf.mode = "segments";
         srcBuf.addEventListener("updateend", this.bufUpdateEnd);
-        this.buf = { state: "open", srcBuf, busy: true, mimeType: part.mimeType, videoSampleEntryId: part.videoSampleEntryId };
+        this.buf = {
+          state: "open",
+          srcBuf,
+          busy: true,
+          mimeType: part.mimeType,
+          videoSampleEntryId: part.videoSampleEntryId,
+        };
         await this.tryAddInitSegment(part.videoSampleEntryId, this.buf);
       } else if (this.buf.state === "open") {
         await this.tryAppendPart(this.buf);
       }
-    } catch(e) {
+    } catch (e) {
       console.error("Error processing blob:", e);
     }
   };
 
-bufUpdateEnd = () => {
+  bufUpdateEnd = () => {
     if (this.aborted || this.buf.state !== "open") return;
     this.buf.busy = false;
     this.tryTrimBuffer();
     this.tryAppendPart(this.buf);
   };
 
-tryAppendPart = async (buf: BufferStateOpen) => {
-    if (this.aborted || buf.busy || this.src.readyState === "closed" || this.src.readyState === "ended") return;
+  tryAppendPart = async (buf: BufferStateOpen) => {
+    if (
+      this.aborted ||
+      buf.busy ||
+      this.src.readyState === "closed" ||
+      this.src.readyState === "ended"
+    )
+      return;
     const part = this.queue.shift();
     if (part === undefined) return;
     if (buf.state !== "open") return;
-    if (part.mimeType !== buf.mimeType) try { buf.srcBuf.changeType(part.mimeType); } catch { /* Ignore */ }
+    if (part.mimeType !== buf.mimeType)
+      try {
+        buf.srcBuf.changeType(part.mimeType);
+      } catch {
+        /* Ignore */
+      }
     if (part.videoSampleEntryId !== buf.videoSampleEntryId) {
       buf.busy = true;
       buf.videoSampleEntryId = part.videoSampleEntryId;
@@ -204,22 +253,46 @@ tryAppendPart = async (buf: BufferStateOpen) => {
     }
     const b = buf.srcBuf.buffered;
     buf.srcBuf.timestampOffset = b.length > 0 ? b.end(b.length - 1) : 0;
-    try { buf.srcBuf.appendBuffer(part.body); buf.busy = true; } catch { /* Ignore */ }
-  };
-
-tryTrimBuffer = () => {
-    if (this.aborted || this.buf.state !== "open" || this.buf.busy || this.buf.srcBuf.buffered.length === 0) return;
-    const sb = this.buf.srcBuf;
-    const firstTs = sb.buffered.start(0);
-    if (firstTs < this.video.currentTime - 5) {
-      try { sb.remove(firstTs, this.video.currentTime - 5); this.buf.busy = true; } catch { /* Ignore */ }
+    try {
+      buf.srcBuf.appendBuffer(part.body);
+      buf.busy = true;
+    } catch {
+      /* Ignore */
     }
   };
 
-  videoPause = () => { this.stopStream("pause"); };
-  videoPlay = () => { this.startStream("play"); };
-  videoPlaying = () => { if (this.buf.state !== "error") this.setPlaybackState({ state: "normal" }); };
-  videoWaiting = () => { if (this.buf.state !== "error") this.setPlaybackState({ state: "waiting" }); };
+  tryTrimBuffer = () => {
+    if (
+      this.aborted ||
+      this.buf.state !== "open" ||
+      this.buf.busy ||
+      this.buf.srcBuf.buffered.length === 0
+    )
+      return;
+    const sb = this.buf.srcBuf;
+    const firstTs = sb.buffered.start(0);
+    if (firstTs < this.video.currentTime - 5) {
+      try {
+        sb.remove(firstTs, this.video.currentTime - 5);
+        this.buf.busy = true;
+      } catch {
+        /* Ignore */
+      }
+    }
+  };
+
+  videoPause = () => {
+    this.stopStream("pause");
+  };
+  videoPlay = () => {
+    this.startStream("play");
+  };
+  videoPlaying = () => {
+    if (this.buf.state !== "error") this.setPlaybackState({ state: "normal" });
+  };
+  videoWaiting = () => {
+    if (this.buf.state !== "error") this.setPlaybackState({ state: "waiting" });
+  };
   videoTimeUpdate = () => {};
 
   stopStream = (reason: string) => {
@@ -245,10 +318,13 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
   const [aspect, setAspect] = React.useState<[number, number]>([16, 9]);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const boxRef = React.useRef<HTMLElement | null>(null);
-  const [playbackState, setPlaybackState] = React.useState<PlaybackState>({ state: "normal" });
+  const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
+    state: "normal",
+  });
 
   React.useLayoutEffect(() => {
-    if (boxRef.current && videoRef.current) fillAspect(boxRef.current.getBoundingClientRect(), videoRef, aspect);
+    if (boxRef.current && videoRef.current)
+      fillAspect(boxRef.current.getBoundingClientRect(), videoRef, aspect);
   }, [aspect, boxRef, videoRef]);
 
   useResizeObserver(boxRef as React.RefObject<HTMLElement>, (entry) => {
@@ -257,7 +333,13 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
 
   React.useEffect(() => {
     if (camera && videoRef.current) {
-      const d = new LiveCameraDriver(mediaSourceApi, camera, setPlaybackState, setAspect, videoRef.current);
+      const d = new LiveCameraDriver(
+        mediaSourceApi,
+        camera,
+        setPlaybackState,
+        setAspect,
+        videoRef.current,
+      );
       return () => d.unmount();
     }
   }, [camera, mediaSourceApi, videoRef]);
@@ -275,7 +357,7 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
   React.useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    const updateRes = () => { 
+    const updateRes = () => {
       if (video.videoWidth > 0) {
         setResolution(`${video.videoWidth}x${video.videoHeight}`);
       }
@@ -305,123 +387,228 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
     <Box
       ref={boxRef}
       sx={{
-        width: "100%", height: "100%", position: "relative",
-        display: "flex", alignItems: "center", justifyContent: "center",
-        bgcolor: "#000", overflow: "hidden",
+        width: "100%",
+        height: "100%",
+        position: "relative",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        bgcolor: "#000",
+        overflow: "hidden",
       }}
     >
-      <video ref={videoRef} muted autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} />
+      <video
+        ref={videoRef}
+        muted
+        autoPlay
+        playsInline
+        style={{
+          width: "100%",
+          height: "100%",
+          objectFit: "contain",
+          zIndex: 1,
+        }}
+      />
 
       {/* HUD: Camera Name + REC Indicator (Top Left) */}
-      <Box sx={{ 
-        position: "absolute", top: 12, left: 15, zIndex: 10, pointerEvents: "none", 
-        display: 'flex', gap: 1
-      }}>
+      <Box
+        sx={{
+          position: "absolute",
+          top: 12,
+          left: 15,
+          zIndex: 10,
+          pointerEvents: "none",
+          display: "flex",
+          gap: 1,
+        }}
+      >
         {/* Camera Name Badge */}
-        <Box sx={{ 
-          bgcolor: "rgba(0,0,0,0.85)", px: 2, py: 1, borderRadius: 1.5, 
-          border: '1px solid rgba(255,255,255,0.12)',
-          backdropFilter: 'blur(8px)',
-          boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
-        }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Box sx={{ 
-              width: 8, height: 8, borderRadius: '50%', 
-              bgcolor: camera ? '#4caf50' : '#757575',
-              boxShadow: camera ? '0 0 8px rgba(76, 175, 80, 0.6)' : 'none',
-              animation: camera ? 'pulse 2s infinite' : 'none',
-              '@keyframes pulse': {
-                '0%': { opacity: 1 },
-                '50%': { opacity: 0.5 },
-                '100%': { opacity: 1 }
-              }
-            }} />
-            <Typography variant="caption" sx={{ 
-              fontWeight: 700, color: '#fff', fontFamily: "'Inter', 'system-ui', sans-serif", 
-              fontSize: '0.9rem', letterSpacing: 0.7, textTransform: 'uppercase',
-              whiteSpace: 'nowrap'
-            }}>
+        <Box
+          sx={{
+            bgcolor: "rgba(0,0,0,0.85)",
+            px: 2,
+            py: 1,
+            borderRadius: 1.5,
+            border: "1px solid rgba(255,255,255,0.12)",
+            backdropFilter: "blur(8px)",
+            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          }}
+        >
+          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+            <Box
+              sx={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                bgcolor: camera ? "#4caf50" : "#757575",
+                boxShadow: camera ? "0 0 8px rgba(76, 175, 80, 0.6)" : "none",
+                animation: camera ? "pulse 2s infinite" : "none",
+                "@keyframes pulse": {
+                  "0%": { opacity: 1 },
+                  "50%": { opacity: 0.5 },
+                  "100%": { opacity: 1 },
+                },
+              }}
+            />
+            <Typography
+              variant="caption"
+              sx={{
+                fontWeight: 700,
+                color: "#fff",
+                fontFamily: "'Inter', 'system-ui', sans-serif",
+                fontSize: "0.9rem",
+                letterSpacing: 0.7,
+                textTransform: "uppercase",
+                whiteSpace: "nowrap",
+              }}
+            >
               {camera?.shortName || "NO CAMERA"}
             </Typography>
           </Box>
         </Box>
         {/* REC Indicator */}
         {isRecording && (
-          <Box sx={{ 
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            bgcolor: "rgba(244, 67, 54, 0.9)", 
-            px: 1.5, py: 1, borderRadius: 1.5,
-            border: '1px solid rgba(255,255,255,0.2)',
-            backdropFilter: 'blur(8px)',
-            boxShadow: '0 2px 8px rgba(244, 67, 54, 0.4)',
-            animation: 'recPulse 1.5s infinite',
-            '@keyframes recPulse': {
-              '0%': { opacity: 1 },
-              '50%': { opacity: 0.6 },
-              '100%': { opacity: 1 }
-            }
-          }}>
-            <Box sx={{ 
-              width: 10, height: 10, borderRadius: '50%', 
-              bgcolor: '#fff',
-              boxShadow: '0 0 6px rgba(255,255,255,0.8)'
-            }} />
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              bgcolor: "rgba(244, 67, 54, 0.9)",
+              px: 1.5,
+              py: 1,
+              borderRadius: 1.5,
+              border: "1px solid rgba(255,255,255,0.2)",
+              backdropFilter: "blur(8px)",
+              boxShadow: "0 2px 8px rgba(244, 67, 54, 0.4)",
+              animation: "recPulse 1.5s infinite",
+              "@keyframes recPulse": {
+                "0%": { opacity: 1 },
+                "50%": { opacity: 0.6 },
+                "100%": { opacity: 1 },
+              },
+            }}
+          >
+            <Box
+              sx={{
+                width: 10,
+                height: 10,
+                borderRadius: "50%",
+                bgcolor: "#fff",
+                boxShadow: "0 0 6px rgba(255,255,255,0.8)",
+              }}
+            />
           </Box>
         )}
       </Box>
 
       {/* HUD: Date/Time & Resolution (Top Right) */}
-      <Box sx={{ 
-        position: "absolute", top: 12, right: 15, zIndex: 10, pointerEvents: "none", 
-        bgcolor: "rgba(0,0,0,0.85)", px: 2, py: 1, borderRadius: 1.5, 
-        border: '1px solid rgba(255,255,255,0.12)',
-        backdropFilter: 'blur(8px)',
-        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
-        minWidth: '160px'
-      }}>
+      <Box
+        sx={{
+          position: "absolute",
+          top: 12,
+          right: 15,
+          zIndex: 10,
+          pointerEvents: "none",
+          bgcolor: "rgba(0,0,0,0.85)",
+          px: 2,
+          py: 1,
+          borderRadius: 1.5,
+          border: "1px solid rgba(255,255,255,0.12)",
+          backdropFilter: "blur(8px)",
+          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+          minWidth: "160px",
+        }}
+      >
         {/* Date */}
-        <Box sx={{ 
-          color: '#bdbdbd', 
-          fontSize: "0.7rem", 
-          fontWeight: 600, 
-          fontFamily: "'Inter Mono', 'Monaco', monospace",
-          letterSpacing: 0.5,
-          mb: 0.5
-        }}>
-          {currentTime.toLocaleDateString('es-ES', { 
-            weekday: 'short',
-            day: '2-digit', month: '2-digit', year: 'numeric' 
-          }).toUpperCase()}
+        <Box
+          sx={{
+            color: "#bdbdbd",
+            fontSize: "0.7rem",
+            fontWeight: 600,
+            fontFamily: "'Inter Mono', 'Monaco', monospace",
+            letterSpacing: 0.5,
+            mb: 0.5,
+          }}
+        >
+          {currentTime
+            .toLocaleDateString("es-ES", {
+              weekday: "short",
+              day: "2-digit",
+              month: "2-digit",
+              year: "numeric",
+            })
+            .toUpperCase()}
         </Box>
         {/* Time */}
-        <Box sx={{ 
-          color: '#4caf50', 
-          fontSize: "1rem", 
-          fontWeight: 700, 
-          fontFamily: "'Inter Mono', 'Monaco', monospace",
-          letterSpacing: 1,
-          mb: 1,
-          textShadow: '0 0 10px rgba(76, 175, 80, 0.3)'
-        }}>
-          {currentTime.toLocaleTimeString('es-ES', { hour12: false })}
+        <Box
+          sx={{
+            color: "#4caf50",
+            fontSize: "1rem",
+            fontWeight: 700,
+            fontFamily: "'Inter Mono', 'Monaco', monospace",
+            letterSpacing: 1,
+            mb: 1,
+            textShadow: "0 0 10px rgba(76, 175, 80, 0.3)",
+          }}
+        >
+          {currentTime.toLocaleTimeString("es-ES", { hour12: false })}
         </Box>
         {/* Stream & Resolution */}
-        <Box sx={{ 
-          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-          pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.15)'
-        }}>
-          <Box sx={{ 
-            display: 'flex', alignItems: 'center', gap: 0.5
-          }}>
-            <Box sx={{ 
-              width: 6, height: 6, borderRadius: '50%',
-              bgcolor: streamType === 'SUB' ? '#2196f3' : streamType === 'MAIN' ? '#ff9800' : '#757575'
-            }} />
-            <Box sx={{ color: streamType === 'SUB' ? '#2196f3' : streamType === 'MAIN' ? '#ff9800' : '#757575', fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", letterSpacing: 0.5 }}>
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            pt: 0.75,
+            borderTop: "1px solid rgba(255,255,255,0.15)",
+          }}
+        >
+          <Box
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              gap: 0.5,
+            }}
+          >
+            <Box
+              sx={{
+                width: 6,
+                height: 6,
+                borderRadius: "50%",
+                bgcolor:
+                  streamType === "SUB"
+                    ? "#2196f3"
+                    : streamType === "MAIN"
+                      ? "#ff9800"
+                      : "#757575",
+              }}
+            />
+            <Box
+              sx={{
+                color:
+                  streamType === "SUB"
+                    ? "#2196f3"
+                    : streamType === "MAIN"
+                      ? "#ff9800"
+                      : "#757575",
+                fontSize: "0.65rem",
+                fontWeight: 700,
+                fontFamily: "monospace",
+                letterSpacing: 0.5,
+              }}
+            >
               {streamType || "N/A"}
             </Box>
           </Box>
-          <Box sx={{ color: '#9e9e9e', fontSize: "0.65rem", fontWeight: 600, fontFamily: "monospace", letterSpacing: 0.5 }}>
+          <Box
+            sx={{
+              color: "#9e9e9e",
+              fontSize: "0.65rem",
+              fontWeight: 600,
+              fontFamily: "monospace",
+              letterSpacing: 0.5,
+            }}
+          >
             {resolution || (camera ? "LOAD" : "N/A")}
           </Box>
         </Box>
@@ -429,20 +616,53 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
 
       {/* Connection Status (Bottom Left) */}
       {camera && (
-        <Box sx={{ 
-          position: "absolute", bottom: 15, left: 15, zIndex: 10, pointerEvents: "none",
-          display: 'flex', alignItems: 'center', gap: 0.75
-        }}>
-          <Box sx={{ 
-            width: 6, height: 6, borderRadius: '50%', 
-            bgcolor: playbackState.state === 'normal' ? '#4caf50' : playbackState.state === 'waiting' ? '#ff9800' : '#f44336',
-            boxShadow: '0 0 6px currentColor'
-          }} />
-          <Typography variant="caption" sx={{ 
-            color: playbackState.state === 'normal' ? '#4caf50' : playbackState.state === 'waiting' ? '#ff9800' : '#f44336',
-            fontSize: '0.65rem', fontWeight: 700, fontFamily: "monospace", letterSpacing: 0.5, textTransform: 'uppercase'
-          }}>
-            {playbackState.state === 'normal' ? 'LIVE' : playbackState.state === 'waiting' ? 'BUFFER' : 'ERROR'}
+        <Box
+          sx={{
+            position: "absolute",
+            bottom: 15,
+            left: 15,
+            zIndex: 10,
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            gap: 0.75,
+          }}
+        >
+          <Box
+            sx={{
+              width: 6,
+              height: 6,
+              borderRadius: "50%",
+              bgcolor:
+                playbackState.state === "normal"
+                  ? "#4caf50"
+                  : playbackState.state === "waiting"
+                    ? "#ff9800"
+                    : "#f44336",
+              boxShadow: "0 0 6px currentColor",
+            }}
+          />
+          <Typography
+            variant="caption"
+            sx={{
+              color:
+                playbackState.state === "normal"
+                  ? "#4caf50"
+                  : playbackState.state === "waiting"
+                    ? "#ff9800"
+                    : "#f44336",
+              fontSize: "0.65rem",
+              fontWeight: 700,
+              fontFamily: "monospace",
+              letterSpacing: 0.5,
+              textTransform: "uppercase",
+            }}
+          >
+            {playbackState.state === "normal"
+              ? "LIVE"
+              : playbackState.state === "waiting"
+                ? "BUFFER"
+                : "ERROR"}
           </Typography>
         </Box>
       )}
@@ -451,33 +671,67 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
       <Box
         className="controls"
         sx={{
-          position: "absolute", bottom: 15, left: "50%", transform: "translateX(-50%)",
+          position: "absolute",
+          bottom: 15,
+          left: "50%",
+          transform: "translateX(-50%)",
           zIndex: 20,
           opacity: camera ? 0.2 : 1, // High visibility if no camera selected
           "&:hover": { opacity: 1 },
           transition: "opacity 0.4s ease-in-out",
-          bgcolor: camera ? 'transparent' : 'rgba(255,255,255,0.05)',
+          bgcolor: camera ? "transparent" : "rgba(255,255,255,0.05)",
           p: camera ? 0 : 4,
           borderRadius: 2,
-          border: camera ? 'none' : '1px dashed rgba(255,255,255,0.2)',
-          textAlign: 'center'
+          border: camera ? "none" : "1px dashed rgba(255,255,255,0.2)",
+          textAlign: "center",
         }}
       >
-        {!camera && <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'rgba(255,255,255,0.5)' }}>Click to assign camera</Typography>}
+        {!camera && (
+          <Typography
+            variant="caption"
+            sx={{ display: "block", mb: 1, color: "rgba(255,255,255,0.5)" }}
+          >
+            Click to assign camera
+          </Typography>
+        )}
         {chooser}
       </Box>
 
       {/* Loading Spinner */}
       {playbackState.state === "waiting" && camera && (
-        <Box sx={{ position: "absolute", zIndex: 5, display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", bgcolor: 'rgba(0,0,0,0.4)' }}>
-          <CircularProgress size={40} thickness={4} sx={{ color: '#fff' }} />
+        <Box
+          sx={{
+            position: "absolute",
+            zIndex: 5,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: "100%",
+            height: "100%",
+            bgcolor: "rgba(0,0,0,0.4)",
+          }}
+        >
+          <CircularProgress size={40} thickness={4} sx={{ color: "#fff" }} />
         </Box>
       )}
 
       {/* Error Message */}
       {playbackState.state === "error" && camera && (
-        <Box sx={{ position: "absolute", bottom: 20, width: "80%", zIndex: 30 }}>
-          <Alert severity="error" variant="filled" sx={{ py: 0.5, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>{playbackState.message}</Alert>
+        <Box
+          sx={{ position: "absolute", bottom: 20, width: "80%", zIndex: 30 }}
+        >
+          <Alert
+            severity="error"
+            variant="filled"
+            sx={{
+              py: 0.5,
+              borderRadius: 1,
+              fontSize: "0.75rem",
+              fontWeight: 600,
+            }}
+          >
+            {playbackState.message}
+          </Alert>
         </Box>
       )}
     </Box>

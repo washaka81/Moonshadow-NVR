@@ -6,7 +6,12 @@ import Container from "@mui/material/Container";
 import ErrorIcon from "@mui/icons-material/Error";
 import { Camera } from "../types";
 import LiveCamera, { MediaSourceApi } from "./LiveCamera";
-import Multiview, { MultiviewChooser, MAX_CAMERAS, selectedReducer, getInitialSelected } from "./Multiview"; // Import moved exports
+import Multiview, {
+  MultiviewChooser,
+  MAX_CAMERAS,
+  selectedReducer,
+  getInitialSelected,
+} from "./Multiview"; // Import moved exports
 import { FrameProps } from "../App";
 import { useSearchParams } from "react-router-dom";
 import React, { useEffect, useState, useReducer } from "react"; // Added useReducer and React
@@ -43,7 +48,7 @@ const Live = ({ cameras, Frame }: LiveProps) => {
   // Effect to keep localStorage and URL in sync with the lifted 'selected' state
   useEffect(() => {
     localStorage.setItem("camsSelected", JSON.stringify(selected));
-    const newParams = new URLSearchParams(window.location.search.split('?')[1]);
+    const newParams = new URLSearchParams(window.location.search.split("?")[1]);
     newParams.set("cams", JSON.stringify(selected));
     // Use window.history to update URL without triggering a full React Router re-render loop if possible,
     // or just ensure we don't depend on searchParams here.
@@ -51,7 +56,9 @@ const Live = ({ cameras, Frame }: LiveProps) => {
   }, [selected, setSearchParams]);
 
   // Auto-detect layout based on selected cameras count
-  const selectedCount = selected.filter((c): c is number => c !== null && c !== undefined).length;
+  const selectedCount = selected.filter(
+    (c): c is number => c !== null && c !== undefined,
+  ).length;
   const getAutoLayoutIndex = () => {
     if (selectedCount <= 1) return 0; // solo
     if (selectedCount === 2) return 1; // dual
@@ -62,26 +69,24 @@ const Live = ({ cameras, Frame }: LiveProps) => {
     return 6; // default to 3x3
   };
 
-  const [multiviewLayoutIndex, setMultiviewLayoutIndex] = useState(
-    () => {
-      // Priority: URL param > localStorage (validated) > auto-detect
-      if (searchParams.has("layout")) {
-        const urlValue = Number.parseInt(searchParams.get("layout") || "0", 10);
-        if (!isNaN(urlValue)) return urlValue;
-      }
-      try {
-        const stored = localStorage.getItem("multiviewLayoutIndex");
-        if (stored) {
-          const parsed = Number.parseInt(stored, 10);
-          if (!isNaN(parsed)) return parsed;
-        }
-      } catch (e) {
-        console.warn("Failed to parse layout index, clearing storage", e);
-        localStorage.removeItem("multiviewLayoutIndex");
-      }
-      return getAutoLayoutIndex();
+  const [multiviewLayoutIndex, setMultiviewLayoutIndex] = useState(() => {
+    // Priority: URL param > localStorage (validated) > auto-detect
+    if (searchParams.has("layout")) {
+      const urlValue = Number.parseInt(searchParams.get("layout") || "0", 10);
+      if (!isNaN(urlValue)) return urlValue;
     }
-  );
+    try {
+      const stored = localStorage.getItem("multiviewLayoutIndex");
+      if (stored) {
+        const parsed = Number.parseInt(stored, 10);
+        if (!isNaN(parsed)) return parsed;
+      }
+    } catch (e) {
+      console.warn("Failed to parse layout index, clearing storage", e);
+      localStorage.removeItem("multiviewLayoutIndex");
+    }
+    return getAutoLayoutIndex();
+  });
 
   useEffect(() => {
     if (searchParams.has("layout"))
@@ -131,7 +136,6 @@ const Live = ({ cameras, Frame }: LiveProps) => {
     }
   };
 
-
   return (
     <Frame
       activityMenuPart={
@@ -148,7 +152,7 @@ const Live = ({ cameras, Frame }: LiveProps) => {
               color="primary"
               size="small"
               onClick={() => setIsDrawerOpen(true)}
-              sx={{ ml: 1, boxShadow: 'none' }}
+              sx={{ ml: 1, boxShadow: "none" }}
             >
               <GridViewIcon fontSize="small" />
             </Fab>
@@ -177,21 +181,39 @@ const Live = ({ cameras, Frame }: LiveProps) => {
         PaperProps={{
           sx: {
             width: 300,
-            bgcolor: 'background.paper',
-            borderLeft: '1px solid rgba(255,255,255,0.1)',
+            bgcolor: "background.paper",
+            borderLeft: "1px solid rgba(255,255,255,0.1)",
           },
         }}
       >
-        <Box sx={{ p: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <Box
+          sx={{
+            p: 2,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+          }}
+        >
           <Typography variant="h6">Organize Mosaic</Typography>
           <IconButton onClick={() => setIsDrawerOpen(false)} size="small">
             <CloseIcon />
           </IconButton>
         </Box>
         <Divider />
-        <Box sx={{ p: 2, display: 'flex', gap: 1, justifyContent: 'space-around' }}>
-          <Button variant="outlined" size="small" onClick={handleAutoFill}>Auto-fill</Button>
-          <Button variant="outlined" size="small" color="error" onClick={handleClearAll}>Clear All</Button>
+        <Box
+          sx={{ p: 2, display: "flex", gap: 1, justifyContent: "space-around" }}
+        >
+          <Button variant="outlined" size="small" onClick={handleAutoFill}>
+            Auto-fill
+          </Button>
+          <Button
+            variant="outlined"
+            size="small"
+            color="error"
+            onClick={handleClearAll}
+          >
+            Clear All
+          </Button>
         </Box>
         <Divider />
         <List>
@@ -202,7 +224,10 @@ const Live = ({ cameras, Frame }: LiveProps) => {
               onDragStart={(e) => {
                 e.dataTransfer.setData("cameraIndex", index.toString());
               }}
-              sx={{ '&:hover': { bgcolor: 'rgba(255,255,255,0.05)' }, cursor: 'grab' }}
+              sx={{
+                "&:hover": { bgcolor: "rgba(255,255,255,0.05)" },
+                cursor: "grab",
+              }}
             >
               <ListItemIcon>
                 <CameraAltIcon />

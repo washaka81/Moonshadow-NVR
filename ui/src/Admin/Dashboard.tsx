@@ -100,7 +100,15 @@ const ProgressBar: React.FC<{
   color?: string;
   showPercent?: boolean;
   compact?: boolean;
-}> = ({ label, value, max, unit = "%", color, showPercent = true, compact }) => {
+}> = ({
+  label,
+  value,
+  max,
+  unit = "%",
+  color,
+  showPercent = true,
+  compact,
+}) => {
   const p = max > 0 ? (value / max) * 100 : 0;
   const c = color || percentColor(p);
   return (
@@ -147,7 +155,10 @@ const ProgressBar: React.FC<{
           height: compact ? 5 : 8,
           borderRadius: 0,
           bgcolor: "rgba(255,255,255,0.04)",
-          "& .MuiLinearProgress-bar": { bgcolor: c, transition: "transform 0.4s ease" },
+          "& .MuiLinearProgress-bar": {
+            bgcolor: c,
+            transition: "transform 0.4s ease",
+          },
         }}
       />
     </Box>
@@ -242,7 +253,9 @@ const StatCard: React.FC<{
         {value}
       </Typography>
       {sub && (
-        <Typography sx={{ color: "#555", fontSize: "0.65rem" }}>{sub}</Typography>
+        <Typography sx={{ color: "#555", fontSize: "0.65rem" }}>
+          {sub}
+        </Typography>
       )}
     </Box>
   </Box>
@@ -304,7 +317,7 @@ export default function AdminDashboard({
   toplevel: any;
 }) {
   const [info, setInfo] = useState<SystemInfo>(
-    toplevel?.systemInfo || defaultInfo
+    toplevel?.systemInfo || defaultInfo,
   );
   const [firstLoad, setFirstLoad] = useState(true);
 
@@ -333,9 +346,7 @@ export default function AdminDashboard({
   const memUsedGB = parseFloat(formatMBtoGB(info.htop.mem_used));
   const swapTotalGB = parseFloat(formatMBtoGB(info.htop.swap_total));
   const swapUsedGB = parseFloat(formatMBtoGB(info.htop.swap_used));
-  const gpuVRAMGB = info.nvtop.vram_total > 0
-    ? info.nvtop.vram_total
-    : 0;
+  const gpuVRAMGB = info.nvtop.vram_total > 0 ? info.nvtop.vram_total : 0;
 
   return (
     <Frame>
@@ -366,7 +377,14 @@ export default function AdminDashboard({
             >
               SYSTEM MONITOR
             </Typography>
-            <Typography variant="caption" sx={{ color: "#666", fontFamily: "monospace", fontSize: "0.6rem" }}>
+            <Typography
+              variant="caption"
+              sx={{
+                color: "#666",
+                fontFamily: "monospace",
+                fontSize: "0.6rem",
+              }}
+            >
               MOONSHADOW NVR — {info.fastfetch.host}
             </Typography>
           </Box>
@@ -403,7 +421,13 @@ export default function AdminDashboard({
             icon={<ThermostatIcon />}
             label="Temperature"
             value={`${info.nvtop.temp.toFixed(0)}°C`}
-            sub={info.nvtop.temp > 70 ? "HIGH" : info.nvtop.temp > 50 ? "WARM" : "NORMAL"}
+            sub={
+              info.nvtop.temp > 70
+                ? "HIGH"
+                : info.nvtop.temp > 50
+                  ? "WARM"
+                  : "NORMAL"
+            }
             color={tempColor(info.nvtop.temp)}
           />
           <StatCard
@@ -450,7 +474,7 @@ export default function AdminDashboard({
                   {(info.htop.cpu_cores || []).map(
                     (usage: number, i: number) => (
                       <CpuCoreBar key={i} index={i} usage={usage} />
-                    )
+                    ),
                   )}
                 </Box>
                 <Box sx={{ mt: 2 }}>
@@ -500,35 +524,115 @@ export default function AdminDashboard({
                     mt: 2,
                   }}
                 >
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       RAM USED
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#26d07c", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#26d07c",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {memUsedGB.toFixed(2)} GB
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       RAM TOTAL
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#26d07c", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#26d07c",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {memTotalGB.toFixed(2)} GB
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       SWAP USED
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#ff9800", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#ff9800",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {swapUsedGB.toFixed(2)} GB
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       SWAP TOTAL
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#ff9800", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#ff9800",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {swapTotalGB.toFixed(2)} GB
                     </Typography>
                   </Box>
@@ -573,33 +677,94 @@ export default function AdminDashboard({
                 <Box
                   sx={{
                     display: "grid",
-                    gridTemplateColumns: gpuVRAMGB > 0 ? "1fr 1fr 1fr" : "1fr 1fr",
+                    gridTemplateColumns:
+                      gpuVRAMGB > 0 ? "1fr 1fr 1fr" : "1fr 1fr",
                     gap: 1,
                     mt: 2,
                   }}
                 >
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       GPU LOAD
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#ce93d8", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#ce93d8",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.nvtop.gpu_usage.toFixed(1)}%
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       TEMP
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: tempColor(info.nvtop.temp), fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: tempColor(info.nvtop.temp),
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.nvtop.temp.toFixed(1)}°C
                     </Typography>
                   </Box>
                   {gpuVRAMGB > 0 && (
-                    <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                      <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                    <Box
+                      sx={{
+                        p: 1.5,
+                        border: "1px solid rgba(255,255,255,0.05)",
+                        borderRadius: 1,
+                      }}
+                    >
+                      <Typography
+                        variant="caption"
+                        sx={{
+                          color: "#666",
+                          fontSize: "0.6rem",
+                          display: "block",
+                        }}
+                      >
                         VRAM
                       </Typography>
-                      <Typography sx={{ fontFamily: "monospace", color: "#7b1fa2", fontSize: "0.9rem", fontWeight: 700 }}>
+                      <Typography
+                        sx={{
+                          fontFamily: "monospace",
+                          color: "#7b1fa2",
+                          fontSize: "0.9rem",
+                          fontWeight: 700,
+                        }}
+                      >
                         {info.nvtop.vram_used}M
                       </Typography>
                     </Box>
@@ -637,19 +802,59 @@ export default function AdminDashboard({
                     mt: 2,
                   }}
                 >
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       FREE
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#4caf50", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#4caf50",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.disk.free} GB
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       TOTAL
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#ff9800", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#ff9800",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.disk.total} GB
                     </Typography>
                   </Box>
@@ -678,35 +883,115 @@ export default function AdminDashboard({
                     gap: 1,
                   }}
                 >
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       HOSTNAME
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#64b5f6", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#64b5f6",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.fastfetch.host}
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       OS
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#64b5f6", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#64b5f6",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.fastfetch.os}
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       KERNEL
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#64b5f6", fontSize: "0.75rem", fontWeight: 600 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#64b5f6",
+                        fontSize: "0.75rem",
+                        fontWeight: 600,
+                      }}
+                    >
                       {info.fastfetch.kernel}
                     </Typography>
                   </Box>
-                  <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                    <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                  <Box
+                    sx={{
+                      p: 1.5,
+                      border: "1px solid rgba(255,255,255,0.05)",
+                      borderRadius: 1,
+                    }}
+                  >
+                    <Typography
+                      variant="caption"
+                      sx={{
+                        color: "#666",
+                        fontSize: "0.6rem",
+                        display: "block",
+                      }}
+                    >
                       UPTIME
                     </Typography>
-                    <Typography sx={{ fontFamily: "monospace", color: "#64b5f6", fontSize: "0.9rem", fontWeight: 700 }}>
+                    <Typography
+                      sx={{
+                        fontFamily: "monospace",
+                        color: "#64b5f6",
+                        fontSize: "0.9rem",
+                        fontWeight: 700,
+                      }}
+                    >
                       {info.fastfetch.uptime}
                     </Typography>
                   </Box>
@@ -759,7 +1044,15 @@ export default function AdminDashboard({
                 >
                   {info.accelerator}
                 </Typography>
-                <Typography variant="caption" sx={{ color: "#555", fontFamily: "monospace", fontSize: "0.65rem", display: "block" }}>
+                <Typography
+                  variant="caption"
+                  sx={{
+                    color: "#555",
+                    fontFamily: "monospace",
+                    fontSize: "0.65rem",
+                    display: "block",
+                  }}
+                >
                   AI COMPUTE ENGINE
                 </Typography>
               </Box>
@@ -771,38 +1064,98 @@ export default function AdminDashboard({
                   gap: 1,
                 }}
               >
-                <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}
+                  >
                     CPU
                   </Typography>
-                  <Typography sx={{ fontFamily: "monospace", color: "#2196f3", fontSize: "0.7rem", fontWeight: 600 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: "monospace",
+                      color: "#2196f3",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     {info.fastfetch.cpu_model}
                   </Typography>
                 </Box>
-                <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}
+                  >
                     SHELL
                   </Typography>
-                  <Typography sx={{ fontFamily: "monospace", color: "#2196f3", fontSize: "0.7rem", fontWeight: 600 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: "monospace",
+                      color: "#2196f3",
+                      fontSize: "0.7rem",
+                      fontWeight: 600,
+                    }}
+                  >
                     {info.fastfetch.shell}
                   </Typography>
                 </Box>
-                <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}
+                  >
                     PACKAGES
                   </Typography>
-                  <Typography sx={{ fontFamily: "monospace", color: "#2196f3", fontSize: "0.9rem", fontWeight: 700 }}>
+                  <Typography
+                    sx={{
+                      fontFamily: "monospace",
+                      color: "#2196f3",
+                      fontSize: "0.9rem",
+                      fontWeight: 700,
+                    }}
+                  >
                     {info.fastfetch.packages}
                   </Typography>
                 </Box>
-                <Box sx={{ p: 1.5, border: "1px solid rgba(255,255,255,0.05)", borderRadius: 1 }}>
-                  <Typography variant="caption" sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}>
+                <Box
+                  sx={{
+                    p: 1.5,
+                    border: "1px solid rgba(255,255,255,0.05)",
+                    borderRadius: 1,
+                  }}
+                >
+                  <Typography
+                    variant="caption"
+                    sx={{ color: "#666", fontSize: "0.6rem", display: "block" }}
+                  >
                     GPU STATUS
                   </Typography>
                   <Typography
                     sx={{
                       fontFamily: "monospace",
-                      color: info.nvtop.gpu_status === "Accelerating" ? "#4caf50" : "#888",
+                      color:
+                        info.nvtop.gpu_status === "Accelerating"
+                          ? "#4caf50"
+                          : "#888",
                       fontSize: "0.9rem",
                       fontWeight: 700,
                     }}
@@ -839,39 +1192,47 @@ export default function AdminDashboard({
               }}
             >
               <Box sx={{ color: "#666", mb: 0.8 }}>
-                [{new Date().toISOString().replace("T", " ").slice(0, 19)}] System monitor initialized
+                [{new Date().toISOString().replace("T", " ").slice(0, 19)}]
+                System monitor initialized
               </Box>
               {info.nvtop.gpu_status === "Accelerating" && (
                 <Box sx={{ color: "#ce93d8", mb: 0.8 }}>
-                  GPU acceleration active — {info.nvtop.gpu_usage.toFixed(1)}% load
+                  GPU acceleration active — {info.nvtop.gpu_usage.toFixed(1)}%
+                  load
                 </Box>
               )}
               {info.nvtop.temp > 70 && (
                 <Box sx={{ color: "#f44336", mb: 0.8 }}>
-                  WARNING: Temperature high ({info.nvtop.temp.toFixed(0)}°C) — consider checking cooling
+                  WARNING: Temperature high ({info.nvtop.temp.toFixed(0)}°C) —
+                  consider checking cooling
                 </Box>
               )}
               {info.disk.percent > 85 && (
                 <Box sx={{ color: "#f44336", mb: 0.8 }}>
-                  WARNING: Disk usage high ({info.disk.percent.toFixed(1)}%) — {info.disk.free} GB remaining
+                  WARNING: Disk usage high ({info.disk.percent.toFixed(1)}%) —{" "}
+                  {info.disk.free} GB remaining
                 </Box>
               )}
               {info.htop.mem_percent > 90 && (
                 <Box sx={{ color: "#f44336", mb: 0.8 }}>
-                  WARNING: Memory usage critical ({info.htop.mem_percent.toFixed(1)}%)
+                  WARNING: Memory usage critical (
+                  {info.htop.mem_percent.toFixed(1)}%)
                 </Box>
               )}
               <Box sx={{ color: "#4caf50", mb: 0.8 }}>
-                OK — CPU: {info.htop.cpu_total.toFixed(1)}% | RAM: {memUsedGB.toFixed(1)}G | Disk: {info.disk.free}G free
+                OK — CPU: {info.htop.cpu_total.toFixed(1)}% | RAM:{" "}
+                {memUsedGB.toFixed(1)}G | Disk: {info.disk.free}G free
               </Box>
               <Box sx={{ color: "#666", mb: 0.8 }}>
-                Kernel: {info.fastfetch.kernel.split(" ")[0]} | Host: {info.fastfetch.host} | Uptime: {info.fastfetch.uptime}
+                Kernel: {info.fastfetch.kernel.split(" ")[0]} | Host:{" "}
+                {info.fastfetch.host} | Uptime: {info.fastfetch.uptime}
               </Box>
               <Box sx={{ color: "#4db6ac", mb: 0.8 }}>
                 Accelerator: {info.accelerator}
               </Box>
               <Box sx={{ color: "#ffb74d", mb: 0.8 }}>
-                Refresh interval: 2s — {info.htop.cpu_cores.length} CPU cores monitored
+                Refresh interval: 2s — {info.htop.cpu_cores.length} CPU cores
+                monitored
               </Box>
               {info.nvtop.vram_total > 0 && (
                 <Box sx={{ color: "#7b1fa2", mb: 0.8 }}>
@@ -895,29 +1256,56 @@ export default function AdminDashboard({
             gap: 1,
           }}
         >
-          <Typography variant="caption" sx={{ fontFamily: "monospace", color: "#444", fontSize: "0.65rem" }}>
+          <Typography
+            variant="caption"
+            sx={{ fontFamily: "monospace", color: "#444", fontSize: "0.65rem" }}
+          >
             MOONSHADOW NVR — AI ARCHITECTURE ENABLED
           </Typography>
           <Box sx={{ display: "flex", gap: 1 }}>
             <Chip
               label={`CPU: ${info.htop.cpu_total.toFixed(0)}%`}
               size="small"
-              sx={{ height: 18, fontSize: "0.6rem", fontFamily: "monospace", bgcolor: "rgba(33,150,243,0.1)", color: "#2196f3" }}
+              sx={{
+                height: 18,
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                bgcolor: "rgba(33,150,243,0.1)",
+                color: "#2196f3",
+              }}
             />
             <Chip
               label={`GPU: ${info.nvtop.gpu_usage.toFixed(0)}%`}
               size="small"
-              sx={{ height: 18, fontSize: "0.6rem", fontFamily: "monospace", bgcolor: "rgba(206,147,216,0.1)", color: "#ce93d8" }}
+              sx={{
+                height: 18,
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                bgcolor: "rgba(206,147,216,0.1)",
+                color: "#ce93d8",
+              }}
             />
             <Chip
               label={`TEMP: ${info.nvtop.temp.toFixed(0)}°C`}
               size="small"
-              sx={{ height: 18, fontSize: "0.6rem", fontFamily: "monospace", bgcolor: "rgba(255,152,0,0.1)", color: tempColor(info.nvtop.temp) }}
+              sx={{
+                height: 18,
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                bgcolor: "rgba(255,152,0,0.1)",
+                color: tempColor(info.nvtop.temp),
+              }}
             />
             <Chip
               label={`DISK: ${info.disk.percent.toFixed(0)}%`}
               size="small"
-              sx={{ height: 18, fontSize: "0.6rem", fontFamily: "monospace", bgcolor: "rgba(255,152,0,0.1)", color: "#ff9800" }}
+              sx={{
+                height: 18,
+                fontSize: "0.6rem",
+                fontFamily: "monospace",
+                bgcolor: "rgba(255,152,0,0.1)",
+                color: "#ff9800",
+              }}
             />
           </Box>
         </Box>

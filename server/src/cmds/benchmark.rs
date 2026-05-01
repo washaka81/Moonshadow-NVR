@@ -4,9 +4,9 @@
 
 use base::Error;
 use bpaf::Bpaf;
-use std::time::Instant;
-use ort::{session::Session};
+use ort::session::Session;
 use std::path::PathBuf;
+use std::time::Instant;
 
 #[derive(Bpaf, Debug)]
 #[bpaf(command("benchmark"))]
@@ -45,14 +45,20 @@ pub fn run(args: Args) -> Result<i32, Error> {
     let duration = start.elapsed();
     println!("Iteraciones: {}", args.iterations);
     println!("Tiempo: {:.2?}", duration);
-    println!("Rendimiento: {:.2} Mops/s", (args.iterations as f64 / duration.as_secs_f64()) / 1_000_000.0);
+    println!(
+        "Rendimiento: {:.2} Mops/s",
+        (args.iterations as f64 / duration.as_secs_f64()) / 1_000_000.0
+    );
     println!("Resultado (checksum): {:.2}\n", sum);
 
     // 3. Benchmark de Inferencia (Intel OpenVINO - Forzado a CPU)
     if let Some(model_path) = args.model {
         println!("--- 🧠 Prueba 3: Inferencia de IA (Intel OpenVINO - CPU Mode) ---");
         if !model_path.exists() {
-            println!("⚠️ Modelo no encontrado en: {:?}. Saltando prueba.", model_path);
+            println!(
+                "⚠️ Modelo no encontrado en: {:?}. Saltando prueba.",
+                model_path
+            );
         } else {
             let start_load = Instant::now();
             let _ = ort::init().with_name("benchmark").commit();
@@ -64,7 +70,7 @@ pub fn run(args: Args) -> Result<i32, Error> {
                 ])
                 .unwrap()
                 .commit_from_file(&model_path);
-            
+
             match session {
                 Ok(_) => {
                     println!("Tiempo de carga del modelo: {:.2?}", start_load.elapsed());

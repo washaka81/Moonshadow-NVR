@@ -52,20 +52,38 @@ pub async fn ai_events(
         }
     }
 
-    let mut sql = "SELECT camera_id, timestamp_90k, event_type, payload, video_link FROM ai_event WHERE 1=1".to_string();
-    if type_filter.is_some() { sql.push_str(" AND event_type = ?"); }
-    if camera_id_filter.is_some() { sql.push_str(" AND camera_id = ?"); }
-    if start_time_90k.is_some() { sql.push_str(" AND timestamp_90k >= ?"); }
-    if end_time_90k.is_some() { sql.push_str(" AND timestamp_90k < ?"); }
+    let mut sql =
+        "SELECT camera_id, timestamp_90k, event_type, payload, video_link FROM ai_event WHERE 1=1"
+            .to_string();
+    if type_filter.is_some() {
+        sql.push_str(" AND event_type = ?");
+    }
+    if camera_id_filter.is_some() {
+        sql.push_str(" AND camera_id = ?");
+    }
+    if start_time_90k.is_some() {
+        sql.push_str(" AND timestamp_90k >= ?");
+    }
+    if end_time_90k.is_some() {
+        sql.push_str(" AND timestamp_90k < ?");
+    }
     sql.push_str(" ORDER BY timestamp_90k DESC LIMIT ?");
 
     let events = {
         let l = db.lock();
         let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
-        if let Some(t) = &type_filter { params.push(t); }
-        if let Some(c) = &camera_id_filter { params.push(c); }
-        if let Some(st) = &start_time_90k { params.push(st); }
-        if let Some(et) = &end_time_90k { params.push(et); }
+        if let Some(t) = &type_filter {
+            params.push(t);
+        }
+        if let Some(c) = &camera_id_filter {
+            params.push(c);
+        }
+        if let Some(st) = &start_time_90k {
+            params.push(st);
+        }
+        if let Some(et) = &end_time_90k {
+            params.push(et);
+        }
         params.push(&limit);
 
         l.execute_raw_query(&sql, &params, |row| {

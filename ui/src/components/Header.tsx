@@ -61,13 +61,38 @@ export default function Header({
               <MenuIcon />
             </IconButton>
           )}
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1, fontWeight: 300, letterSpacing: 1 }}>
+          <Typography
+            variant="h6"
+            component="div"
+            sx={{ flexGrow: 1, fontWeight: 300, letterSpacing: 1 }}
+          >
             Moonshadow NVR
           </Typography>
-          <Box sx={{ display: { xs: 'none', md: 'flex' }, gap: 1, mr: 2 }}>
-            <Button color="inherit" component={Link} to="/" sx={{ opacity: 0.8, '&:hover': { opacity: 1 } }}>Live</Button>
-            <Button color="inherit" component={Link} to="/list" sx={{ opacity: 0.8, '&:hover': { opacity: 1 } }}>Archives</Button>
-            <Button color="inherit" component={Link} to="/ai-events" sx={{ opacity: 0.8, '&:hover': { opacity: 1 } }}>AI Events</Button>
+          <Box sx={{ display: { xs: "none", md: "flex" }, gap: 1, mr: 2 }}>
+            <Button
+              color="inherit"
+              component={Link}
+              to="/"
+              sx={{ opacity: 0.8, "&:hover": { opacity: 1 } }}
+            >
+              Live
+            </Button>
+            <Button
+              color="inherit"
+              component={Link}
+              to="/list"
+              sx={{ opacity: 0.8, "&:hover": { opacity: 1 } }}
+            >
+              Archives
+            </Button>
+            <Button
+              color="inherit"
+              component={Link}
+              to="/ai-events"
+              sx={{ opacity: 0.8, "&:hover": { opacity: 1 } }}
+            >
+              AI Events
+            </Button>
           </Box>
           {activityMenuPart}
           {loginState === "logged-in" ? (
@@ -99,7 +124,10 @@ export default function Header({
               <ListItemIcon>
                 <Videocam />
               </ListItemIcon>
-              <ListItemText primary="Live Mosaic" secondary="Real-time multi-view" />
+              <ListItemText
+                primary="Live Mosaic"
+                secondary="Real-time multi-view"
+              />
             </ListItemButton>
             <ListItemButton
               key="list"
@@ -110,7 +138,10 @@ export default function Header({
               <ListItemIcon>
                 <ListIcon />
               </ListItemIcon>
-              <ListItemText primary="Recording Archives" secondary="History & timeline" />
+              <ListItemText
+                primary="Recording Archives"
+                secondary="History & timeline"
+              />
             </ListItemButton>
             <ListItemButton
               key="ai-events"
@@ -121,7 +152,10 @@ export default function Header({
               <ListItemIcon>
                 <AssessmentIcon />
               </ListItemIcon>
-              <ListItemText primary="AI Smart Events" secondary="Detections & alerts" />
+              <ListItemText
+                primary="AI Smart Events"
+                secondary="Detections & alerts"
+              />
             </ListItemButton>
             <ListItemButton
               key="admin"
@@ -132,7 +166,10 @@ export default function Header({
               <ListItemIcon>
                 <SettingsIcon />
               </ListItemIcon>
-              <ListItemText primary="System Diagnostics" secondary="Hardware & telemetry" />
+              <ListItemText
+                primary="System Diagnostics"
+                secondary="Hardware & telemetry"
+              />
             </ListItemButton>
             <Divider sx={{ my: 1 }} />
             {toplevel?.permissions.readCameraConfigs && (

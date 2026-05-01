@@ -133,7 +133,10 @@ const Inner = ({ csrf }: { csrf?: string }) => {
     setProbing(null);
 
     if (resp.status === "success") {
-      setValue(`streams.${index}.detectedCodec`, resp.response.codec || "Unknown");
+      setValue(
+        `streams.${index}.detectedCodec`,
+        resp.response.codec || "Unknown",
+      );
       snackbars.enqueue({
         message: `Probe successful! Codec: ${resp.response.codec || "Unknown"}`,
         severity: "success",
@@ -226,16 +229,19 @@ const Inner = ({ csrf }: { csrf?: string }) => {
                   </Divider>
                 </Box>
               </Grid>
-              <Grid size={12} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+              <Grid
+                size={12}
+                sx={{ display: "flex", alignItems: "center", gap: 2 }}
+              >
                 <CheckboxElement
                   name={`streams.${i}.enabled`}
                   label="Enabled"
                 />
                 {watch(`streams.${i}.detectedCodec`) && (
-                  <Chip 
-                    label={`Detected: ${watch(`streams.${i}.detectedCodec`)}`} 
-                    size="small" 
-                    color="primary" 
+                  <Chip
+                    label={`Detected: ${watch(`streams.${i}.detectedCodec`)}`}
+                    size="small"
+                    color="primary"
                     variant="outlined"
                   />
                 )}

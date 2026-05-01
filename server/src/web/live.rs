@@ -93,7 +93,11 @@ impl Service {
                     Err(_) => {
                         bail!(
                             DeadlineExceeded,
-                            msg("timeout waiting for initial frame on {}/{}", uuid, stream_type)
+                            msg(
+                                "timeout waiting for initial frame on {}/{}",
+                                uuid,
+                                stream_type
+                            )
                         );
                     }
                 }
@@ -175,7 +179,8 @@ impl Service {
                 },
             )?;
         }
-        let row = row.ok_or_else(|| err!(Internal, msg("unable to find recording for {live:?}")))?;
+        let row =
+            row.ok_or_else(|| err!(Internal, msg("unable to find recording for {live:?}")))?;
         tracing::debug!("have row to match frame");
         use http_serve::Entity;
         let mp4 = builder.build(self.db.clone())?;
@@ -204,6 +209,9 @@ impl Service {
         let mut v = hdr.into_bytes();
         mp4.append_into_vec(&mut v).await?;
         tracing::debug!("sending frame msg");
-        Ok(ws.send(tungstenite::Message::Binary(v.into())).await.is_ok())
+        Ok(ws
+            .send(tungstenite::Message::Binary(v.into()))
+            .await
+            .is_ok())
     }
 }

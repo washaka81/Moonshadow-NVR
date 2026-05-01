@@ -7,6 +7,7 @@ use nix::fcntl::FlockArg;
 use std::path::Path;
 use tracing::info;
 
+pub mod benchmark;
 pub mod check;
 pub mod config;
 pub mod init;
@@ -15,7 +16,6 @@ pub mod run;
 pub mod sql;
 pub mod ts;
 pub mod upgrade;
-pub mod benchmark;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpenMode {

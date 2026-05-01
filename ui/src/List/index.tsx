@@ -48,7 +48,10 @@ interface ParsedSearchParamsAndSetters extends ParsedSearchParams {
   setTimestampTrack: (timestampTrack: boolean) => void;
 }
 
-const parseSearchParams = (raw: URLSearchParams, toplevel: api.ToplevelResponse): ParsedSearchParams => {
+const parseSearchParams = (
+  raw: URLSearchParams,
+  toplevel: api.ToplevelResponse,
+): ParsedSearchParams => {
   const selectedStreamIds = new Set<number>();
   let split90k = DEFAULT_DURATION;
   let trimStartAndEnd = true;
@@ -59,9 +62,15 @@ const parseSearchParams = (raw: URLSearchParams, toplevel: api.ToplevelResponse)
   }
   for (const [key, value] of raw) {
     switch (key) {
-      case "split": split90k = value === "inf" ? undefined : Number.parseInt(value, 10); break;
-      case "trim": trimStartAndEnd = value === "true"; break;
-      case "ts": timestampTrack = value === "true"; break;
+      case "split":
+        split90k = value === "inf" ? undefined : Number.parseInt(value, 10);
+        break;
+      case "trim":
+        trimStartAndEnd = value === "true";
+        break;
+      case "ts":
+        timestampTrack = value === "true";
+        break;
     }
   }
   if (sValues.length === 0) {
@@ -72,15 +81,20 @@ const parseSearchParams = (raw: URLSearchParams, toplevel: api.ToplevelResponse)
   return { selectedStreamIds, split90k, trimStartAndEnd, timestampTrack };
 };
 
-const useParsedSearchParams = (toplevel: api.ToplevelResponse): ParsedSearchParamsAndSetters => {
+const useParsedSearchParams = (
+  toplevel: api.ToplevelResponse,
+): ParsedSearchParamsAndSetters => {
   const [search, setSearch] = useSearchParams();
-  const { selectedStreamIds, split90k, trimStartAndEnd, timestampTrack } = useMemo(() => parseSearchParams(search, toplevel), [search, toplevel]);
+  const { selectedStreamIds, split90k, trimStartAndEnd, timestampTrack } =
+    useMemo(() => parseSearchParams(search, toplevel), [search, toplevel]);
 
   const setSelectedStreamIds = (newSelectedStreamIds: Set<number>) => {
     const newSearch = new URLSearchParams(search);
     newSearch.delete("s");
     if (newSelectedStreamIds.size > 0) {
-      for (const id of newSelectedStreamIds) { newSearch.append("s", id.toString()); }
+      for (const id of newSelectedStreamIds) {
+        newSearch.append("s", id.toString());
+      }
     }
     setSearch(newSearch);
   };
@@ -106,10 +120,22 @@ const useParsedSearchParams = (toplevel: api.ToplevelResponse): ParsedSearchPara
     else newSearch.set("ts", "true");
     setSearch(newSearch);
   };
-  return { selectedStreamIds, setSelectedStreamIds, split90k, setSplit90k, trimStartAndEnd, setTrimStartAndEnd, timestampTrack, setTimestampTrack };
+  return {
+    selectedStreamIds,
+    setSelectedStreamIds,
+    split90k,
+    setSplit90k,
+    trimStartAndEnd,
+    setTrimStartAndEnd,
+    timestampTrack,
+    setTimestampTrack,
+  };
 };
 
-const calcSelectedStreams = (toplevel: api.ToplevelResponse, ids: Set<number>): Set<Stream> => {
+const calcSelectedStreams = (
+  toplevel: api.ToplevelResponse,
+  ids: Set<number>,
+): Set<Stream> => {
   const streams = new Set<Stream>();
   for (const id of ids) {
     const s = toplevel.streams.get(id);
@@ -120,14 +146,38 @@ const calcSelectedStreams = (toplevel: api.ToplevelResponse, ids: Set<number>): 
 
 const Main = ({ toplevel, timeZoneName, Frame }: Props) => {
   const theme = useTheme();
-  const { selectedStreamIds, setSelectedStreamIds, split90k, setSplit90k, trimStartAndEnd, setTrimStartAndEnd, timestampTrack, setTimestampTrack } = useParsedSearchParams(toplevel);
-  const [showSelectors, toggleShowSelectors] = useReducer((m: boolean) => !m, true);
+  const {
+    selectedStreamIds,
+    setSelectedStreamIds,
+    split90k,
+    setSplit90k,
+    trimStartAndEnd,
+    setTrimStartAndEnd,
+    timestampTrack,
+    setTimestampTrack,
+  } = useParsedSearchParams(toplevel);
+  const [showSelectors, toggleShowSelectors] = useReducer(
+    (m: boolean) => !m,
+    true,
+  );
   const [range90k, setRange90k] = useState<[number, number] | null>(null);
-  const selectedStreams = useMemo(() => calcSelectedStreams(toplevel, selectedStreamIds), [toplevel, selectedStreamIds]);
-  const [activeVideo, setActiveVideo] = useState<{ src: string, aspect: [number, number], initialSpeed?: number, filename?: string } | null>(null);
+  const selectedStreams = useMemo(
+    () => calcSelectedStreams(toplevel, selectedStreamIds),
+    [toplevel, selectedStreamIds],
+  );
+  const [activeVideo, setActiveVideo] = useState<{
+    src: string;
+    aspect: [number, number];
+    initialSpeed?: number;
+    filename?: string;
+  } | null>(null);
 
   const formatTime = useMemo(() => {
-    return (time90k: number) => format(toZonedTime(new Date(time90k / 90), timeZoneName), "d MMM yyyy HH:mm:ss");
+    return (time90k: number) =>
+      format(
+        toZonedTime(new Date(time90k / 90), timeZoneName),
+        "d MMM yyyy HH:mm:ss",
+      );
   }, [timeZoneName]);
 
   useEffect(() => {
@@ -162,9 +212,19 @@ const Main = ({ toplevel, timeZoneName, Frame }: Props) => {
         setActiveRecording={(recording) => {
           if (!recording) return;
           const [stream, r] = recording;
-          const src = api.recordingUrl(stream.camera.uuid, stream.streamType, r, timestampTrack, trimStartAndEnd ? range90k! : undefined);
-          const filename = `recording_${stream.camera.shortName}_${formatTime(r.startTime90k).replace(/[: ]/g, '-')}.mp4`;
-          setActiveVideo({ src, aspect: [r.aspectWidth, r.aspectHeight], filename });
+          const src = api.recordingUrl(
+            stream.camera.uuid,
+            stream.streamType,
+            r,
+            timestampTrack,
+            trimStartAndEnd ? range90k! : undefined,
+          );
+          const filename = `recording_${stream.camera.shortName}_${formatTime(r.startTime90k).replace(/[: ]/g, "-")}.mp4`;
+          setActiveVideo({
+            src,
+            aspect: [r.aspectWidth, r.aspectHeight],
+            filename,
+          });
         }}
         formatTime={formatTime}
       />,
@@ -192,16 +252,53 @@ const Main = ({ toplevel, timeZoneName, Frame }: Props) => {
         "& .opt": { [theme.breakpoints.down("lg")]: { display: "none" } },
       }}
     >
-      <Table size="small" stickyHeader sx={{ minWidth: 650, borderCollapse: 'separate' }}>
+      <Table
+        size="small"
+        stickyHeader
+        sx={{ minWidth: 650, borderCollapse: "separate" }}
+      >
         <TableHead>
-          <TableRow sx={{ '& th': { fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase', fontSize: '0.75rem', bgcolor: 'background.paper', borderBottom: '1px solid rgba(255,255,255,0.1)', zIndex: 10 } }}>
+          <TableRow
+            sx={{
+              "& th": {
+                fontWeight: 700,
+                color: "text.secondary",
+                textTransform: "uppercase",
+                fontSize: "0.75rem",
+                bgcolor: "background.paper",
+                borderBottom: "1px solid rgba(255,255,255,0.1)",
+                zIndex: 10,
+              },
+            }}
+          >
             <TableCell padding="checkbox" component="th" />
-            <TableCell align="left" component="th">Start</TableCell>
-            <TableCell align="left" component="th">End<Icon sx={{ verticalAlign: "bottom", marginLeft: ".5em", visibility: 'hidden' }}><ErrorIcon /></Icon></TableCell>
-            <TableCell align="right" className="opt" component="th">Resolution</TableCell>
-            <TableCell align="right" className="opt" component="th">FPS</TableCell>
-            <TableCell align="right" className="opt" component="th">Storage</TableCell>
-            <TableCell align="right" component="th">Bitrate / AI</TableCell>
+            <TableCell align="left" component="th">
+              Start
+            </TableCell>
+            <TableCell align="left" component="th">
+              End
+              <Icon
+                sx={{
+                  verticalAlign: "bottom",
+                  marginLeft: ".5em",
+                  visibility: "hidden",
+                }}
+              >
+                <ErrorIcon />
+              </Icon>
+            </TableCell>
+            <TableCell align="right" className="opt" component="th">
+              Resolution
+            </TableCell>
+            <TableCell align="right" className="opt" component="th">
+              FPS
+            </TableCell>
+            <TableCell align="right" className="opt" component="th">
+              Storage
+            </TableCell>
+            <TableCell align="right" component="th">
+              Bitrate / AI
+            </TableCell>
           </TableRow>
         </TableHead>
         {videoLists}
@@ -212,20 +309,70 @@ const Main = ({ toplevel, timeZoneName, Frame }: Props) => {
   return (
     <Frame
       activityMenuPart={
-        <IconButton onClick={toggleShowSelectors} color="inherit" sx={showSelectors ? { border: `1px solid rgba(255,255,255,0.2)` } : {}} size="small">
+        <IconButton
+          onClick={toggleShowSelectors}
+          color="inherit"
+          sx={
+            showSelectors ? { border: `1px solid rgba(255,255,255,0.2)` } : {}
+          }
+          size="small"
+        >
           <FilterList />
         </IconButton>
       }
     >
-      <Box sx={{ display: "flex", flexWrap: { xs: "wrap", md: "nowrap" }, margin: theme.spacing(2), height: "calc(100% - 32px)", overflow: "hidden" }}>
-        <Box sx={{ display: showSelectors ? "flex" : "none", width: { xs: "100%", md: "300px" }, flexShrink: 0, gap: 1, mb: { xs: 2, md: 0 }, flexDirection: "column", overflowY: "auto", height: "100%", pr: 1 }}>
-          <StreamMultiSelector toplevel={toplevel} selected={selectedStreamIds} setSelected={setSelectedStreamIds} />
-          <TimerangeSelector selectedStreams={selectedStreams} setRange90k={setRange90k} timeZoneName={timeZoneName} />
-          <DisplaySelector split90k={split90k} setSplit90k={setSplit90k} trimStartAndEnd={trimStartAndEnd} setTrimStartAndEnd={setTrimStartAndEnd} timestampTrack={timestampTrack} setTimestampTrack={setTimestampTrack} />
+      <Box
+        sx={{
+          display: "flex",
+          flexWrap: { xs: "wrap", md: "nowrap" },
+          margin: theme.spacing(2),
+          height: "calc(100% - 32px)",
+          overflow: "hidden",
+        }}
+      >
+        <Box
+          sx={{
+            display: showSelectors ? "flex" : "none",
+            width: { xs: "100%", md: "300px" },
+            flexShrink: 0,
+            gap: 1,
+            mb: { xs: 2, md: 0 },
+            flexDirection: "column",
+            overflowY: "auto",
+            height: "100%",
+            pr: 1,
+          }}
+        >
+          <StreamMultiSelector
+            toplevel={toplevel}
+            selected={selectedStreamIds}
+            setSelected={setSelectedStreamIds}
+          />
+          <TimerangeSelector
+            selectedStreams={selectedStreams}
+            setRange90k={setRange90k}
+            timeZoneName={timeZoneName}
+          />
+          <DisplaySelector
+            split90k={split90k}
+            setSplit90k={setSplit90k}
+            trimStartAndEnd={trimStartAndEnd}
+            setTrimStartAndEnd={setTrimStartAndEnd}
+            timestampTrack={timestampTrack}
+            setTimestampTrack={setTimestampTrack}
+          />
         </Box>
         {videoLists.length > 0 && recordingsTable}
         {activeVideo != null && (
-          <Modal open onClose={() => setActiveVideo(null)} sx={{ display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Modal
+            open
+            onClose={() => setActiveVideo(null)}
+            sx={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+            }}
+          >
             <FullScreenVideo
               onClose={() => setActiveVideo(null)}
               src={activeVideo.src}

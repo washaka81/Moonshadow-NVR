@@ -5,7 +5,7 @@
 use crate::stream;
 use base::clock::{Clocks, TimerGuard};
 use base::{bail, err, Error};
-use db::{recording, writer, Camera, stream::StreamType};
+use db::{recording, stream::StreamType, writer, Camera};
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -142,28 +142,28 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
 
         let mut stream = {
             let mut t = TimerGuard::new(clocks, |_| format!("opening {}", self.url));
-// Force TCP transport for better compatibility with cameras
-        let transport = match &self.transport {
-            retina::client::Transport::Udp(_) => {
-                tracing::info!("Forcing TCP transport for {}", self.short_name);
-                retina::client::Transport::Tcp(retina::client::TcpTransportOptions::default())
-            }
-            _ => self.transport.clone(),
-        };
-        
-        let options = stream::Options {
-            session: retina::client::SessionOptions::default()
-                .creds(if self.username.is_empty() {
-                    None
-                } else {
-                    Some(retina::client::Credentials {
-                        username: self.username.clone(),
-                        password: self.password.clone(),
+            // Force TCP transport for better compatibility with cameras
+            let transport = match &self.transport {
+                retina::client::Transport::Udp(_) => {
+                    tracing::info!("Forcing TCP transport for {}", self.short_name);
+                    retina::client::Transport::Tcp(retina::client::TcpTransportOptions::default())
+                }
+                _ => self.transport.clone(),
+            };
+
+            let options = stream::Options {
+                session: retina::client::SessionOptions::default()
+                    .creds(if self.username.is_empty() {
+                        None
+                    } else {
+                        Some(retina::client::Credentials {
+                            username: self.username.clone(),
+                            password: self.password.clone(),
+                        })
                     })
-                })
-                .session_group(self.session_group.clone()),
-            setup: retina::client::SetupOptions::default().transport(transport),
-        };
+                    .session_group(self.session_group.clone()),
+                setup: retina::client::SetupOptions::default().transport(transport),
+            };
             let r = tokio::select! {
                 biased;
                 _ = self.env.shutdown_rx.as_future() => bail!(Cancelled, msg("shutdown")),
@@ -259,21 +259,21 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
                     self.rotate_interval_sec
                 }
             };
-// Only send frames to AI detector from the secondary (sub) stream
-// If sub stream is not available, AI detection stays in standby
-if frame.is_key {
-  if let Some(tx) = &self.env.detection_tx {
-    let stream_type = self.stream.inner.lock().type_;
-    if stream_type == StreamType::Sub {
-      let _ = tx.try_send((
-        frame.data.clone(),
-        self.camera_id,
-        local_time.0,
-        self.stream.clone(),
-      ));
-    }
-  }
-}
+            // Only send frames to AI detector from the secondary (sub) stream
+            // If sub stream is not available, AI detection stays in standby
+            if frame.is_key {
+                if let Some(tx) = &self.env.detection_tx {
+                    let stream_type = self.stream.inner.lock().type_;
+                    if stream_type == StreamType::Sub {
+                        let _ = tx.try_send((
+                            frame.data.clone(),
+                            self.camera_id,
+                            local_time.0,
+                            self.stream.clone(),
+                        ));
+                    }
+                }
+            }
             w.write(
                 frame.data,
                 local_time,
