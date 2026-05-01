@@ -89,28 +89,40 @@ else
     exit 1
 fi
 
-# Create system user
-echo -e "${YELLOW}[6/6] Configuring system user and service...${NC}"
-if ! id -u moonshadow >/dev/null 2>&1; then
-    useradd -r -s /bin/false -M moonshadow
-fi
-
-# Create directories and set permissions
-echo "Setting up directories in /var/lib/moonshadow-nvr..."
+# Create directories
+echo -e "${YELLOW}[6/6] Configuring system folders and external components...${NC}"
 mkdir -p /var/lib/moonshadow-nvr/{db,recordings}
 mkdir -p /etc/moonshadow-nvr
-mkdir -p /opt/moonshadow-nvr
+mkdir -p /opt/moonshadow-nvr/{bin,models,ui}
+
+# Download MediaMTX if missing
+if [[ ! -f "./bin/mediamtx" ]]; then
+    echo -e "${BLUE}Downloading MediaMTX server...${NC}"
+    MTX_VER="v1.9.3"
+    curl -L -o mediamtx.tar.gz "https://github.com/bluenviron/mediamtx/releases/download/${MTX_VER}/mediamtx_${MTX_VER}_linux_amd64.tar.gz"
+    mkdir -p bin
+    tar -xzf mediamtx.tar.gz -C bin/ mediamtx
+    rm mediamtx.tar.gz
+fi
+
+# Download default AI model if missing
+if [[ ! -f "models/yolov8n.onnx" ]]; then
+    echo -e "${BLUE}Downloading default YOLOv8n object detection model...${NC}"
+    mkdir -p models
+    curl -L -o models/yolov8n.onnx "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.onnx"
+fi
 
 # Copy files
 echo "Installing binaries, default config, UI and AI models..."
-mkdir -p /opt/moonshadow-nvr/models
-mkdir -p /opt/moonshadow-nvr/bin
-mkdir -p /opt/moonshadow-nvr/ui
-
 cp server/target/release/moonshadow-nvr /opt/moonshadow-nvr/
 cp bin/mediamtx /opt/moonshadow-nvr/bin/ 2>/dev/null || true
 chmod +x /opt/moonshadow-nvr/bin/mediamtx 2>/dev/null || true
 cp -r models/*.onnx /opt/moonshadow-nvr/models/ 2>/dev/null || true
+
+# Create system user
+if ! id -u moonshadow >/dev/null 2>&1; then
+    useradd -r -s /bin/false -M moonshadow
+fi
 
 # Copy UI build
 if [ -d "ui/dist" ]; then
