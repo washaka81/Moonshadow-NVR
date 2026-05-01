@@ -1,31 +1,43 @@
 # Moonshadow NVR 🌙🛡️
+### *The Intelligent, High-Performance Network Video Recorder for Linux*
 
 [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE.txt)
 [![Rust](https://img.shields.io/badge/Rust-1.91+-orange.svg)](https://www.rust-lang.org)
 [![React](https://img.shields.io/badge/UI-React_18-61dafb.svg)](https://reactjs.org/)
+[![AI-Powered](https://img.shields.io/badge/AI-YOLOv8_%7C_LPRNet-green.svg)](#-integrated-ai-acceleration)
 
-**Moonshadow NVR** is a high-performance, intelligent Network Video Recorder built with **Rust** and **React**. Designed to run on modern Linux systems, it offers rock-solid RTSP recording, ultra-low latency WebRTC viewing, and integrated hardware-accelerated AI for object detection and License Plate Recognition (LPR).
+**Moonshadow NVR** is a high-performance, open-source **Network Video Recorder (NVR)** and **Surveillance System** engineered for speed and intelligence. Built with a **Rust** core and a **React** frontend, it delivers rock-solid RTSP recording, ultra-low latency **WebRTC** viewing, and native hardware-accelerated AI for real-time **Object Detection** and **License Plate Recognition (LPR)**.
 
 ---
 
-## ✨ Features
+## ✨ Key Features
 
-- **🚀 High-Performance Rust Core:** Direct-to-disk recording and efficient memory management ensuring low CPU overhead.
-- **🧠 Integrated AI Acceleration:** Native support for OpenVINO, Vulkan Compute, and CUDA to power real-time object detection (YOLO), LPR, and Person Re-Identification.
-- **💻 Interactive TUI Configuration:** A fully-featured Terminal User Interface to easily manage cameras, users, and storage pools without editing raw config files.
-- **🌐 Modern Web Dashboard:** A sleek React-based UI for live multi-camera viewing, timeline playback, AI event filtering, and system monitoring.
-- **📊 Advanced System Monitor:** Real-time hardware metrics (CPU Cores, RAM, Swap, Disk, GPU/VRAM load, and Temperatures) directly in the web dashboard.
-- **📡 Universal Streaming:** Integrated MediaMTX proxy for seamless sub-second latency viewing via WebRTC.
+- **🚀 High-Performance Rust Core:** Optimized direct-to-disk recording (H.264/H.265) and efficient memory management, ensuring minimal CPU overhead even with multiple high-bitrate 4K streams.
+- **🧠 Integrated AI Acceleration:** Native, multi-backend support for **ONNX Runtime**, **OpenVINO**, **Vulkan Compute**, and **NVIDIA CUDA**. Powering real-time YOLOv8 object detection, Chilean/Universal LPR, and Person Re-Identification.
+- **📡 Low-Latency Streaming:** Seamless multi-camera live viewing with sub-second latency via **WebRTC** and **MediaMTX** proxy integration.
+- **📊 Real-Time System Monitor:** Detailed hardware telemetry (CPU Cores, RAM/Swap, Disk IO, GPU/VRAM load, and Temperatures) accessible directly from your web dashboard.
+- **💻 Interactive TUI Configuration:** A robust **Terminal User Interface** to manage cameras, users, storage pools, and AI settings without manually editing complex configuration files.
+- **🌐 Modern Web Dashboard:** Sleek, responsive React-based interface with intelligent timeline playback, AI event filtering (Person, Vehicle, Plate), and easy MP4 downloads.
+
+---
+
+## 🏗️ Tech Stack
+
+- **Backend:** [Rust](https://www.rust-lang.org/) (Hyper, Tokio, Rusqlite, ONNX Runtime)
+- **Frontend:** [React 18](https://reactjs.org/), [TypeScript](https://www.typescriptlang.org/), [Material UI (MUI)](https://mui.com/)
+- **Streaming:** [MediaMTX](https://github.com/bluenviron/mediamtx), WebRTC, RTSP
+- **AI/ML:** YOLOv8, LPRNet, OpenVINO, Vulkan, CUDA
+- **Storage:** SQLite (Metadata), Direct MP4 (Video)
 
 ---
 
 ## 🛠️ Automated Deployment (Arch Linux / CachyOS)
 
-Moonshadow NVR includes a robust suite of shell scripts to automate deployment, build processes, and service orchestration on modern Arch-based distributions.
+Moonshadow NVR provides a professional suite of automation scripts for installation, service management, and pre-flight AI model checks.
 
 ### 1. Installation
 
-Clone the repository and run the automated installer. The installer detects your OS, installs necessary dependencies (including NVIDIA/CUDA support if hardware is detected), builds both the Rust backend and React frontend, and sets up a `systemd` service.
+Our intelligent installer detects your OS (optimized for **Arch Linux** and **CachyOS**), configures hardware acceleration (auto-detects NVIDIA/Intel), builds all components, and sets up a `systemd` service.
 
 ```bash
 git clone https://github.com/washaka81/Moonshadow-NVR.git
@@ -33,52 +45,50 @@ cd Moonshadow-NVR
 sudo ./install.sh
 ```
 
-### 2. Configuration
+### 2. Fast Configuration
 
-Moonshadow comes with a built-in Terminal UI (TUI) to easily configure your cameras, users, and AI hardware settings.
+Use the built-in Terminal UI to setup your surveillance network in seconds.
 
 ```bash
 ./configure-tui.sh
 ```
 
-### 3. Running the Server
+### 3. Run and Monitor
 
-If you used `./install.sh`, the NVR is already configured as a systemd service:
-
-```bash
-sudo systemctl enable moonshadow-nvr
-sudo systemctl start moonshadow-nvr
-```
-
-To run it manually (for debugging or development), use the start script which automatically manages the MediaMTX proxy, checks AI models, and sets process priorities:
+The NVR is managed as a standard Linux service:
 
 ```bash
-./start-server.sh
+sudo systemctl enable --now moonshadow-nvr
 ```
 
-**Access the Web Interface at:** `http://<your-server-ip>:8080`
+**Access your Dashboard at:** `http://<server-ip>:8080` (Default login: `admin` / `admin`)
 
 ---
 
-## 📁 Repository Structure
-
-- `server/`: The core Rust application handling RTSP ingestion, MP4 writing, AI inference via ONNX Runtime, and the HTTP API.
-- `ui/`: The modern React/Material-UI frontend dashboard.
-- `bin/`: Pre-compiled or downloaded binaries (e.g., MediaMTX).
-- `models/`: *[Optional]* Directory to place `.onnx` models (`yolov8n.onnx`, `LPRNet.onnx`) for AI acceleration.
+## 📸 Interface Preview
+*(Coming soon: Updated screenshots of the Mosaic Multiview, AI Timeline, and TUI Manager)*
 
 ---
 
-## 🤝 Contributing
+## 📁 Project Structure
 
-We welcome contributions! Please feel free to submit Pull Requests or open Issues to discuss potential improvements. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
+- `/server`: Core NVR engine, RTSP handler, and REST API.
+- `/ui`: Modern React frontend and static assets.
+- `/bin`: Orchestrated third-party binaries (MediaMTX).
+- `/models`: Dynamic directory for ONNX AI models.
+
+---
+
+## 🤝 Contributing & Support
+
+Moonshadow NVR is an evolving project. We welcome contributions, bug reports, and feature requests. Check out [CONTRIBUTING.md](CONTRIBUTING.md) to get started.
 
 ## 📄 License
 
-Moonshadow NVR is licensed under [GPL-3.0-or-later](LICENSE.txt) with a linking exception for OpenSSL.
+Licensed under [GPL-3.0-or-later](LICENSE.txt) with a linking exception for OpenSSL.
 
 ---
 
-*Started by Scott Lamb & evolved by the Moonshadow Community.*
+*Evolved by the Moonshadow Community.*
 
 [![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I21X53HM)
