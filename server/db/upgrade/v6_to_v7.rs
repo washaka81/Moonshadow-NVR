@@ -269,7 +269,7 @@ fn copy_cameras(tx: &rusqlite::Transaction) -> Result<(), Error> {
             onvif_base_url: onvif_host
                 // Older releases set the onvif host to the empty string instead
                 // of using a SQL NULL, so convert empty to None here.
-                // https://github.com/scottlamb/moonshadow-nvr/issues/182
+                // https://github.com/washaka81/Moonshadow-NVR/issues/182
                 .filter(|h| !h.is_empty())
                 .map(|h| Url::parse(&format!("http://{h}/")))
                 .transpose()

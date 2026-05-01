@@ -14,20 +14,20 @@ There are lots of ways you can contribute.
 
 Please say hi on the [mailing
 list](https://groups.google.com/g/moonshadow-nvr-users) or in [github
-discussions](https://github.com/scottlamb/moonshadow-nvr/discussions) after
+discussions](https://github.com/washaka81/Moonshadow-NVR/discussions) after
 trying out Moonshadow NVR. Often open source authors only hear from users when
 something goes wrong. I love to hear when it works well, too. It's motivating
 to know Moonshadow NVR is helping people. And knowing how people want to use
 Moonshadow NVR will guide development.
 
-Great example: [this Show & Tell from JasonKleban](https://github.com/scottlamb/moonshadow-nvr/discussions/118).
+Great example: [this Show & Tell from JasonKleban](https://github.com/washaka81/Moonshadow-NVR/discussions/118).
 
 ## Asking for support
 
 When you're stuck, look at the [troubleshooting
 guide](guide/troubleshooting.md). If it doesn't answer your question, please
 ask for help! Support requests are welcome on the
-[issue tracker](https://github.com/scottlamb/moonshadow-nvr/issues).
+[issue tracker](https://github.com/washaka81/Moonshadow-NVR/issues).
 Often they help create good bug reports and enhancement requests.
 
 ## Offering support
@@ -39,7 +39,7 @@ or enhancement request.
 ## Filing bug and enhancement issues
 
 First skim the [github issue
-tracker](https://github.com/scottlamb/moonshadow-nvr/issues) to see if someone
+tracker](https://github.com/washaka81/Moonshadow-NVR/issues) to see if someone
 has already reported your problem. If so, no need to file a new issue. Instead:
 
 *   +1 the first comment so we know how many people are affected.
@@ -48,7 +48,7 @@ has already reported your problem. If so, no need to file a new issue. Instead:
 
 If there's no existing issue, file a new one:
 
-*   bugs: follow the [template](https://github.com/scottlamb/moonshadow-nvr/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
+*   bugs: follow the [template](https://github.com/washaka81/Moonshadow-NVR/issues/new?assignees=&labels=bug&template=bug_report.md&title=).
 *   enhancement requests: there's no template. Use your best judgement.
 
 Please be understanding if your issue isn't marked as top priority. I have
@@ -63,13 +63,13 @@ Moonshadow NVR has checked-in documentation (in [guide](guide/) and
 NVR. Please send a github PR for changes. I will review them for accuracy
 and clarity.
 
-There's also a [wiki](https://github.com/scottlamb/moonshadow-nvr/wiki). This
+There's also a [wiki](https://github.com/washaka81/Moonshadow-NVR/wiki). This
 is for anything else: notes on compatibility with a particular camera, how to
 configure your Linux system and network for recording, hardware
 recommendations, etc. This area is less formal. No review is necessary; just
 make a change.
 
-You could be the first to create a [YouTube tour](https://github.com/scottlamb/moonshadow-nvr/issues/82) or start other forms of documentation!
+You could be the first to create a [YouTube tour](https://github.com/washaka81/Moonshadow-NVR/issues/82) or start other forms of documentation!
 
 ## Contributing code and UI changes
 
@@ -97,7 +97,7 @@ The [Building Moonshadow NVR](guide/build.md) and [Working on UI
 development](guide/developing-ui.md) guides should help you get started.
 The [design documents](design/) will help you fit your work into the whole.
 The wiki has a page to help you find copies of [standards and
-specifications](https://github.com/scottlamb/moonshadow-nvr/wiki/Standards-and-specifications)
+specifications](https://github.com/washaka81/Moonshadow-NVR/wiki/Standards-and-specifications)
 that Moonshadow NVR interacts with.
 
 Please tell me when you get stuck! Every software developer knows in theory
@@ -113,6 +113,6 @@ prioritize on my own. Together we can do more.
 If you're looking for something to do:
 
 *   Please skim issues with the [`1.0` or `1.0?`
-    milestone](https://github.com/scottlamb/moonshadow-nvr/issues?q=is%3Aopen+is%3Aissue+milestone%3A1.0+milestone%3A1.0%3F+). Let's ship a minimum viable product!
+    milestone](https://github.com/washaka81/Moonshadow-NVR/issues?q=is%3Aopen+is%3Aissue+milestone%3A1.0+milestone%3A1.0%3F+). Let's ship a minimum viable product!
 *   Please help with UI and video analytics. These aren't my field of expertise.
     Maybe you can teach me.

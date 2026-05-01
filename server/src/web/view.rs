@@ -11,7 +11,6 @@ use nom::bytes::complete::{tag, take_while1};
 use nom::combinator::{all_consuming, map, map_res, opt};
 use nom::sequence::{preceded, tuple};
 use nom::IResult;
-use std::borrow::Borrow;
 use std::cmp;
 use std::convert::TryFrom;
 use std::ops::Range;
@@ -55,12 +54,22 @@ impl Service {
         };
         let mut start_time_for_filename = None;
         let mut builder = mp4::FileBuilder::new(mp4_type);
+        let (mut req_start, mut req_end) = (None, None);
         if let Some(q) = req.uri().query() {
             for (key, value) in form_urlencoded::parse(q.as_bytes()) {
-                let (key, value) = (key.borrow(), value.borrow());
-                match key {
+                match &*key {
+                    "startTime90k" => {
+                        req_start = Some(recording::Time::parse(&value).map_err(|_| {
+                            err!(InvalidArgument, msg("unparseable startTime90k"))
+                        })?);
+                    }
+                    "endTime90k" => {
+                        req_end = Some(recording::Time::parse(&value).map_err(|_| {
+                            err!(InvalidArgument, msg("unparseable endTime90k"))
+                        })?);
+                    }
                     "s" => {
-                        let s = Segments::from_str(value).map_err(|()| {
+                        let s = Segments::from_str(&value).map_err(|()| {
                             err!(InvalidArgument, msg("invalid s parameter: {value}"))
                         })?;
                         trace!("stream_view_mp4: appending s={:?}", s);
@@ -174,10 +183,33 @@ impl Service {
                             }
                         }
                     }
-                    "ts" => builder.include_timestamp_subtitle_track(value == "true")?,
+                    "ts" => builder.include_timestamp_subtitle_track(&value == "true")?,
                     _ => bail!(InvalidArgument, msg("parameter {key} not understood")),
                 }
             }
+        }
+
+        if let (Some(start), Some(end)) = (req_start, req_end) {
+            let db = self.db.lock();
+            db.list_recordings_by_time(stream_id, start..end, &mut |r| {
+                let rd = recording::Duration(i64::from(r.wall_duration_90k));
+                let rs = r.start;
+                let re = rs + rd;
+                let overlap_s = cmp::max(start, rs);
+                let overlap_e = cmp::min(end, re);
+                if overlap_s < overlap_e {
+                    let off_s = (overlap_s - rs).0;
+                    let off_e = (overlap_e - rs).0;
+                    let wr = i32::try_from(off_s).unwrap()..i32::try_from(off_e).unwrap();
+                    if start_time_for_filename.is_none() {
+                        start_time_for_filename = Some(overlap_s);
+                    }
+                    let mr = rescale(wr.start, r.wall_duration_90k, r.media_duration_90k)
+                        ..rescale(wr.end, r.wall_duration_90k, r.media_duration_90k);
+                    builder.append(&db, &r, mr, true)?;
+                }
+                Ok(())
+            })?;
         }
         if let Some(start) = start_time_for_filename {
             let zone = base::time::global_zone();

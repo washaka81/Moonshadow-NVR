@@ -1,47 +1,59 @@
 <!doctype html>
-<!--
-  - This file is part of Moonshadow NVR, a security camera network video recorder.
-  - Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
-  - SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
-  -->
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-
-    <link
-      rel="apple-touch-icon"
-      sizes="180x180"
-      href="favicons/apple-touch-icon-94a09b5d2ddb5af47.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="32x32"
-      href="favicons/favicon-32x32-ab95901a9e0d040e2.png"
-    />
-    <link
-      rel="icon"
-      type="image/png"
-      sizes="16x16"
-      href="favicons/favicon-16x16-b16b3f2883aacf9f1.png"
-    />
-    <link rel="manifest" href="site.webmanifest" />
-    <link
-      rel="mask-icon"
-      href="favicons/safari-pinned-tab-9792c2c82f04639f8.svg"
-      color="#e04e1b"
-    />
-    <meta name="theme-color" content="#e04e1b" />
     <meta
       name="viewport"
       content="minimum-scale=1, initial-scale=1, width=device-width"
     />
-    <meta name="description" content="security camera network video recorder" />
+    <meta name="description" content="Moonshadow NVR - Intelligent Surveillance" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <title>Moonshadow NVR</title>
+    <style>
+      /* Immediate black background to prevent white flashes */
+      html, body {
+        margin: 0;
+        padding: 0;
+        background-color: #000000 !important;
+        color: #eeeeee;
+        font-family: 'Inter', 'Roboto', sans-serif;
+        overflow: hidden;
+      }
+      #root {
+        background-color: #000000;
+        min-height: 100vh;
+      }
+      /* Custom scrollbars for a premium feel */
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: #000; }
+      ::-webkit-scrollbar-thumb { background: #222; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #333; }
+      
+      #initial-loader {
+        position: fixed;
+        top: 0; left: 0; width: 100%; height: 100%;
+        display: flex; align-items: center; justify-content: center;
+        background: #000; z-index: 9999;
+        transition: opacity 0.5s ease-out;
+      }
+    </style>
   </head>
   <body>
-    <noscript>You need to enable JavaScript to run this app.</noscript>
-    <div id="root" style="display: flex; flex-direction: column"></div>
+    <div id="initial-loader">
+      <div style="color: #fff; font-family: monospace; letter-spacing: 2px; font-size: 0.8rem; border: 1px solid #333; padding: 10px 20px;">
+        INITIALIZING MOONSHADOW STATION...
+      </div>
+    </div>
+    <noscript>JavaScript is required to run this application.</noscript>
+    <div id="root"></div>
     <script type="module" src="/src/index.tsx"></script>
+    <script>
+      window.addEventListener('load', () => {
+        const loader = document.getElementById('initial-loader');
+        if (loader) setTimeout(() => { loader.style.opacity = '0'; setTimeout(() => loader.remove(), 500); }, 500);
+      });
+    </script>
   </body>
 </html>

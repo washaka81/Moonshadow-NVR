@@ -1,4 +1,4 @@
-// This file is part of Moonshadow NVR, a security camera network video recorder.
+// This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
 // Copyright (C) 2021 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception
 
@@ -6,128 +6,106 @@ import Button from "@mui/material/Button";
 import IconButton from "@mui/material/IconButton";
 import Menu from "@mui/material/Menu";
 import MenuItem from "@mui/material/MenuItem";
-import { useColorScheme, useTheme } from "@mui/material/styles";
-import Toolbar from "@mui/material/Toolbar";
-import Typography from "@mui/material/Typography";
+import { useColorScheme } from "@mui/material/styles";
 import AccountCircle from "@mui/icons-material/AccountCircle";
-import MenuIcon from "@mui/icons-material/Menu";
 import React from "react";
 import { LoginState } from "./App";
 import Box from "@mui/material/Box";
 import Brightness2 from "@mui/icons-material/Brightness2";
 import Brightness7 from "@mui/icons-material/Brightness7";
-import BrightnessAuto from "@mui/icons-material/BrightnessAuto";
+import SettingsBrightness from "@mui/icons-material/SettingsBrightness";
 import Tooltip from "@mui/material/Tooltip";
+import ListItemIcon from "@mui/material/ListItemIcon";
+import ListItemText from "@mui/material/ListItemText";
 
 interface Props {
   loginState: LoginState;
   requestLogin: () => void;
   logout: () => void;
   changePassword: () => void;
-  menuClick?: () => void;
   activityMenuPart?: React.JSX.Element;
 }
 
-// https://material-ui.com/components/app-bar/
 function MoonshadowMenu(props: Props) {
   const { mode, setMode } = useColorScheme();
-  const changeMode = React.useCallback(() => {
-    setMode(mode === "dark" ? "light" : mode === "light" ? "system" : "dark");
-  }, [mode, setMode]);
-  const theme = useTheme();
-  const [accountMenuAnchor, setAccountMenuAnchor] =
-    React.useState<null | HTMLElement>(null);
+  const [accountMenuAnchor, setAccountMenuAnchor] = React.useState<null | HTMLElement>(null);
+  const [themeMenuAnchor, setThemeMenuAnchor] = React.useState<null | HTMLElement>(null);
 
-  const handleMenu = (event: React.MouseEvent<HTMLElement>) => {
-    setAccountMenuAnchor(event.currentTarget);
+  const handleAccountMenu = (event: React.MouseEvent<HTMLElement>) => { setAccountMenuAnchor(event.currentTarget); };
+  const handleThemeMenu = (event: React.MouseEvent<HTMLElement>) => { setThemeMenuAnchor(event.currentTarget); };
+  
+  const handleClose = () => { 
+    setAccountMenuAnchor(null); 
+    setThemeMenuAnchor(null); 
   };
 
-  const handleClose = () => {
-    setAccountMenuAnchor(null);
-  };
-
-  const handleLogout = () => {
-    // Note this close should happen before `auth` toggles, or material-ui will
-    // be unhappy about the anchor element not being part of the layout.
+  const handleLogout = () => { handleClose(); props.logout(); };
+  const handleChangePassword = () => { handleClose(); props.changePassword(); };
+  
+  const handleSetTheme = (newMode: "light" | "dark" | "system") => {
+    setMode(newMode);
     handleClose();
-    props.logout();
-  };
-
-  const handleChangePassword = () => {
-    handleClose();
-    props.changePassword();
   };
 
   return (
-    <>
-      <Toolbar variant="dense">
-        <IconButton
-          edge="start"
-          color="inherit"
-          aria-label="menu"
-          onClick={props.menuClick}
-        >
-          <MenuIcon />
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+      {props.activityMenuPart}
+      
+      {/* Theme Switcher Button */}
+      <Tooltip title="Switch Theme">
+        <IconButton onClick={handleThemeMenu} color="inherit" size="small" sx={{ opacity: 0.8 }}>
+          {mode === "light" ? <Brightness7 fontSize="small" /> : mode === "dark" ? <Brightness2 fontSize="small" /> : <SettingsBrightness fontSize="small" />}
         </IconButton>
-        <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          Moonshadow NVR
-        </Typography>
-        {props.activityMenuPart !== null && (
-          <Box sx={{ marginRight: theme.spacing(2) }}>
-            {props.activityMenuPart}
-          </Box>
-        )}
-        <Tooltip title="Toggle theme">
-          <IconButton onClick={changeMode} color="inherit" size="small">
-            {mode === "light" ? (
-              <Brightness7 />
-            ) : mode === "dark" ? (
-              <Brightness2 />
-            ) : (
-              <BrightnessAuto />
-            )}
+      </Tooltip>
+      <Menu
+        anchorEl={themeMenuAnchor}
+        open={Boolean(themeMenuAnchor)}
+        onClose={handleClose}
+        disableScrollLock
+      >
+        <MenuItem onClick={() => handleSetTheme("light")}>
+          <ListItemIcon><Brightness7 fontSize="small" /></ListItemIcon>
+          <ListItemText>Light</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleSetTheme("dark")}>
+          <ListItemIcon><Brightness2 fontSize="small" /></ListItemIcon>
+          <ListItemText>Dark</ListItemText>
+        </MenuItem>
+        <MenuItem onClick={() => handleSetTheme("system")}>
+          <ListItemIcon><SettingsBrightness fontSize="small" /></ListItemIcon>
+          <ListItemText>System (Auto)</ListItemText>
+        </MenuItem>
+      </Menu>
+
+      {props.loginState !== "logged-in" ? (
+        <Button 
+          variant="outlined"
+          color="inherit" 
+          size="small" 
+          onClick={props.requestLogin} 
+          sx={{ textTransform: 'none', borderColor: 'rgba(255,255,255,0.2)', px: 2, height: 32 }}
+        >
+          Login
+        </Button>
+      ) : (
+        <>
+          <IconButton onClick={handleAccountMenu} color="inherit" size="small">
+            <AccountCircle fontSize="small" />
           </IconButton>
-        </Tooltip>
-        {props.loginState !== "unknown" && props.loginState !== "logged-in" && (
-          <Button color="inherit" onClick={props.requestLogin}>
-            Log in
-          </Button>
-        )}
-        {props.loginState === "logged-in" && (
-          <div>
-            <IconButton
-              aria-label="account of current user"
-              aria-controls="primary-search-account-menu"
-              aria-haspopup="true"
-              onClick={handleMenu}
-              color="inherit"
-              size="small"
-            >
-              <AccountCircle />
-            </IconButton>
-            <Menu
-              anchorEl={accountMenuAnchor}
-              keepMounted
-              anchorOrigin={{
-                vertical: "bottom",
-                horizontal: "right",
-              }}
-              transformOrigin={{
-                vertical: "top",
-                horizontal: "right",
-              }}
-              open={Boolean(accountMenuAnchor)}
-              onClose={handleClose}
-            >
-              <MenuItem onClick={handleChangePassword}>
-                Change password
-              </MenuItem>
-              <MenuItem onClick={handleLogout}>Logout</MenuItem>
-            </Menu>
-          </div>
-        )}
-      </Toolbar>
-    </>
+          <Menu
+            anchorEl={accountMenuAnchor}
+            open={Boolean(accountMenuAnchor)}
+            onClose={handleClose}
+            anchorOrigin={{ vertical: "bottom", horizontal: "right" }}
+            transformOrigin={{ vertical: "top", horizontal: "right" }}
+            disableScrollLock
+          >
+            <MenuItem onClick={handleChangePassword} sx={{ fontSize: '0.85rem' }}>Change Password</MenuItem>
+            <MenuItem onClick={handleLogout} sx={{ fontSize: '0.85rem' }}>Logout</MenuItem>
+          </Menu>
+        </>
+      )}
+    </Box>
   );
 }
 

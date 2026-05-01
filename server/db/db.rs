@@ -68,7 +68,7 @@ use tracing::{error, info, trace};
 use uuid::Uuid;
 
 /// Expected schema version. See `guide/schema.md` for more information.
-pub const EXPECTED_SCHEMA_VERSION: i32 = 8;
+pub const EXPECTED_SCHEMA_VERSION: i32 = 9;
 
 /// Length of the video index cache.
 /// The actual data structure is one bigger than this because we insert before we remove.
@@ -97,7 +97,7 @@ const DIR_POOL_WORKERS: NonZeroUsize = const { NonZeroUsize::new(2).unwrap() };
 /// The size of a filesystem block, to use in disk space accounting.
 /// This should really be obtained by a stat call on the sample file directory in question,
 /// but that requires some refactoring. See
-/// [#89](https://github.com/scottlamb/moonshadow-nvr/issues/89). We might be able to get away with
+/// [#89](https://github.com/washaka81/Moonshadow-NVR/issues/89). We might be able to get away with
 /// this hardcoded value for a while.
 const ASSUMED_BLOCK_SIZE_BYTES: i64 = 4096;
 
@@ -711,6 +711,28 @@ impl LockedDatabase {
 
     pub fn sample_entries(&self) -> &sample_entries::Handle {
         &self.sample_entries
+    }
+
+    /// Updates a stream's sample file directory.
+    pub fn set_stream_sample_file_dir(&mut self, stream_id: i32, dir_id: Option<i32>) -> Result<(), Error> {
+        let stream = self.streams_by_id.get(&stream_id).ok_or_else(|| err!(NotFound, msg("no such stream {stream_id}")))?;
+        let mut stream_locked = stream.inner.lock();
+        let dir = if let Some(id) = dir_id {
+            Some(self.sample_file_dirs_by_id.get(&id).ok_or_else(|| err!(NotFound, msg("no such sample file dir {id}")))? .clone())
+        } else {
+            None
+        };
+        
+        let mut conn = self.conn.borrow_mut();
+        let tx = conn.transaction()?;
+        {
+            let mut stmt = tx.prepare_cached("update stream set sample_file_dir_id = ? where id = ?")?;
+            stmt.execute(params![dir_id, stream_id])?;
+        }
+        tx.commit()?;
+        
+        stream_locked.sample_file_dir = dir;
+        Ok(())
     }
 
     /// Helper for `DatabaseGuard::flush()` and `Database::drop()`.
@@ -1989,9 +2011,9 @@ pub(crate) fn check_schema_version(conn: &rusqlite::Connection) -> Result<(), Er
             msg("no such table: version.\n\n\
                 If you have created an empty database by hand, delete it and use `moonshadow-nvr init` \
                 instead, as noted in the installation instructions: \
-                <https://github.com/scottlamb/moonshadow-nvr/blob/master/guide/install.md>\n\n\
+                <https://github.com/washaka81/Moonshadow-NVR/blob/master/guide/install.md>\n\n\
                 If you are starting from a database that predates schema versioning, see \
-                <https://github.com/scottlamb/moonshadow-nvr/blob/master/guide/schema.md>."),
+                <https://github.com/washaka81/Moonshadow-NVR/blob/master/guide/schema.md>."),
         )
     };
     match ver.cmp(&EXPECTED_SCHEMA_VERSION) {
@@ -2133,6 +2155,30 @@ impl<C: Clocks + Clone> Database<C> {
     #[inline(always)]
     pub fn clocks(&self) -> C {
         self.clocks.clone()
+    }
+
+    /// Reloads the in-memory state from the database.
+    pub fn reload(&self) -> Result<(), Error> {
+        let mut l = self.lock();
+        let (db_uuid, config) = raw::read_meta(&l.conn.borrow())?;
+        l.uuid = db_uuid;
+        l.auth = auth::State::init(&l.conn.borrow())?;
+        l.signal = signal::State::init(&l.conn.borrow(), &config)?;
+        
+        l.sample_file_dirs_by_id.clear();
+        l.cameras_by_id.clear();
+        l.cameras_by_uuid.clear();
+        l.streams_by_id.clear();
+
+        l.init_sample_file_dirs()?;
+        l.init_cameras()?;
+        l.init_streams()?;
+        for (&stream_id, stream) in &l.streams_by_id {
+            let mut stream_locked = stream.inner.lock();
+            let camera = l.cameras_by_id.get(&stream_locked.camera_id).unwrap();
+            init_recordings(&l.conn.borrow(), stream_id, camera, &mut stream_locked)?;
+        }
+        Ok(())
     }
 
     /// Locks the database; the returned reference is the only way to perform (read or write)
@@ -2389,6 +2435,51 @@ impl<C: Clocks + Clone> DatabaseGuard<'_, C> {
     pub(crate) fn flush(&mut self, reason: &str) -> Result<(), Error> {
         self.db.flush(self.clocks, reason)
     }
+
+    pub fn insert_ai_event(
+        &mut self,
+        camera_id: i32,
+        time_90k: i64,
+        event_type: &str,
+        payload: &str,
+        video_link: &str,
+    ) -> Result<(), Error> {
+        let sql = "INSERT INTO ai_event (camera_id, timestamp_90k, event_type, payload, video_link) VALUES (?, ?, ?, ?, ?)";
+        self.db.conn.borrow().execute(
+            sql,
+            rusqlite::params![camera_id, time_90k, event_type, payload, video_link],
+        ).map_err(|e| err!(Unknown, msg("failed to insert ai event"), source(e)))?;
+        Ok(())
+    }
+
+    pub fn global_config(&self) -> crate::json::GlobalConfig {
+        let conn = self.db.conn.borrow();
+        match crate::raw::read_meta(&conn) {
+            Ok((_, config)) => config,
+            Err(_) => crate::json::GlobalConfig::default(),
+        }
+    }
+
+    pub fn set_global_config(&mut self, config: crate::json::GlobalConfig) -> Result<(), Error> {
+        let conn = self.db.conn.borrow();
+        conn.execute(
+            "update meta set config = ?",
+            rusqlite::params![config],
+        ).map_err(|e| err!(Unknown, msg("fail update global config"), source(e)))?;
+        Ok(())
+    }
+
+    pub fn execute_raw_query<F, T>(&self, sql: &str, params: &[&dyn rusqlite::ToSql], mut f: F) -> Result<Vec<T>, Error>
+    where
+        F: FnMut(&rusqlite::Row) -> rusqlite::Result<T>,
+    {
+        let conn = self.conn.borrow();
+        let mut stmt = conn.prepare(sql).map_err(|e| err!(Unknown, msg("fail prep"), source(e)))?;
+        let rows = stmt.query_map(params, |row| f(row)).map_err(|e| err!(Unknown, msg("fail query"), source(e)))?;
+        let mut res = Vec::new();
+        for e in rows.flatten() { res.push(e); }
+        Ok(res)
+    }
 }
 
 impl<C: Clocks + Clone> ::std::ops::Deref for DatabaseGuard<'_, C> {
@@ -2546,7 +2637,7 @@ mod tests {
         assert!(
             e.msg()
                 .unwrap()
-                .starts_with("database schema version 7 is too old (expected 8)"),
+                .starts_with("database schema version 7 is too old (expected 9)"),
             "got: {e:?}"
         );
     }
@@ -2555,13 +2646,13 @@ mod tests {
     fn test_version_too_new() {
         testutil::init();
         let c = setup_conn();
-        c.execute_batch("delete from version; insert into version values (9, 0, '');")
+        c.execute_batch("delete from version; insert into version values (10, 0, '');")
             .unwrap();
         let e = Database::new(clock::RealClocks {}, c, false).err().unwrap();
         assert!(
             e.msg()
                 .unwrap()
-                .starts_with("database schema version 9 is too new (expected 8)"),
+                .starts_with("database schema version 10 is too new (expected 9)"),
             "got: {e:?}"
         );
     }

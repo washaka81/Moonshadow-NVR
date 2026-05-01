@@ -146,7 +146,7 @@ The `application/json` response will have a JSON object as follows:
             with non-zero total duration of recordings for that day. Currently
             this includes uncommitted and growing recordings. This is likely
             to change in a future release for
-            [#40](https://github.com/scottlamb/moonshadow-nvr/issues/40). The
+            [#40](https://github.com/washaka81/Moonshadow-NVR/issues/40). The
             keys are of the form `YYYY-mm-dd`; the values are objects with the
             following attributes:
             *   `totalDuration90k` is the total duration recorded during that
@@ -504,7 +504,7 @@ Bugs and limitations:
     the server will return a 400 error like `Invalid argument: unable to append
     recording 2/16672 after recording 2/16671 with trailing zero`. See also
     `hasTrailingZero` above, and
-    [#178](https://github.com/scottlamb/moonshadow-nvr/issues/178).
+    [#178](https://github.com/washaka81/Moonshadow-NVR/issues/178).
 
 ### `GET /api/cameras/<uuid>/<stream>/view.mp4.txt`
 

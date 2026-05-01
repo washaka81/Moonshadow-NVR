@@ -18,7 +18,7 @@ use bytes::Bytes;
 #[derive(Clone, derive_more::Debug, derive_more::Display, derive_more::Error)]
 #[display("{_0}")]
 #[debug("{_0:?}")]
-pub struct Error(#[error(not(source))] pub(crate) Arc<ErrorInt>);
+pub struct Error(#[error(not(source))] pub Arc<ErrorInt>);
 
 impl Error {
     /// Returns the status code, if the error was generated from a response.
@@ -31,7 +31,7 @@ impl Error {
 }
 
 #[derive(Debug, derive_more::Display, derive_more::Error)]
-pub(crate) enum ErrorInt {
+pub enum ErrorInt {
     /// The method's caller provided an invalid argument.
     #[display("Invalid argument: {_0}")]
     InvalidArgument(#[error(not(source))] String),

@@ -15,6 +15,7 @@ pub mod run;
 pub mod sql;
 pub mod ts;
 pub mod upgrade;
+pub mod benchmark;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub enum OpenMode {

@@ -17,7 +17,7 @@ instructions](build.md).
 
 Make sure you are viewing instructions that match the release you intend
 to install. When viewing this page on Github, look for a pull-down in the upper
-left, and pick the [latest tagged version](https://github.com/scottlamb/moonshadow-nvr/releases/latest):
+left, and pick the [latest tagged version](https://github.com/washaka81/Moonshadow-NVR/releases/latest):
 
 <img src="install-version.png" height=367 alt="Selecting a version of install instructions">
 
@@ -31,7 +31,7 @@ for version `v0.7.31`:
 ```console
 $ VERSION=v0.7.31
 $ ARCH=$(uname -m)
-$ curl -OL "https://github.com/scottlamb/moonshadow-nvr/releases/download/$VERSION/moonshadow-nvr-$VERSION-$ARCH"
+$ curl -OL "https://github.com/washaka81/Moonshadow-NVR/releases/download/$VERSION/moonshadow-nvr-$VERSION-$ARCH"
 $ sudo install -m 755 "moonshadow-nvr-$VERSION-$ARCH" /usr/local/bin/moonshadow-nvr
 ```
 
@@ -54,7 +54,7 @@ recommended.
     sidestepping all of this and have rewritten the docs accordingly.
 
 …but, you may still prefer Docker for familiarity or other reasons. If so, you
-can install the [`ghcr.io/scottlamb/moonshadow-nvr`](https://github.com/scottlamb/moonshadow-nvr/pkgs/container/moonshadow-nvr) Docker images instead. We'll
+can install the [`ghcr.io/scottlamb/moonshadow-nvr`](https://github.com/washaka81/Moonshadow-NVR/pkgs/container/moonshadow-nvr) Docker images instead. We'll
 assume you know your way around your preferred tools and can adapt the
 instructions to the workflow you use with Docker.  You may find the following
 Docker compose snippet useful:
@@ -196,7 +196,7 @@ If a dedicated hard drive is available, set it up now.
 
 If you haven't yet created the filesystem, consider using
 `mkfs.ext4 -T largefile -m 1`, as described in more detail [on the
-wiki](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup). If you're
+wiki](https://github.com/washaka81/Moonshadow-NVR/wiki/System-setup). If you're
 using a USB SATA bridge, this is also a good time to ensure you're not
 using UAS, as described there. UAS has been linked to filesystem corruption.
 
@@ -256,8 +256,8 @@ In the user interface,
 
 2.  add cameras under "Cameras and streams".
 
-    *   See the [wiki](https://github.com/scottlamb/moonshadow-nvr/wiki) for notes
-        about specific camera models. The [Configuring cameras](https://github.com/scottlamb/moonshadow-nvr/wiki/Configuring-cameras)
+    *   See the [wiki](https://github.com/washaka81/Moonshadow-NVR/wiki) for notes
+        about specific camera models. The [Configuring cameras](https://github.com/washaka81/Moonshadow-NVR/wiki/Configuring-cameras)
         page mentions a couple tools that can autodetect RTSP URLs.
 
     *   There's a "Test" button to verify your settings directly from the add/edit
@@ -369,7 +369,7 @@ on the same machine, you can access it at
 If the system isn't working, see the [Troubleshooting
 guide](troubleshooting.md).
 
-See also the [system setup guide](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup)
+See also the [system setup guide](https://github.com/washaka81/Moonshadow-NVR/wiki/System-setup)
 on the wiki, which has additional advice on configuring a Linux system which
 runs Moonshadow NVR.
 

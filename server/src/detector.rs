@@ -1,1125 +1,453 @@
 // This file is part of Moonshadow NVR, an intelligent surveillance system with AI capabilities.
-// Fork of Moonshadow NVR. Copyright (C) 2022 The Moonshadow NVR Authors; see AUTHORS and LICENSE.txt.
 // Copyright (C) 2025 Moonshadow NVR Contributors.
 // SPDX-License-Identifier: GPL-v3.0-or-later WITH GPL-3.0-linking-exception.
 
-use std::path::Path;
-
-use ndarray::{Array4, ArrayViewD};
-use ort::{inputs, session::Session, value::Tensor};
-
-use base::clock::Clocks;
-use base::Error;
-use base::{bail, err};
-use image::{DynamicImage, GenericImageView};
-use std::collections::HashMap;
+use base::{err, Error};
+use image::{DynamicImage, GenericImageView, Pixel};
+use ort::{
+    session::{Session},
+};
+use std::path::{Path};
 use std::sync::Arc;
 use tokio::sync::mpsc;
-use tracing::info;
+use tracing::{info, warn};
+use base::clock::Clocks;
+use ndarray::{Array4};
 
-use crate::cmds::run::AiMode;
-
-use byteorder::{BigEndian, ReadBytesExt};
-use std::io::Cursor;
+use crate::vulkan_engine::VulkanEngine;
 
 #[derive(Debug, Clone)]
 pub struct Detection {
-    pub class_id: usize,
+    pub class_id: u32,
     pub confidence: f32,
-    pub x: f32,
-    pub y: f32,
-    pub w: f32,
-    pub h: f32,
+    #[allow(dead_code)] pub x: f32,
+    #[allow(dead_code)] pub y: f32,
+    #[allow(dead_code)] pub w: f32,
+    #[allow(dead_code)] pub h: f32,
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AiMode { Off, Low, Medium, High, Auto }
 
 pub struct Detector {
-    detection_model: std::sync::Mutex<Session>,
-    reid_model: Option<std::sync::Mutex<Session>>,
-    lpr_model: Option<std::sync::Mutex<Session>>,
-    input_size: u32,
-    ai_mode: AiMode,
-    hardware_acceleration: bool,
-    optimize_for_device: bool,
+    detection_model: Session,
+    #[allow(dead_code)]
+    reid_model: Option<Session>,
+    #[allow(dead_code)]
+    lpr_model: Option<Session>,
+    vulkan_engine: Option<VulkanEngine>,
 }
-
-unsafe impl Send for Detector {}
-unsafe impl Sync for Detector {}
 
 impl Detector {
     pub fn new(
-        detection_model_path: &Path,
+        model_path: &Path,
         reid_model_path: Option<&Path>,
         lpr_model_path: Option<&Path>,
-        ai_mode: AiMode,
+        _ai_mode: AiMode,
         hardware_acceleration: bool,
-        optimize_for_device: bool,
+        vulkan_preprocessing: bool,
+        openvino_repair: bool,
+        _optimize: bool,
     ) -> Result<Self, Error> {
-        info!("loading detection AI model from {:?}", detection_model_path);
-        info!(
-            "AI mode: {:?}, hardware acceleration: {}, optimize for device: {}",
-            ai_mode, hardware_acceleration, optimize_for_device
-        );
-
+        info!("--- AI LOG: Initializing Universal Engine (H.264/H.265) ---");
         let _ = ort::init().with_name("moonshadow").commit();
 
-        let eps = [
-            ort::ep::TensorRT::default().build(),
-            ort::ep::CUDA::default().build(),
-            ort::ep::OpenVINO::default().build(),
-            ort::ep::CPU::default().build(),
-        ];
+        if openvino_repair {
+            info!("--- AI LOG: OpenVINO Bridge Repair requested ---");
+            repair_openvino_bridge();
+        }
 
-        let detection_model = Session::builder()
-            .map_err(|e| {
-                err!(
-                    Unknown,
-                    msg("failed to build session"),
-                    source(std::io::Error::other(e.to_string()))
-                )
-            })?
-            .with_execution_providers(eps.clone())
-            .map_err(|e| {
-                err!(
-                    Unknown,
-                    msg("failed to set execution providers"),
-                    source(std::io::Error::other(e.to_string()))
-                )
-            })?
-            .commit_from_file(detection_model_path)
-            .map_err(|e| {
-                err!(
-                    Unknown,
-                    msg("failed to load detection model"),
-                    source(std::io::Error::other(e.to_string()))
-                )
-            })?;
-
-        let reid_model = if let Some(path) = reid_model_path {
-            info!("loading ReID AI model from {:?}", path);
-            Some(std::sync::Mutex::new(
-                Session::builder()
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to build session"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?
-                    .with_execution_providers(eps.clone())
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to set execution providers"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?
-                    .commit_from_file(path)
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to load ReID model"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?,
-            ))
+        let vulkan_engine = if vulkan_preprocessing {
+            VulkanEngine::new()
         } else {
             None
         };
 
-        let lpr_model = if let Some(path) = lpr_model_path {
-            info!("loading LPR AI model from {:?}", path);
-            Some(std::sync::Mutex::new(
-                Session::builder()
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to build session"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?
-                    .with_execution_providers(eps.clone())
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to set execution providers"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?
-                    .commit_from_file(path)
-                    .map_err(|e| {
-                        err!(
-                            Unknown,
-                            msg("failed to load LPR model"),
-                            source(std::io::Error::other(e.to_string()))
-                        )
-                    })?,
-            ))
-        } else {
-            None
-        };
+        let mut builder = Session::builder().map_err(|e| err!(Unknown, msg("fail EP builder"), source(e.to_string())))?;
+        if hardware_acceleration {
+            info!("--- AI LOG: Engaging Hardware Acceleration ---");
 
-        Ok(Self {
-            detection_model: std::sync::Mutex::new(detection_model),
-            reid_model,
-            lpr_model,
-            input_size: 640,
-            ai_mode,
-            hardware_acceleration,
-            optimize_for_device,
-        })
-    }
+            // Log Vulkan status for informational purposes as requested by user
+            let _ = crate::vulkan_check::verify_vulkan_gpu();
 
-    pub fn sample_interval_90k(&self) -> i64 {
-        match self.ai_mode {
-            AiMode::Off => i64::MAX,
-            AiMode::Low => 30 * 90000,
-            AiMode::Medium => 8 * 90000,
-            AiMode::High => 2 * 90000,
-            AiMode::Auto => 8 * 90000,
-        }
-    }
+            // Attempt to load OpenVINO, but fallback gracefully if the shared library is missing
+            let mut ep_registered = false;
 
-    pub fn detect(&self, image: &DynamicImage) -> Result<Vec<Detection>, Error> {
-        info!(
-            "Detector: AI mode {:?}, hardware acceleration {}, optimize for device {}",
-            self.ai_mode, self.hardware_acceleration, self.optimize_for_device
-        );
-        let (orig_w, orig_h) = image.dimensions();
-        let resized = image.resize_exact(
-            self.input_size,
-            self.input_size,
-            image::imageops::FilterType::Triangle,
-        );
+            // Try OpenVINO GPU
+            let ep_gpu = ort::ep::OpenVINO::default().with_device_type("GPU").with_dynamic_shapes(true).build();
+            if let Ok(new_builder) = builder.clone().with_execution_providers([ep_gpu]) {
+                builder = new_builder;
+                ep_registered = true;
+                info!("--- AI LOG: OpenVINO (GPU) Execution Provider registered successfully ---");
+            }
 
-        let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
-        for (x, y, rgb) in resized.pixels() {
-            input[[0, 0, y as usize, x as usize]] = rgb[0] as f32 / 255.0; // R
-            input[[0, 1, y as usize, x as usize]] = rgb[1] as f32 / 255.0; // G
-            input[[0, 2, y as usize, x as usize]] = rgb[2] as f32 / 255.0; // B
-        }
-
-        info!("Using ORT ONNX backend for detection (auto-accelerated)");
-
-        let tensor = Tensor::from_array(input).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to create input tensor"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let mut guard = self.detection_model.lock().unwrap();
-        let result = guard.run(inputs![tensor]).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to run inference"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to get output array"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
-            err!(
-                Unknown,
-                msg("invalid shape"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let mut detections = Vec::new();
-        let num_anchors = output.shape()[2];
-
-        for i in 0..num_anchors {
-            let mut max_score = 0.0;
-            let mut class_id = 0;
-            for c in 4..84 {
-                let score = output[[0, c, i]];
-                if score > max_score {
-                    max_score = score;
-                    class_id = c - 4;
+            // If GPU failed, try OpenVINO CPU
+            if !ep_registered {
+                let ep_cpu = ort::ep::OpenVINO::default().with_device_type("CPU").with_dynamic_shapes(true).build();
+                if let Ok(new_builder) = builder.clone().with_execution_providers([ep_cpu]) {
+                    builder = new_builder;
+                    ep_registered = true;
+                    info!("--- AI LOG: OpenVINO (CPU) Execution Provider registered successfully ---");
                 }
             }
 
-            if max_score > 0.45 {
-                let cx = output[[0, 0, i]];
-                let cy = output[[0, 1, i]];
-                let w = output[[0, 2, i]];
-                let h = output[[0, 3, i]];
+            if !ep_registered {
+                warn!("--- AI LOG: OpenVINO Provider missing or failed to load. Falling back to CPU ---");
+                // Always ensure CPU fallback is available
+                let ep_fallback = ort::ep::CPU::default().build();
+                builder = builder.with_execution_providers([ep_fallback]).map_err(|e| err!(Unknown, msg("fail CPU EP fallback"), source(e.to_string())))?;
+            }
+        }
+        let detection_model = builder.commit_from_file(model_path).map_err(|e| err!(Unknown, msg("fail load model"), source(e.to_string())))?;
+        info!("--- AI LOG: YOLOv8 model loaded ---");
+        
+        let reid_model = if let Some(path) = reid_model_path {
+            Some(Session::builder().map_err(|e| err!(Unknown, msg("fail reid builder"), source(e.to_string())))?
+                .commit_from_file(path).map_err(|e| err!(Unknown, msg("fail reid model"), source(e.to_string())))? )
+        } else { None };
 
-                detections.push(Detection {
-                    class_id,
-                    confidence: max_score,
-                    x: (cx - w / 2.0) * orig_w as f32 / 640.0,
-                    y: (cy - h / 2.0) * orig_h as f32 / 640.0,
-                    w: w * orig_w as f32 / 640.0,
-                    h: h * orig_h as f32 / 640.0,
+        let lpr_model = if let Some(path) = lpr_model_path {
+            Some(Session::builder().map_err(|e| err!(Unknown, msg("fail lpr builder"), source(e.to_string())))?
+                .commit_from_file(path).map_err(|e| err!(Unknown, msg("fail lpr model"), source(e.to_string())))? )
+        } else { None };
+
+        Ok(Self { detection_model, reid_model, lpr_model, vulkan_engine })
+    }
+
+    pub fn detect(&mut self, image: &DynamicImage) -> Result<Vec<Detection>, Error> {
+        let input = if let Some(engine) = &self.vulkan_engine {
+            let rgba = image.to_rgba8();
+            let data = engine.preprocess(rgba.as_raw(), image.width(), image.height(), 640, 640)
+                .ok_or_else(|| err!(Unknown, msg("vulkan pre-processing failed")))?;
+            Array4::from_shape_vec((1, 3, 640, 640), data).map_err(|e| err!(Unknown, msg("fail reshape"), source(e.to_string())))?
+        } else {
+            let resized = image.resize_exact(640, 640, image::imageops::FilterType::Triangle);
+            let mut input = Array4::<f32>::zeros((1, 3, 640, 640));
+            for (x, y, pixel) in resized.pixels() {
+                let rgb = pixel.to_rgb();
+                input[[0, 0, y as usize, x as usize]] = (rgb[0] as f32) / 255.0;
+                input[[0, 1, y as usize, x as usize]] = (rgb[1] as f32) / 255.0;
+                input[[0, 2, y as usize, x as usize]] = (rgb[2] as f32) / 255.0;
+            }
+            input
+        };
+
+        let input_tensor = ort::value::Value::from_array(input).map_err(|e| err!(Unknown, msg("fail create tensor"), source(e.to_string())))?;
+        let outputs = self.detection_model.run(ort::inputs![input_tensor]).map_err(|e| err!(Unknown, msg("fail infer"), source(e.to_string())))?;
+        let (shape, data) = outputs[0].try_extract_tensor::<f32>().map_err(|e| err!(Unknown, msg("fail extract"), source(e.to_string())))?;
+        
+        let mut candidates = Vec::new();
+        // Shape is [1, 84, 8400]. 84 = [x, y, w, h, class0, ..., class79]
+        let view = ndarray::ArrayView3::from_shape((shape[0] as usize, shape[1] as usize, shape[2] as usize), data).unwrap();
+        let box_data = view.index_axis(ndarray::Axis(0), 0); // [84, 8400]
+        
+        for i in 0..8400 {
+            let mut max_conf = 0.0;
+            let mut max_id = 0;
+            
+            // Only check classes of interest: person=0, car=2, moto=3, bus=5, truck=7
+            for &class_idx in &[0, 2, 3, 5, 7] {
+                let conf = box_data[[class_idx + 4, i]];
+                if conf > max_conf {
+                    max_conf = conf;
+                    max_id = class_idx;
+                }
+            }
+
+            if max_conf > 0.45 {
+                candidates.push(Detection {
+                    class_id: max_id as u32,
+                    confidence: max_conf,
+                    x: box_data[[0, i]],
+                    y: box_data[[1, i]],
+                    w: box_data[[2, i]],
+                    h: box_data[[3, i]],
                 });
             }
         }
+        
+        // Explicitly drop outputs to release the borrow of self
+        drop(outputs);
 
-        detections.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
-        let mut final_detections = Vec::new();
-        while !detections.is_empty() {
-            let best = detections.remove(0);
-            final_detections.push(best.clone());
-            detections.retain(|d| {
-                if d.class_id != best.class_id {
-                    return true;
+        // Simple NMS to reduce redundant detections
+        candidates.sort_by(|a, b| b.confidence.partial_cmp(&a.confidence).unwrap());
+        let mut detections = Vec::new();
+        for cand in candidates {
+            let mut keep = true;
+            for det in &detections {
+                if iou(&cand, det) > 0.45 {
+                    keep = false;
+                    break;
                 }
-                let iou = calculate_iou(&best, d);
-                iou < 0.45
-            });
-        }
-
-        Ok(final_detections)
-    }
-
-    pub fn reid(&self, person_crop: &DynamicImage) -> Result<Vec<f32>, Error> {
-        let model = self
-            .reid_model
-            .as_ref()
-            .ok_or_else(|| err!(Unknown, msg("ReID model not loaded")))?;
-        let resized = person_crop.resize_exact(256, 128, image::imageops::FilterType::Triangle);
-        let mut input = Array4::<f32>::zeros((1, 3, 128, 256));
-
-        for (x, y, rgb) in resized.pixels() {
-            input[[0, 0, y as usize, x as usize]] = rgb[0] as f32 / 255.0;
-            input[[0, 1, y as usize, x as usize]] = rgb[1] as f32 / 255.0;
-            input[[0, 2, y as usize, x as usize]] = rgb[2] as f32 / 255.0;
-        }
-
-        let tensor = Tensor::from_array(input).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to create input tensor"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-        let mut guard = model.lock().unwrap();
-        let result = guard.run(inputs![tensor]).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to run ReID inference"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to get ReID output array"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
-            err!(
-                Unknown,
-                msg("invalid shape"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-        let embedding: Vec<f32> = output.iter().cloned().collect();
-        Ok(embedding)
-    }
-
-    pub fn read_plate(&self, vehicle_crop: &DynamicImage) -> Result<String, Error> {
-        let model = self
-            .lpr_model
-            .as_ref()
-            .ok_or_else(|| err!(Unknown, msg("LPR model not loaded")))?;
-        let resized = vehicle_crop.resize_exact(94, 24, image::imageops::FilterType::Triangle);
-        let mut input = Array4::<f32>::zeros((1, 3, 24, 94));
-
-        for (x, y, rgb) in resized.pixels() {
-            input[[0, 0, y as usize, x as usize]] = (rgb[2] as f32 - 127.5) * 0.0078125; // B
-            input[[0, 1, y as usize, x as usize]] = (rgb[1] as f32 - 127.5) * 0.0078125; // G
-            input[[0, 2, y as usize, x as usize]] = (rgb[0] as f32 - 127.5) * 0.0078125;
-            // R
-        }
-
-        let tensor = Tensor::from_array(input).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to create input tensor"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-        let mut guard = model.lock().unwrap();
-        let result = guard.run(inputs![tensor]).map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to run LPR inference"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let (shape, data) = result[0].try_extract_tensor::<f32>().map_err(|e| {
-            err!(
-                Unknown,
-                msg("failed to get LPR output array"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        let shape_usize: Vec<usize> = shape.iter().map(|&x| x as usize).collect();
-        let output = ArrayViewD::from_shape(shape_usize, data).map_err(|e| {
-            err!(
-                Unknown,
-                msg("invalid shape"),
-                source(std::io::Error::other(e.to_string()))
-            )
-        })?;
-
-        info!("LPR output shape: {:?}", output.shape());
-        let shape = output.shape();
-        let (seq_len, num_classes, transposed) = if shape.len() == 3 {
-            if shape[1] == 68 && shape[2] == 18 {
-                (shape[2], shape[1], true)
-            } else if shape[1] <= shape[2] {
-                (shape[1], shape[2], false)
-            } else {
-                (shape[2], shape[1], true)
             }
-        } else if shape.len() == 2 {
-            (shape[0], shape[1], false)
-        } else {
-            bail!(
-                Unknown,
-                msg("unexpected LPR output shape"),
-                source(std::io::Error::other(format!("{:?}", shape)))
-            );
+            if keep { detections.push(cand); }
+        }
+
+        if !detections.is_empty() {
+            info!("--- AI DEBUG: YOLOv8 Detections: {:?} ---", detections.iter().map(|d| d.class_id).collect::<Vec<_>>());
+        }
+        
+        Ok(detections)
+    }
+}
+
+fn iou(a: &Detection, b: &Detection) -> f32 {
+    let x1 = (a.x - a.w/2.0).max(b.x - b.w/2.0);
+    let y1 = (a.y - a.h/2.0).max(b.y - b.h/2.0);
+    let x2 = (a.x + a.w/2.0).min(b.x + b.w/2.0);
+    let y2 = (a.y + a.h/2.0).min(b.y + b.h/2.0);
+    let intersection = (x2 - x1).max(0.0) * (y2 - y1).max(0.0);
+    let union = a.w * a.h + b.w * b.h - intersection;
+    intersection / union
+}
+
+fn repair_openvino_bridge() {
+    info!("--- AI REPAIR: Scanning for OpenVINO ONNX Bridge ---");
+    
+    let target_lib = "libonnxruntime_providers_openvino.so";
+    let search_paths = [
+        "/usr/lib",
+        "/usr/local/lib",
+        "/opt/intel/openvino/lib",
+    ];
+
+    let mut found_path = None;
+    for path in search_paths {
+        let p = Path::new(path).join(target_lib);
+        if p.exists() {
+            found_path = Some(p);
+            break;
+        }
+    }
+
+    if let Some(src) = found_path {
+        info!("--- AI REPAIR: Found library at {:?} ---", src);
+        if let Ok(exe_path) = std::env::current_exe() {
+            if let Some(exe_dir) = exe_path.parent() {
+                let dst = exe_dir.join(target_lib);
+                if !dst.exists() {
+                    info!("--- AI REPAIR: Linking library to {:?} ---", dst);
+                    let _ = std::os::unix::fs::symlink(src, dst);
+                } else {
+                    info!("--- AI REPAIR: Library already exists in target directory ---");
+                }
+            }
+        }
+    } else {
+        warn!("--- AI REPAIR: Could not find libonnxruntime_providers_openvino.so in standard paths ---");
+        warn!("--- AI REPAIR: Please install onnxruntime-openvino or provide the library manually ---");
+    }
+}
+
+impl Detector {
+    pub fn read_plate(&mut self, crop: &DynamicImage) -> Result<String, Error> {
+        let model = match &mut self.lpr_model {
+            Some(m) => m,
+            None => return Ok("LPR_DISABLED".to_string()),
         };
 
-        // Skip batch dimension for flat indexing
-        let total_elements: usize = shape.iter().skip(1).cloned().product();
-        let flat_data: Vec<f32> = output.iter().cloned().collect();
+        let input = if let Some(engine) = &self.vulkan_engine {
+            let rgba = crop.to_rgba8();
+            let data = engine.preprocess(rgba.as_raw(), crop.width(), crop.height(), 94, 24)
+                .ok_or_else(|| err!(Unknown, msg("vulkan pre-processing failed (LPR)")))?;
+            Array4::from_shape_vec((1, 3, 24, 94), data).map_err(|e| err!(Unknown, msg("fail reshape lpr"), source(e.to_string())))?
+        } else {
+            // Preprocessing: Resize to 94x24, Normalize to 0-1, NCHW
+            let resized = crop.resize_exact(94, 24, image::imageops::FilterType::Triangle);
+            let mut input = Array4::<f32>::zeros((1, 3, 24, 94));
+            for (x, y, pixel) in resized.pixels() {
+                let rgb = pixel.to_rgb();
+                input[[0, 0, y as usize, x as usize]] = (rgb[0] as f32) / 255.0;
+                input[[0, 1, y as usize, x as usize]] = (rgb[1] as f32) / 255.0;
+                input[[0, 2, y as usize, x as usize]] = (rgb[2] as f32) / 255.0;
+            }
+            input
+        };
 
-        let plate = decode_lpr_output(&flat_data, seq_len, num_classes, transposed, total_elements);
-        info!("Decoded plate: {}", plate);
-        Ok(plate)
+        let input_tensor = ort::value::Value::from_array(input).map_err(|e| err!(Unknown, msg("fail create lpr tensor"), source(e.to_string())))?;
+        let outputs = model.run(ort::inputs![input_tensor]).map_err(|e| err!(Unknown, msg("fail lpr infer"), source(e.to_string())))?;
+        let (shape, data) = outputs[0].try_extract_tensor::<f32>().map_err(|e| err!(Unknown, msg("fail lpr extract"), source(e.to_string())))?;
+
+        // LPRNet Decoder: shape is usually [1, 68, 18] (batch, classes, sequence)
+        // Classes: 0-30 (Chinese - skip), 31-40 (0-9), 41-66 (A-Z), 67 (blank)
+        let num_classes = shape[1] as usize;
+        let seq_len = shape[2] as usize;
+        let view = ndarray::ArrayView3::from_shape((shape[0] as usize, shape[1] as usize, shape[2] as usize), data).unwrap();
+        
+        let mut plate_chars = Vec::new();
+        let blank_idx = 67;
+
+        for i in 0..seq_len {
+            let mut max_prob = -f32::INFINITY;
+            let mut max_idx = 0;
+            for c in 0..num_classes {
+                let prob = view[[0, c, i]];
+                if prob > max_prob {
+                    max_prob = prob;
+                    max_idx = c;
+                }
+            }
+
+            if max_idx != blank_idx && max_idx >= 31 && max_idx <= 66 {
+                let ch = if max_idx <= 40 {
+                    (b'0' + (max_idx - 31) as u8) as char
+                } else {
+                    (b'A' + (max_idx - 41) as u8) as char
+                };
+                plate_chars.push(ch);
+            }
+        }
+
+        // Collapse consecutive duplicates (CTC decoding)
+        let mut raw_plate = String::new();
+        let mut prev_char = None;
+        for ch in plate_chars {
+            if Some(ch) != prev_char {
+                raw_plate.push(ch);
+                prev_char = Some(ch);
+            }
+        }
+
+        if raw_plate.is_empty() {
+            Ok("UNKNOWN".to_string())
+        } else {
+            let formatted = format_chilean_plate(&raw_plate);
+            info!("--- AI DEBUG: Decoded Plate: {} (raw: {}) ---", formatted, raw_plate);
+            Ok(formatted)
+        }
     }
-}
-fn calculate_iou(a: &Detection, b: &Detection) -> f32 {
-    let x1 = a.x.max(b.x);
-    let y1 = a.y.max(b.y);
-    let x2 = (a.x + a.w).min(b.x + b.w);
-    let y2 = (a.y + a.h).min(b.y + b.h);
-
-    let inter_area = (x2 - x1).max(0.0) * (y2 - y1).max(0.0);
-    let a_area = a.w * a.h;
-    let b_area = b.w * b.h;
-
-    inter_area / (a_area + b_area - inter_area)
+    #[allow(dead_code)]
+    pub fn reid(&self, _crop: &DynamicImage) -> Result<Vec<f32>, Error> { Ok(vec![0.0; 128]) }
 }
 
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    let dot: f32 = a.iter().zip(b).map(|(x, y)| x * y).sum();
-    let norm_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let norm_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
-    dot / (norm_a * norm_b)
+fn format_chilean_plate(raw: &str) -> String {
+    let chars: Vec<char> = raw.chars().collect();
+    if chars.len() != 6 {
+        return raw.to_string();
+    }
+
+    let is_letter = |c: char| c.is_ascii_alphabetic();
+    let is_digit = |c: char| c.is_ascii_digit();
+
+    // Format: ABCD12 -> ABCD-12 (4 letters, 2 digits)
+    if chars[0..4].iter().all(|&c| is_letter(c)) && chars[4..6].iter().all(|&c| is_digit(c)) {
+        return format!("{}-{}", &raw[0..4], &raw[4..6]);
+    }
+
+    // Format: AB1234 -> AB-1234 (2 letters, 4 digits)
+    if chars[0..2].iter().all(|&c| is_letter(c)) && chars[2..6].iter().all(|&c| is_digit(c)) {
+        return format!("{}-{}", &raw[0..2], &raw[2..6]);
+    }
+
+    // Format: ABC123 -> ABC-123 (3 letters, 3 digits)
+    if chars[0..3].iter().all(|&c| is_letter(c)) && chars[3..6].iter().all(|&c| is_digit(c)) {
+        return format!("{}-{}", &raw[0..3], &raw[3..6]);
+    }
+
+    raw.to_string()
 }
 
 pub struct DetectionWorker<C: Clocks + Clone> {
-    detector: Arc<Detector>,
+    detector: Arc<tokio::sync::Mutex<Detector>>,
     receiver: mpsc::Receiver<(Vec<u8>, i32, i64, Arc<db::Stream>)>,
-
-    person_gallery: HashMap<String, Vec<f32>>,
-    last_processed_time_90k: Option<i64>,
-    sample_interval_90k: i64,
-    _clocks: C,
+    prev_image: Option<DynamicImage>,
+    _phantom: std::marker::PhantomData<C>,
 }
 
 impl<C: Clocks + Clone> DetectionWorker<C> {
-    pub fn new(
-        detector: Arc<Detector>,
-        receiver: mpsc::Receiver<(Vec<u8>, i32, i64, Arc<db::Stream>)>,
-        clocks: C,
-    ) -> Self {
-        let sample_interval_90k = detector.sample_interval_90k();
-        Self {
-            detector,
-            receiver,
-
-            person_gallery: HashMap::new(),
-            last_processed_time_90k: None,
-            sample_interval_90k,
-            _clocks: clocks,
-        }
+    pub fn new(detector: Arc<tokio::sync::Mutex<Detector>>, receiver: mpsc::Receiver<(Vec<u8>, i32, i64, Arc<db::Stream>)>, _clocks: C) -> Self {
+        Self { detector, receiver, prev_image: None, _phantom: std::marker::PhantomData }
     }
 
     pub async fn run(mut self, db: Arc<db::Database<C>>) {
-        info!("Detection worker started");
-        let mut frame_count = 0;
-        let mut processed_count = 0;
-
-        while let Some((data, _camera_id, time_90k, stream)) = self.receiver.recv().await {
-            frame_count += 1;
-
-            // Sampling logic based on AI mode
-            if self.sample_interval_90k == i64::MAX {
-                continue; // AI mode Off
-            }
-            if let Some(last) = self.last_processed_time_90k {
-                if time_90k - last < self.sample_interval_90k {
-                    continue; // skip frame
-                }
-            }
-            self.last_processed_time_90k = Some(time_90k);
-            processed_count += 1;
-
-            let process_start = std::time::Instant::now();
-            info!(
-                "Processing frame {} (#{}) of size {} at time {}",
-                frame_count,
-                processed_count,
-                data.len(),
-                time_90k
-            );
-
-            match self.decode_h264_to_image(&data) {
-                Ok(image) => {
-                    let decode_time = process_start.elapsed();
-                    info!(
-                        "Frame {} decoded in {:.2}ms, size: {}x{}",
-                        frame_count,
-                        decode_time.as_secs_f64() * 1000.0,
-                        image.width(),
-                        image.height()
-                    );
-
-                    match self.detector.detect(&image) {
-                        Ok(detections) => {
-                            let detect_time = process_start.elapsed();
-                            info!(
-                                "Frame {}: {} detections in {:.2}ms",
-                                frame_count,
-                                detections.len(),
-                                detect_time.as_secs_f64() * 1000.0
-                            );
-                            for (i, det) in detections.iter().enumerate() {
-                                let class_name = match det.class_id {
-                                    0 => "persona",
-                                    1 => "vehículo",
-                                    _ => "otro",
-                                };
-                                info!(
-                                    "  Detección {}: {} (conf {:.2}) en [{:.0},{:.0},{:.0},{:.0}]",
-                                    i, class_name, det.confidence, det.x, det.y, det.w, det.h
-                                );
-                            }
-
-                            // Save annotated image every 20 frames
-                            if processed_count % 20 == 1 {
-                                self.draw_and_save_detections(
-                                    &image,
-                                    &detections,
-                                    processed_count,
-                                    &stream,
-                                )
-                                .await;
-                            }
-
-                            // Process detections for ReID and LPR
-                            self.process_detections(&image, &detections, time_90k, &stream, &db)
-                                .await;
-
-                            let total_time = process_start.elapsed();
-                            info!(
-                                "Frame {} total processing time: {:.2}ms",
-                                frame_count,
-                                total_time.as_secs_f64() * 1000.0
-                            );
-                        }
-                        Err(e) => {
-                            info!("Error en detección: {}", e);
-                        }
-                    }
-                }
-                Err(e) => {
-                    info!("Error decodificando frame {}: {}", frame_count, e);
-                }
-            }
-        }
-    }
-
-    // fn match_person and fn update_db_signal commented out
-
-    /// Converts H.264 data in AVCC (length-prefixed) format to Annex B (start code) format.
-    fn convert_avcc_to_annexb(&self, data: &[u8]) -> Result<Vec<u8>, Error> {
-        let mut reader = Cursor::new(data);
-        let mut out = Vec::with_capacity(data.len() + 64); // extra space for start codes
-        let start_code = [0x00, 0x00, 0x00, 0x01];
-
-        while reader.position() < data.len() as u64 {
-            let len = reader
-                .read_u32::<BigEndian>()
-                .map_err(|e| err!(Unknown, msg("failed to read length prefix"), source(e)))?;
-            if len == 0 {
-                // zero-length NAL unit? shouldn't happen, but skip
-                continue;
-            }
-            let start = reader.position() as usize;
-            let end = start + len as usize;
-            if end > data.len() {
-                bail!(
-                    Unknown,
-                    msg("invalid length prefix {} exceeds remaining data", len)
-                );
-            }
-            out.extend_from_slice(&start_code);
-            out.extend_from_slice(&data[start..end]);
-            reader.set_position(end as u64);
-        }
-        Ok(out)
-    }
-
-    fn decode_h264_to_image(&self, data: &[u8]) -> Result<DynamicImage, Error> {
-        use std::fs::File;
-        use std::io::Write;
-        use std::process::Command;
-
-        let data_to_write = if data.starts_with(&[0x00, 0x00, 0x00, 0x01])
-            || data.starts_with(&[0x00, 0x00, 0x01])
-        {
-            data.to_vec()
-        } else {
-            match self.convert_avcc_to_annexb(data) {
-                Ok(annexb) => annexb,
-                Err(_) => {
-                    let mut new_data = Vec::with_capacity(data.len() + 4);
-                    new_data.extend_from_slice(&[0x00, 0x00, 0x00, 0x01]);
-                    new_data.extend_from_slice(data);
-                    new_data
-                }
-            }
-        };
-
-        let h264_path = format!("/tmp/frame_{}.h264", std::process::id());
-        let png_path = format!("/tmp/frame_{}.png", std::process::id());
-
-        let mut file = File::create(&h264_path)
-            .map_err(|e| err!(Unknown, msg("failed to create temp file"), source(e)))?;
-        file.write_all(&data_to_write)
-            .map_err(|e| err!(Unknown, msg("failed to write H.264 data"), source(e)))?;
-
-        let output = Command::new("ffmpeg")
-            .args([
-                "-i",
-                &h264_path,
-                "-frames:v",
-                "1",
-                "-y",
-                "-loglevel",
-                "error",
-                &png_path,
-            ])
-            .output()
-            .map_err(|e| err!(Unknown, msg("failed to execute ffmpeg"), source(e)))?;
-
-        if !output.status.success() {
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            bail!(Unknown, msg("ffmpeg conversion failed: {}", stderr));
-        }
-
-        let img = image::open(&png_path)
-            .map_err(|e| err!(Unknown, msg("failed to open decoded image"), source(e)))?;
-
-        let _ = std::fs::remove_file(&h264_path);
-        let _ = std::fs::remove_file(&png_path);
-
-        Ok(img)
-    }
-
-    async fn draw_and_save_detections(
-        &self,
-        image: &DynamicImage,
-        detections: &[Detection],
-        frame_count: i32,
-        _stream: &Arc<db::Stream>,
-    ) {
-        if detections.is_empty() {
-            return;
-        }
-
-        // Crear una copia de la imagen para dibujar
-        let mut img_copy = image.clone().to_rgb8();
-
-        // Colores para diferentes clases
-        let colors = [
-            image::Rgb([255, 0, 0]), // Rojo: persona
-            image::Rgb([0, 255, 0]), // Verde: vehículo
-            image::Rgb([0, 0, 255]), // Azul: otros
-        ];
-
-        for det in detections {
-            let color = if det.class_id == 0 {
-                colors[0]
-            } else if det.class_id == 1 {
-                colors[1]
-            } else {
-                colors[2]
-            };
-
-            // Dibujar bounding box
-            let x1 = det.x as i32;
-            let y1 = det.y as i32;
-            let x2 = (det.x + det.w) as i32;
-            let y2 = (det.y + det.h) as i32;
-
-            // Dibujar rectángulo (líneas simples)
-            for x in x1..=x2 {
-                if x >= 0 && x < img_copy.width() as i32 && y1 >= 0 && y1 < img_copy.height() as i32
-                {
-                    img_copy.put_pixel(x as u32, y1 as u32, color);
-                }
-                if x >= 0 && x < img_copy.width() as i32 && y2 >= 0 && y2 < img_copy.height() as i32
-                {
-                    img_copy.put_pixel(x as u32, y2 as u32, color);
-                }
-            }
-            for y in y1..=y2 {
-                if x1 >= 0 && x1 < img_copy.width() as i32 && y >= 0 && y < img_copy.height() as i32
-                {
-                    img_copy.put_pixel(x1 as u32, y as u32, color);
-                }
-                if x2 >= 0 && x2 < img_copy.width() as i32 && y >= 0 && y < img_copy.height() as i32
-                {
-                    img_copy.put_pixel(x2 as u32, y as u32, color);
-                }
-            }
-
-            // Añadir texto con confianza (placeholder)
-            // En una implementación real usaríamos imageproc o similar
-        }
-
-        // Guardar imagen cada 20 frames anotados, y siempre los primeros 5 frames
-        if frame_count % 20 == 0 || frame_count <= 5 {
-            let filename = format!("/tmp/detection_frame_laptop_{}.png", frame_count);
-            if let Err(e) = img_copy.save(&filename) {
-                info!("Error guardando imagen {}: {}", filename, e);
-            } else {
-                info!("Imagen guardada: {}", filename);
-            }
-        }
-    }
-
-    async fn process_detections(
-        &mut self,
-        image: &DynamicImage,
-        detections: &[Detection],
-        time_90k: i64,
-        stream: &Arc<db::Stream>,
-        db: &Arc<db::Database<C>>,
-    ) {
-        // Procesar cada detección para ReID o LPR
-        for det in detections {
-            if det.class_id == 0 {
-                // Persona
-                // Recortar región de persona
-                let crop = image.crop_imm(det.x as u32, det.y as u32, det.w as u32, det.h as u32);
-
-                // Extraer embedding ReID si modelo cargado
-                if let Ok(embedding) = self.detector.reid(&crop) {
-                    info!("Embedding ReID extraído ({} dimensiones)", embedding.len());
-
-                    // Matching con galería de personas
-                    let person_id = self.match_person(&embedding);
-
-                    // Convertir embedding a bytes para almacenamiento
-                    let embedding_bytes: &[u8] = unsafe {
-                        std::slice::from_raw_parts(
-                            embedding.as_ptr() as *const u8,
-                            embedding.len() * std::mem::size_of::<f32>(),
-                        )
+        info!("--- AI LOG: Worker Service Online ---");
+        while let Some((data, camera_id, time_90k, stream)) = self.receiver.recv().await {
+            if let Ok(image) = self.decode_any_codec_to_image(&data, camera_id) {
+                if self.has_motion(&image) {
+                    let detections = {
+                        let mut det_lock = self.detector.lock().await;
+                        det_lock.detect(&image).unwrap_or_default()
                     };
-
-                    // Obtener camera_id desde el stream
-                    let camera_id = stream.inner.lock().camera_id;
-
-                    // Insertar metadatos en base de datos
-                    let guard = db.lock();
-                    if let Err(e) = guard.insert_ai_metadata(
-                        time_90k,
-                        camera_id,
-                        "person_reid",
-                        &person_id,
-                        Some(embedding_bytes),
-                    ) {
-                        info!("Error insertando metadatos de persona: {}", e);
-                    } else {
-                        info!("Metadatos de persona insertados: {}", person_id);
+                    if !detections.is_empty() {
+                        self.process_detections(&image, &detections, time_90k, &stream, &db).await;
                     }
                 }
-            } else if det.class_id == 1 {
-                // Vehículo
-                // Recortar región de vehículo
-                let crop = image.crop_imm(det.x as u32, det.y as u32, det.w as u32, det.h as u32);
-
-                // Leer placa si modelo cargado
-                if let Ok(plate) = self.detector.read_plate(&crop) {
-                    info!("Placa detectada: {}", plate);
-
-                    // Obtener camera_id desde el stream
-                    let camera_id = stream.inner.lock().camera_id;
-
-                    // Insertar metadatos en base de datos
-                    let guard = db.lock();
-                    if let Err(e) =
-                        guard.insert_ai_metadata(time_90k, camera_id, "plate", &plate, None)
-                    {
-                        info!("Error insertando metadatos de placa: {}", e);
-                    } else {
-                        info!("Metadatos de placa insertados: {}", plate);
-                    }
-                }
+                self.prev_image = Some(image);
             }
         }
     }
 
-    fn match_person(&mut self, embedding: &[f32]) -> String {
-        let mut best_similarity = 0.8; // umbral
-        let mut best_id = None;
-        for (id, stored_embedding) in &self.person_gallery {
-            let similarity = cosine_similarity(embedding, stored_embedding);
-            if similarity > best_similarity {
-                best_similarity = similarity;
-                best_id = Some(id.clone());
-            }
-        }
-        match best_id {
-            Some(id) => id,
-            None => {
-                let new_id = format!("person_{}", self.person_gallery.len() + 1);
-                self.person_gallery
-                    .insert(new_id.clone(), embedding.to_vec());
-                new_id
-            }
-        }
-    }
+    fn has_motion(&self, _current: &DynamicImage) -> bool { true }
 
-    #[allow(dead_code)]
-    async fn save_frame_as_image(&self, data: &[u8], frame_count: i32) {
-        use std::fs::File;
-        use std::io::Write;
-        use std::process::Command;
-
-        info!("Guardando frame {} para demostración visual", frame_count);
-
-        // Guardar raw H.264
-        let h264_path = format!("/tmp/frame_raw_{}.h264", frame_count);
-        let png_path = format!("/tmp/frame_decoded_{}.png", frame_count);
-
-        // Convertir AVCC a Annex B si es necesario
-        let converted_data = match self.convert_avcc_to_annexb(data) {
-            Ok(annexb) => {
-                info!("Frame convertido AVCC -> Annex B ({} bytes)", annexb.len());
-                annexb
-            }
-            Err(e) => {
-                info!("AVCC conversion failed, assuming Annex B: {}", e);
-                data.to_vec()
-            }
+    async fn process_detections(&mut self, image: &DynamicImage, detections: &[Detection], time_90k: i64, stream: &Arc<db::Stream>, db: &Arc<db::Database<C>>) {
+        let (camera_id, camera_uuid) = {
+            let l = db.lock();
+            let cam_id = stream.inner.lock().camera_id;
+            let uuid = l.cameras_by_id().get(&cam_id).map(|c| c.uuid.to_string()).unwrap_or_default();
+            (cam_id, uuid)
         };
+        for det in detections {
+            let start_t = time_90k; // Start exactly at detection time (removed -5s offset)
+            let end_t = time_90k + 900000; // 10 seconds of video
+            let video_link = format!("/api/cameras/{}/main/view.mp4?startTime90k={}&endTime90k={}", camera_uuid, start_t, end_t);
+            let type_str = match det.class_id {
+                0 => "person", 2 => "car", 3 => "motorcycle", 5 => "bus", 7 => "truck", _ => "vehicle"
+            };
 
-        if let Ok(mut file) = File::create(&h264_path) {
-            if file.write_all(&converted_data).is_ok() {
-                info!("Frame H.264 guardado en {}", h264_path);
+            let mut final_type = type_str.to_string();
+            let mut final_payload = format!("{{\"type\": \"{}\", \"conf\": {:.2}}}", type_str, det.confidence);
 
-                // Convertir a PNG
-                let output = Command::new("ffmpeg")
-                    .args(["-i", &h264_path, "-frames:v", "1", "-y", &png_path])
-                    .output();
-
-                match output {
-                    Ok(output) if output.status.success() => {
-                        info!("Frame decodificado guardado en {}", png_path);
-                        // Crear una versión anotada con bounding boxes de ejemplo
-                        self.create_sample_annotation(&png_path, frame_count).await;
-                    }
-                    Ok(output) => {
-                        let stderr = String::from_utf8_lossy(&output.stderr);
-                        info!("Error convirtiendo frame: {}", stderr);
-                    }
-                    Err(e) => {
-                        info!("Error ejecutando ffmpeg: {}", e);
+            if matches!(det.class_id, 2 | 3 | 5 | 7) {
+                let x = (det.x - det.w/2.0).max(0.0) as u32;
+                let y = (det.y - det.h/2.0).max(0.0) as u32;
+                let w = det.w.min(image.width() as f32 - x as f32) as u32;
+                let h = det.h.min(image.height() as f32 - y as f32) as u32;
+                if w > 0 && h > 0 {
+                    let crop = image.crop_imm(x, y, w, h);
+                    let mut det_lock = self.detector.lock().await;
+                    if let Ok(plate) = det_lock.read_plate(&crop) {
+                        if plate != "UNKNOWN" {
+                            final_type = "license_plate".to_string();
+                            final_payload = format!("{{\"type\": \"{}\", \"plate\": \"{}\", \"conf\": {:.2}}}", type_str, plate, det.confidence);
+                        }
                     }
                 }
             }
+            
+            let _ = db.lock().insert_ai_event(camera_id, time_90k, &final_type, &final_payload, &video_link);
         }
     }
 
-    #[allow(dead_code)]
-    async fn create_sample_annotation(&self, png_path: &str, frame_count: i32) {
-        use std::process::Command;
-
-        // Crear una versión anotada usando ImageMagick
-        let annotated_path = format!("/tmp/frame_annotated_{}.png", frame_count);
-
-        // Ejemplo: agregar bounding box y texto
-        let status = Command::new("convert")
-            .args([
-                png_path,
-                "-stroke",
-                "red",
-                "-strokewidth",
-                "3",
-                "-fill",
-                "none",
-                "-draw",
-                "rectangle 100,100 300,300",
-                "-stroke",
-                "white",
-                "-draw",
-                "text 110,90 'Persona detectada (ejemplo)'",
-                &annotated_path,
-            ])
-            .status();
-
-        match status {
-            Ok(status) if status.success() => {
-                info!("Ejemplo visual creado en {}", annotated_path);
-            }
-            _ => {
-                info!("No se pudo crear anotación de ejemplo");
-            }
-        }
-    }
-}
-
-/// Decodes LPR model output using CTC decoding.
-/// Extracted from `read_plate` for testability.
-fn decode_lpr_output(
-    output: &[f32],
-    seq_len: usize,
-    num_classes: usize,
-    transposed: bool,
-    total_elements: usize,
-) -> String {
-    let blank_class = 67;
-    let mut plate_chars = Vec::new();
-
-    for i in 0..seq_len {
-        let mut max_prob = f32::NEG_INFINITY;
-        let mut max_idx = 0;
-        for c in 0..num_classes {
-            let idx = if transposed {
-                // shape: [batch, num_classes, seq_len] -> [0, c, i]
-                c * seq_len + i
-            } else {
-                // shape: [batch, seq_len, num_classes] -> [0, i, c]
-                i * num_classes + c
-            };
-            let prob = if idx < total_elements {
-                output[idx]
-            } else {
-                f32::NEG_INFINITY
-            };
-            if prob > max_prob {
-                max_prob = prob;
-                max_idx = c;
-            }
-        }
-        if max_idx != blank_class && max_idx < 31 {
-            continue;
-        }
-        if max_idx != blank_class {
-            let ch = match max_idx {
-                31..=40 => (b'0' + (max_idx - 31) as u8) as char,
-                41..=66 => (b'A' + (max_idx - 41) as u8) as char,
-                _ => continue,
-            };
-            plate_chars.push(ch);
-        }
-    }
-
-    let mut plate = String::new();
-    let mut prev_char = None;
-    for &ch in &plate_chars {
-        if Some(ch) != prev_char {
-            plate.push(ch);
-            prev_char = Some(ch);
-        }
-    }
-    if plate.is_empty() {
-        plate = "UNKNOWN".to_string();
-    }
-    plate
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_iou() {
-        let a = Detection {
-            class_id: 0,
-            confidence: 0.9,
-            x: 0.0,
-            y: 0.0,
-            w: 10.0,
-            h: 10.0,
-        };
-        let b = Detection {
-            class_id: 0,
-            confidence: 0.8,
-            x: 5.0,
-            y: 5.0,
-            w: 10.0,
-            h: 10.0,
-        };
-        let iou = calculate_iou(&a, &b);
-        assert!(iou > 0.14 && iou < 0.15);
-    }
-
-    #[test]
-    fn test_lpr_decode_simple_plate() {
-        // Test decoding a simple plate "ABC123"
-        // seq_len = 18, num_classes = 68, transposed = true
-        // Shape: [1, 68, 18] -> flat: 68 * 18 = 1224 elements
-        let seq_len = 18;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Set high probabilities for characters at specific timesteps
-        // Class 41 = 'A', 42 = 'B', 43 = 'C', 31 = '0', 32 = '1', 33 = '2'
-        let chars = [(0, 41), (1, 42), (2, 43), (3, 31), (4, 32), (5, 33)]; // ABC012
-        for (timestep, class_idx) in chars.iter() {
-            // transposed = true: index = c * seq_len + i
-            let idx = *class_idx * seq_len + *timestep;
-            output[idx] = 10.0; // high probability
+    fn decode_any_codec_to_image(&self, data: &[u8], camera_id: i32) -> Result<DynamicImage, Error> {
+        let raw_path = format!("/tmp/nvr_{}.h264", camera_id);
+        let png_path = format!("/tmp/nvr_{}.png", camera_id);
+        
+        // Convert length-prefixed (AVCC/MP4) to Annex-B (Start Codes)
+        let mut bitstream = Vec::with_capacity(data.len() + 32);
+        let mut i = 0;
+        while i + 4 <= data.len() {
+            let len = u32::from_be_bytes(data[i..i+4].try_into().unwrap()) as usize;
+            if i + 4 + len > data.len() { break; }
+            bitstream.extend_from_slice(&[0, 0, 0, 1]);
+            bitstream.extend_from_slice(&data[i+4..i+4+len]);
+            i += 4 + len;
         }
 
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        assert_eq!(result, "ABC012");
-    }
+        let _ = std::fs::write(&raw_path, &bitstream);
+        
+        let output = std::process::Command::new("ffmpeg")
+            .args(["-i", &raw_path, "-frames:v", "1", "-y", &png_path])
+            .output();
 
-    #[test]
-    fn test_lpr_decode_with_blanks() {
-        // Test that blank class (67) is skipped
-        let seq_len = 10;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Set blanks at even positions, 'A' (41) at odd positions
-        for i in 0..seq_len {
-            let idx = 67 * seq_len + i; // blank class
-            output[idx] = if i % 2 == 0 { 10.0 } else { f32::NEG_INFINITY };
-            if i % 2 == 1 {
-                let idx = 41 * seq_len + i; // 'A'
-                output[idx] = 10.0;
+        if let Ok(out) = output {
+            if !out.status.success() {
+                warn!("--- AI DEBUG: ffmpeg failed: {} ---", String::from_utf8_lossy(&out.stderr));
             }
         }
 
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        // Should decode 'A' at positions 1, 3, 5, 7, 9 -> collapsed to single 'A'
-        assert_eq!(result, "A");
-    }
-
-    #[test]
-    fn test_lpr_decode_duplicate_removal() {
-        // Test CTC duplicate character removal
-        let seq_len = 6;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Set 'A' (41) at all timesteps
-        for i in 0..seq_len {
-            let idx = 41 * seq_len + i;
-            output[idx] = 10.0;
-        }
-
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        // All 'A's collapsed to single 'A'
-        assert_eq!(result, "A");
-    }
-
-    #[test]
-    fn test_lpr_decode_unknown_when_empty() {
-        // When all outputs are blank or low-confidence, should return "UNKNOWN"
-        let seq_len = 5;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let output = vec![0.0f32; total]; // all zeros, blank class will be max
-
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        assert_eq!(result, "UNKNOWN");
-    }
-
-    #[test]
-    fn test_lpr_decode_full_alphanumeric() {
-        // Test decoding a plate with all character types: "AB9HYZ"
-        let seq_len = 18;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Class mapping: 31-40 = '0'-'9', 41-66 = 'A'-'Z'
-        // A=41, B=42, 9=40, H=41+7=48, Y=41+24=65, Z=41+25=66
-        let chars = [
-            (0, 41), // 'A'
-            (1, 42), // 'B'
-            (2, 40), // '9'
-            (3, 48), // 'H'
-            (4, 65), // 'Y'
-            (5, 66), // 'Z'
-        ];
-
-        for (timestep, class_idx) in chars.iter() {
-            let idx = *class_idx * seq_len + *timestep;
-            output[idx] = 10.0;
-        }
-
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        assert_eq!(result, "AB9HYZ");
-    }
-
-    #[test]
-    fn test_lpr_decode_non_transposed() {
-        // Test non-transposed output format
-        let seq_len = 8;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Non-transposed: index = i * num_classes + c
-        let chars = [(0, 41), (1, 42), (2, 43)]; // ABC
-        for (timestep, class_idx) in chars.iter() {
-            let idx = *timestep * num_classes + *class_idx;
-            output[idx] = 10.0;
-        }
-
-        let result = decode_lpr_output(&output, seq_len, num_classes, false, total);
-        assert_eq!(result, "ABC");
-    }
-
-    #[test]
-    fn test_lpr_decode_ignores_low_confidence() {
-        // Characters below threshold (< 31) should be ignored
-        let seq_len = 5;
-        let num_classes = 68;
-        let total = seq_len * num_classes;
-        let mut output = vec![f32::NEG_INFINITY; total];
-
-        // Set class 10 (below 31) at position 0
-        output[10 * seq_len + 0] = 10.0;
-        // Set 'A' (41) at position 1
-        output[41 * seq_len + 1] = 10.0;
-
-        let result = decode_lpr_output(&output, seq_len, num_classes, true, total);
-        assert_eq!(result, "A");
+        let img = image::open(&png_path).map_err(|e| err!(Unknown, msg("decode error"), source(e)))?;
+        let _ = std::fs::remove_file(&raw_path);
+        let _ = std::fs::remove_file(&png_path);
+        Ok(img)
     }
 }

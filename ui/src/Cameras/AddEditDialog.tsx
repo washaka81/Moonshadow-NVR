@@ -17,6 +17,7 @@ import DialogTitle from "@mui/material/DialogTitle";
 import * as api from "../api";
 import { Camera } from "../types";
 import Box from "@mui/material/Box";
+import Chip from "@mui/material/Chip";
 import React, { useEffect, useState } from "react";
 import { useSnackbars } from "../snackbars";
 import Typography from "@mui/material/Typography";
@@ -25,6 +26,7 @@ import Grid from "@mui/material/Grid";
 import FormControl from "@mui/material/FormControl";
 import InputAdornment from "@mui/material/InputAdornment";
 import TravelExploreIcon from "@mui/icons-material/TravelExplore";
+import VideoSettingsIcon from "@mui/icons-material/VideoSettings";
 import { LoadingButton } from "@mui/lab";
 
 interface Props {
@@ -45,6 +47,7 @@ interface FormData {
     url: string;
     rtspTransport: "tcp" | "udp" | "";
     retainBytesGb: number;
+    detectedCodec?: string;
   }[];
 }
 
@@ -55,6 +58,7 @@ const Inner = ({ csrf }: { csrf?: string }) => {
   const { watch, setValue, getValues } = useFormContext<FormData>();
   const onvifBaseUrl = watch("onvifBaseUrl");
   const [autodetecting, setAutodetecting] = useState(false);
+  const [probing, setProbing] = useState<number | null>(null);
 
   const onAutodetect = async () => {
     let ip = onvifBaseUrl;
@@ -95,7 +99,7 @@ const Inner = ({ csrf }: { csrf?: string }) => {
         break;
       case "success":
         snackbars.enqueue({
-          message: "Autodetect successful!",
+          message: `Autodetect successful! Found: ${resp.response.mainCodec || "Unknown"} / ${resp.response.subCodec || "Unknown"}`,
           severity: "success",
         });
         if (resp.response.mainUrl) {
@@ -103,14 +107,42 @@ const Inner = ({ csrf }: { csrf?: string }) => {
             shouldDirty: true,
           });
           setValue("streams.0.enabled", true, { shouldDirty: true });
+          if (resp.response.mainCodec) {
+            setValue("streams.0.detectedCodec", resp.response.mainCodec);
+          }
         }
         if (resp.response.subUrl) {
           setValue("streams.1.url", resp.response.subUrl, {
             shouldDirty: true,
           });
           setValue("streams.1.enabled", true, { shouldDirty: true });
+          if (resp.response.subCodec) {
+            setValue("streams.1.detectedCodec", resp.response.subCodec);
+          }
         }
         break;
+    }
+  };
+
+  const onProbe = async (index: number) => {
+    const url = getValues(`streams.${index}.url`);
+    if (!url) return;
+
+    setProbing(index);
+    const resp = await api.streamProbe({ csrf, url }, {});
+    setProbing(null);
+
+    if (resp.status === "success") {
+      setValue(`streams.${index}.detectedCodec`, resp.response.codec || "Unknown");
+      snackbars.enqueue({
+        message: `Probe successful! Codec: ${resp.response.codec || "Unknown"}`,
+        severity: "success",
+      });
+    } else if (resp.status === "error") {
+      snackbars.enqueue({
+        message: `Probe failed: ${resp.message}`,
+        severity: "error",
+      });
     }
   };
 
@@ -145,6 +177,7 @@ const Inner = ({ csrf }: { csrf?: string }) => {
                         aria-label="autodetect"
                         onClick={onAutodetect}
                         loading={autodetecting}
+                        title="Autodetect Streams"
                       >
                         <TravelExploreIcon />
                       </LoadingButton>
@@ -193,11 +226,19 @@ const Inner = ({ csrf }: { csrf?: string }) => {
                   </Divider>
                 </Box>
               </Grid>
-              <Grid size={12}>
+              <Grid size={12} sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                 <CheckboxElement
                   name={`streams.${i}.enabled`}
                   label="Enabled"
                 />
+                {watch(`streams.${i}.detectedCodec`) && (
+                  <Chip 
+                    label={`Detected: ${watch(`streams.${i}.detectedCodec`)}`} 
+                    size="small" 
+                    color="primary" 
+                    variant="outlined"
+                  />
+                )}
               </Grid>
               <Grid size={12}>
                 <TextFieldElement
@@ -206,6 +247,20 @@ const Inner = ({ csrf }: { csrf?: string }) => {
                   fullWidth
                   variant="filled"
                   placeholder="rtsp://192.168.1.100:554/live"
+                  InputProps={{
+                    endAdornment: (
+                      <InputAdornment position="end">
+                        <LoadingButton
+                          aria-label="probe"
+                          onClick={() => onProbe(i)}
+                          loading={probing === i}
+                          title="Probe Codec"
+                        >
+                          <VideoSettingsIcon />
+                        </LoadingButton>
+                      </InputAdornment>
+                    ),
+                  }}
                 />
               </Grid>
               <Grid size={{ xs: 12, sm: 6 }}>

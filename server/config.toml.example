@@ -1,0 +1,14 @@
+# Moonshadow NVR - System Configuration Example
+# Used as template for /etc/moonshadow-nvr/config.toml
+
+# Database directory path (where recordings and metadata live)
+dbDir = "/var/lib/moonshadow-nvr/db"
+
+# UI directory (static files for the web interface)
+uiDir = "/opt/moonshadow-nvr/ui/dist"
+
+# Bind settings - listen on all interfaces
+[[binds]]
+ipv4 = "0.0.0.0:8080"
+# For secure environments, consider restricting permissions or adding auth.
+allowUnauthenticatedPermissions = { viewVideo = true, readCameraConfigs = true, updateSignals = true, adminUsers = true }

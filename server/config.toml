@@ -1,6 +1,11 @@
-dbDir = "/tmp/moonshadow-nvr"
-uiDir = "../ui/dist"
+# Database directory path
+dbDir = "/home/ale/Videos/Moonshadow-NVR/db"
 
+# UI directory (comment out if not built)
+# uiDir = "./ui/dist"
+
+# Bind settings - listen on all interfaces
+# For open access (no login required), uncomment allowUnauthenticatedPermissions:
 [[binds]]
 ipv4 = "0.0.0.0:8080"
 allowUnauthenticatedPermissions = { viewVideo = true, readCameraConfigs = true, updateSignals = true, adminUsers = true }

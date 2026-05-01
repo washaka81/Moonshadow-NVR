@@ -8,6 +8,7 @@ import { useSnackbars } from "../snackbars";
 import { Stream, AiEvent } from "../types";
 import TableBody from "@mui/material/TableBody";
 import TableCell from "@mui/material/TableCell";
+import Box from "@mui/material/Box";
 import TableRow, { TableRowProps } from "@mui/material/TableRow";
 import Skeleton from "@mui/material/Skeleton";
 import Alert from "@mui/material/Alert";
@@ -15,8 +16,12 @@ import Tooltip from "@mui/material/Tooltip";
 import ErrorIcon from "@mui/icons-material/Error";
 import Icon from "@mui/material/Icon";
 import Chip from "@mui/material/Chip";
+import Typography from "@mui/material/Typography";
 import PersonIcon from "@mui/icons-material/Person";
 import DirectionsCarIcon from "@mui/icons-material/DirectionsCar";
+import IconButton from "@mui/material/IconButton";
+import DownloadIcon from "@mui/icons-material/Download";
+import PlayArrowIcon from "@mui/icons-material/PlayArrow";
 
 interface Props {
   stream: Stream;
@@ -139,6 +144,7 @@ interface State {
 }
 
 interface RowProps extends TableRowProps {
+  onPlay?: () => void;
   start: React.ReactNode;
   end: React.ReactNode;
   endReason?: string;
@@ -147,9 +153,11 @@ interface RowProps extends TableRowProps {
   storage: React.ReactNode;
   bitrate: React.ReactNode;
   aiEvents?: AiEvent[];
+  downloadUrl?: string;
 }
 
 const Row = ({
+  onPlay,
   start,
   end,
   endReason,
@@ -158,11 +166,19 @@ const Row = ({
   storage,
   bitrate,
   aiEvents,
+  downloadUrl,
   ...rest
 }: RowProps) => (
   <TableRow {...rest}>
-    <TableCell align="right">{start}</TableCell>
-    <TableCell align="right">
+    <TableCell padding="checkbox">
+      {onPlay && (
+        <IconButton size="small" onClick={(e) => { e.stopPropagation(); onPlay(); }}>
+          <PlayArrowIcon fontSize="small" />
+        </IconButton>
+      )}
+    </TableCell>
+    <TableCell align="left">{start}</TableCell>
+    <TableCell align="left">
       {end}
       {endReason !== undefined ? (
         <Tooltip title={endReason}>
@@ -184,57 +200,90 @@ const Row = ({
       {storage}
     </TableCell>
     <TableCell align="right">
-      {bitrate}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'flex-end', gap: 1 }}>
+        {bitrate}
+        {downloadUrl && (
+          <Tooltip title="Download MP4">
+            <IconButton size="small" component="a" href={downloadUrl} onClick={(e) => e.stopPropagation()}>
+              <DownloadIcon fontSize="small" />
+            </IconButton>
+          </Tooltip>
+        )}
+      </Box>
       {aiEvents && aiEvents.length > 0 && (
-        <div
-          style={{
-            marginTop: "4px",
+        <Box
+          sx={{
+            marginTop: "2px",
             display: "flex",
             gap: "2px",
             flexWrap: "wrap",
             justifyContent: "flex-end",
+            maxHeight: "44px",
+            overflow: "hidden",
+            width: "100%"
           }}
         >
-          {aiEvents.map((event, idx) => (
-            <Tooltip
-              key={idx}
-              title={
-                event.type_ === "plate"
-                  ? `Plate: ${event.value}`
-                  : event.type_ === "person_reid"
-                    ? `Person: ${event.value}`
-                    : `${event.type_}: ${event.value}`
+          {(() => {
+            const grouped = new Map<string, { type: string, value: string, count: number }>();
+            aiEvents.forEach(e => {
+              const key = `${e.type_}:${e.value}`;
+              const existing = grouped.get(key);
+              if (existing) {
+                existing.count++;
+              } else {
+                grouped.set(key, { type: e.type_, value: e.value, count: 1 });
               }
-            >
-              <Chip
-                size="small"
-                icon={
-                  event.type_ === "plate" ? (
-                    <DirectionsCarIcon fontSize="small" />
-                  ) : event.type_ === "person_reid" ? (
-                    <PersonIcon fontSize="small" />
-                  ) : undefined
-                }
-                label={
-                  event.type_ === "plate"
-                    ? event.value
-                    : event.type_ === "person_reid"
-                      ? event.value.replace("person_", "P")
-                      : event.type_
-                }
-                sx={{
-                  height: "20px",
-                  fontSize: "0.7rem",
-                  ...(event.type_ === "plate"
-                    ? { backgroundColor: "#e3f2fd", color: "#1565c0" }
-                    : event.type_ === "person_reid"
-                      ? { backgroundColor: "#fce4ec", color: "#c2185b" }
-                      : { backgroundColor: "#f3e5f5", color: "#7b1fa2" }),
-                }}
-              />
-            </Tooltip>
-          ))}
-        </div>
+            });
+
+            const groupedList = Array.from(grouped.values());
+            const displayList = groupedList.slice(0, 8);
+            const displayedCount = displayList.reduce((acc, curr) => acc + curr.count, 0);
+
+            return (
+              <>
+                {displayList.map((group, idx) => (
+                  <Tooltip
+                    key={idx}
+                    title={`${group.type === 'plate' ? 'Plate' : group.type === 'person_reid' ? 'Person' : group.type}: ${group.value}${group.count > 1 ? ` (Seen ${group.count} times)` : ''}`}
+                  >
+                    <Chip
+                      size="small"
+                      icon={
+                        group.type === "plate" ? (
+                          <DirectionsCarIcon sx={{ fontSize: '0.75rem !important' }} />
+                        ) : group.type === "person_reid" ? (
+                          <PersonIcon sx={{ fontSize: '0.75rem !important' }} />
+                        ) : undefined
+                      }
+                      label={
+                        `${group.type === "plate"
+                          ? group.value
+                          : group.type === "person_reid"
+                            ? group.value.replace("person_", "P")
+                            : group.type}${group.count > 1 ? ` x${group.count}` : ''}`
+                      }
+                      sx={{
+                        height: "18px",
+                        fontSize: "0.65rem",
+                        "& .MuiChip-label": { px: 0.5 },
+                        ...(group.type === "plate"
+                          ? { backgroundColor: "#e3f2fd", color: "#1565c0" }
+                          : group.type === "person_reid"
+                            ? { backgroundColor: "#fce4ec", color: "#c2185b" }
+                            : { backgroundColor: "#f3e5f5", color: "#7b1fa2" }),
+                      }}
+                    />
+                  </Tooltip>
+                ))}
+                {aiEvents.length > displayedCount && (
+                   <Typography variant="caption" sx={{ fontSize: '0.65rem', color: 'text.secondary', ml: 0.5, lineHeight: '18px' }}>
+                     +{aiEvents.length - displayedCount}
+                   </Typography>
+                )}
+              </>
+            );
+          })()}
+        </Box>
       )}
     </TableCell>
   </TableRow>
@@ -344,6 +393,7 @@ const VideoList = ({
     body = (
       <Row
         role="progressbar"
+        onPlay={() => {}}
         start={<Skeleton />}
         end={<Skeleton />}
         resolution={<Skeleton />}
@@ -355,7 +405,7 @@ const VideoList = ({
   } else if (state.response.status === "error") {
     body = (
       <TableRow>
-        <TableCell colSpan={6}>
+        <TableCell colSpan={7}>
           <Alert severity="error">{state.response.message}</Alert>
         </TableCell>
       </TableRow>
@@ -389,11 +439,20 @@ const VideoList = ({
         r.endTime90k,
       );
 
+      const downloadUrl = api.recordingUrl(
+        stream.camera.uuid,
+        stream.streamType,
+        r,
+        false, // timestampTrack
+        trimStartAndEnd ? state.range90k : undefined,
+      ) + ".mp4";
+
       return (
         <Row
           key={r.startId}
           className="recording"
           onClick={() => setActiveRecording([stream, r])}
+          onPlay={() => setActiveRecording([stream, r])}
           start={formatTime(start)}
           end={formatTime(end)}
           endReason={r.endReason}
@@ -404,25 +463,26 @@ const VideoList = ({
           aiEvents={
             recordingAiEvents.length > 0 ? recordingAiEvents : undefined
           }
+          downloadUrl={downloadUrl}
         />
       );
     });
   }
-  return (
+return (
     <TableBody>
-      <TableRow>
-        <TableCell colSpan={6} className="streamHeader">
-          {stream.camera.shortName} {stream.streamType}
+      <TableRow sx={{
+        position: 'sticky',
+        top: 36, // Main header height
+        zIndex: 1100,
+        backgroundColor: 'background.paper',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.2)',
+      }}>
+        <TableCell colSpan={7} className="streamHeader" sx={{ py: 0.75, fontWeight: 900, borderBottom: '1px solid rgba(255,255,255,0.1)' }}>
+          <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+            <span style={{ fontSize: '0.8rem', letterSpacing: '0.5px', textTransform: 'uppercase' }}>{stream.camera.shortName} — {stream.streamType}</span>
+          </Box>
         </TableCell>
       </TableRow>
-      <Row
-        start="start"
-        end="end"
-        resolution="resolution"
-        fps="fps"
-        storage="storage"
-        bitrate="bitrate"
-      />
       {body}
     </TableBody>
   );

@@ -9,31 +9,20 @@ import * as api from "../api";
 import Box from "@mui/material/Box";
 import CircularProgress from "@mui/material/CircularProgress";
 import Alert from "@mui/material/Alert";
+import Typography from "@mui/material/Typography";
 import useResizeObserver from "@react-hook/resize-observer";
 import { fillAspect } from "../aspect";
 
-/// The media source API to use:
-/// * Essentially everything but iPhone supports `MediaSource`.
-///   (All major desktop browsers; Android browsers; and Safari on iPad are
-///   fine.)
-/// * Safari/macOS and Safari/iPhone on iOS 17+ support `ManagedMediaSource`.
-/// * Safari/iPhone with older iOS does not support anything close to
-///   `MediaSource`.
 export const MediaSourceApi: typeof MediaSource | undefined =
   (self as any).ManagedMediaSource ?? self.MediaSource;
 
 interface LiveCameraProps {
-  /// Caller should provide a failure path when `MediaSourceApi` is undefined
-  /// and pass it back here otherwise.
   mediaSourceApi: typeof MediaSource;
   camera: Camera | null;
   chooser: React.JSX.Element;
 }
 
-interface BufferStateClosed {
-  state: "closed";
-}
-
+interface BufferStateClosed { state: "closed"; }
 interface BufferStateOpen {
   state: "open";
   srcBuf: SourceBuffer;
@@ -41,46 +30,18 @@ interface BufferStateOpen {
   mimeType: string;
   videoSampleEntryId: number;
 }
-
-interface BufferStateError {
-  state: "error";
-}
-
+interface BufferStateError { state: "error"; }
 type BufferState = BufferStateClosed | BufferStateOpen | BufferStateError;
 
-interface PlaybackStateNormal {
-  state: "normal";
-}
+interface PlaybackStateNormal { state: "normal"; }
+interface PlaybackStateWaiting { state: "waiting"; }
+interface PlaybackStateError { state: "error"; message: ReactNode; }
+type PlaybackState = | PlaybackStateNormal | PlaybackStateWaiting | PlaybackStateError;
 
-interface PlaybackStateWaiting {
-  state: "waiting";
-}
-
-interface PlaybackStateError {
-  state: "error";
-  message: ReactNode;
-}
-
-type PlaybackState =
-  | PlaybackStateNormal
-  | PlaybackStateWaiting
-  | PlaybackStateError;
-
-interface DroppedMessage {
-  type: "dropped";
-  frames: number;
-}
-interface ErrorMessage {
-  type: "error";
-  message: string;
-}
+interface DroppedMessage { type: "dropped"; frames: number; }
+interface ErrorMessage { type: "error"; message: string; }
 type Message = DroppedMessage | ErrorMessage;
 
-/**
- * Drives a live camera.
- * Implementation detail of LiveCamera which listens to various DOM events and
- * drives the WebSocket feed and the MediaSource and SourceBuffers.
- */
 class LiveCameraDriver {
   constructor(
     mediaSourceApi: typeof MediaSource,
@@ -95,21 +56,20 @@ class LiveCameraDriver {
     this.setPlaybackState = setPlaybackState;
     this.setAspect = setAspect;
     this.video = video;
+    this.aborted = false;
     video.addEventListener("pause", this.videoPause);
     video.addEventListener("play", this.videoPlay);
     video.addEventListener("playing", this.videoPlaying);
     video.addEventListener("timeupdate", this.videoTimeUpdate);
     video.addEventListener("waiting", this.videoWaiting);
     this.src.addEventListener("sourceopen", this.onMediaSourceOpen);
-
-    // This appears necessary for the `ManagedMediaSource` API to function
-    // on Safari/iOS.
     video["disableRemotePlayback"] = true;
     video.src = this.objectUrl = URL.createObjectURL(this.src);
     video.load();
   }
 
   unmount = () => {
+    this.aborted = true;
     this.stopStream("unmount");
     const v = this.video;
     v.removeEventListener("pause", this.videoPause);
@@ -117,306 +77,154 @@ class LiveCameraDriver {
     v.removeEventListener("playing", this.videoPlaying);
     v.removeEventListener("timeupdate", this.videoTimeUpdate);
     v.removeEventListener("waiting", this.videoWaiting);
-    v.src = "";
+    v.removeAttribute("src");
     URL.revokeObjectURL(this.objectUrl);
     v.load();
+    this.buf = { state: "error" };
+    this.queue = [];
   };
 
-  onMediaSourceOpen = () => {
-    this.startStream("sourceopen");
-  };
+  onMediaSourceOpen = () => { this.startStream("sourceopen"); };
 
   startStream = (reason: string) => {
-    if (this.ws !== undefined) {
-      return;
-    }
+    if (this.ws !== undefined) return;
+    const mainStream = this.camera.streams.main;
     const subStream = this.camera.streams.sub;
-    if (subStream === undefined || !subStream.record) {
-      this.error(
-        "Must have sub stream set to record",
-        <span>
-          see{" "}
-          <a
-            href="https://github.com/scottlamb/moonshadow-nvr/issues/119"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #119
-          </a>{" "}
-          and{" "}
-          <a
-            href="https://github.com/scottlamb/moonshadow-nvr/issues/120"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            #120
-          </a>
-        </span>,
-      );
+    const hasMain = mainStream && mainStream.config?.mode !== "off";
+    const hasSub = subStream && subStream.config?.mode !== "off";
+    // Use MAIN stream for live view (continuous recording), SUB for AI detection only
+    const streamType = hasMain ? "main" : hasSub ? "sub" : null;
+
+    if (!streamType) {
+      const details = [];
+      if (!hasMain && !hasSub) details.push("No active streams configured");
+      this.error(`No stream available: ${details.join(", ")}. Check Camera Settings`);
       return;
     }
-    console.log(`${this.camera.shortName}: starting stream: ${reason}`);
     const loc = window.location;
     const proto = loc.protocol === "https:" ? "wss" : "ws";
-
-    // TODO: switch between sub and main based on window size/bandwidth.
-    const url = `${proto}://${loc.host}/api/cameras/${this.camera.uuid}/sub/live.m4s`;
+    const url = `${proto}://${loc.host}/api/cameras/${this.camera.uuid}/${streamType}/live.m4s`;
+    console.log(`[LiveCamera] Connecting to ${streamType} stream: ${url}`);
     this.ws = new WebSocket(url);
-    this.ws.addEventListener("close", this.onWsClose);
-    this.ws.addEventListener("open", this.onWsOpen);
-    this.ws.addEventListener("error", this.onWsError);
+    this.ws.addEventListener("open", () => {
+      console.log(`[LiveCamera] WebSocket opened to ${streamType} stream`);
+    });
+    this.ws.addEventListener("close", (e) => {
+      console.log(`[LiveCamera] WebSocket closed: code=${e.code}, reason=${e.reason}`);
+      this.error(`Connection closed (${e.code})`);
+    });
+    this.ws.addEventListener("error", (e) => {
+      console.error(`[LiveCamera] WebSocket error:`, e);
+      this.error("Connection failed");
+    });
     this.ws.addEventListener("message", this.onWsMessage);
   };
 
   error = (reason: string, extra?: ReactNode) => {
-    console.error(`${this.camera.shortName}: aborting due to ${reason}`);
     this.stopStream(reason);
     this.buf = { state: "error" };
-    this.setPlaybackState({
-      state: "error",
-      message: extra ? (
-        <div>
-          {reason} {extra}
-        </div>
-      ) : (
-        reason
-      ),
-    });
-  };
-
-  onWsClose = (e: CloseEvent) => {
-    // e doesn't say much. code is likely 1006, reason is likely empty.
-    // See the warning here: https://websockets.spec.whatwg.org/#closeWebSocket
-    const cleanly = e.wasClean ? "cleanly" : "uncleanly";
-    this.error(`connection closed ${cleanly}`);
-  };
-
-  onWsOpen = (e: Event) => {
-    console.debug(`${this.camera.shortName}: ws open`);
-  };
-
-  onWsError = (e: Event) => {
-    console.error(`${this.camera.shortName}: ws error`, e);
+    this.queue = [];
+    this.setPlaybackState({ state: "error", message: extra || reason });
   };
 
   tryAddInitSegment = async (id: number, buf: BufferStateOpen) => {
-    const initSegmentResult = await api.init(id, {});
-    switch (initSegmentResult.status) {
-      case "error":
-        this.error(`init segment fetch error: ${initSegmentResult.message}`);
-        return;
-      case "aborted":
-        this.error(`init segment fetch aborted`);
-        return;
-      case "success":
-        break;
+    const res = await api.init(id, {});
+    if (res.status === "success") {
+      this.setAspect(res.response.aspect);
+      buf.srcBuf.appendBuffer(res.response.body);
+    } else {
+      this.error(`Init fetch error: ${res.status}`);
     }
-    this.setAspect(initSegmentResult.response.aspect);
-    buf.srcBuf.appendBuffer(initSegmentResult.response.body);
-    return;
   };
 
   onWsMessage = (e: MessageEvent<any>) => {
     if (typeof e.data === "string") {
       const message = JSON.parse(e.data) as Message;
-      switch (message.type) {
-        case "dropped":
-          console.log(
-            `${this.camera.shortName}: dropped ${message.frames} frames`,
-          );
-          return;
-        case "error":
-          this.error(`server error: ${message.message}`);
-          return;
-        default:
-          return;
+      if (message.type === "error") {
+        console.error(`[LiveCamera] Server error: ${message.message}`);
+        this.error(`Server: ${message.message}`);
+      } else if (message.type === "dropped") {
+        console.warn(`[LiveCamera] Dropped ${message.frames} frames`);
       }
+      return;
     }
-    // Process blobs sequentially by chaining onto a promise. This prevents
-    // concurrent Blob.arrayBuffer() calls from resolving out of order and
-    // delivering segments to the SourceBuffer out of order.
-    this.messageChain = this.messageChain.then(() =>
-      this.processWsBlob(e.data as Blob),
-    );
+    // Process blob immediately without chaining to avoid backlog
+    console.log(`[LiveCamera] Received blob: ${e.data.size} bytes`);
+    this.processWsBlob(e.data as Blob);
   };
-
-  messageChain: Promise<void> = Promise.resolve();
 
   processWsBlob = async (blob: Blob) => {
-    let raw;
+    if (this.aborted || this.buf.state === "error" || this.src.readyState === "closed" || this.src.readyState === "ended") return;
     try {
-      raw = new Uint8Array(await blob.arrayBuffer());
-    } catch (e) {
-      if (!(e instanceof DOMException)) {
-        throw e;
+      const raw = new Uint8Array(await blob.arrayBuffer());
+      const result = parsePart(raw);
+      if (result.status === "error") {
+        console.warn("Failed to parse blob:", result.errorMessage);
+        return;
       }
-      this.error(`error reading part: ${(e as DOMException).message}`);
-      return;
-    }
-    if (this.buf.state === "error") {
-      return;
-    }
-    const result = parsePart(raw);
-    if (result.status === "error") {
-      this.error(`unparseable part: ${result.errorMessage}`);
-      return;
-    }
-    const part = result.part;
-    if (!this.mediaSourceApi.isTypeSupported(part.mimeType)) {
-      this.error(`unsupported mime type ${part.mimeType}`);
-      return;
-    }
-
-    this.queue.push(part);
-    this.queuedBytes += part.body.byteLength;
-    if (this.buf.state === "closed") {
-      const srcBuf = this.src.addSourceBuffer(part.mimeType);
-      srcBuf.mode = "segments";
-      srcBuf.addEventListener("updateend", this.bufUpdateEnd);
-      srcBuf.addEventListener("error", this.bufEvent);
-      srcBuf.addEventListener("abort", this.bufEvent);
-      this.buf = {
-        state: "open",
-        srcBuf,
-        busy: true,
-        mimeType: part.mimeType,
-        videoSampleEntryId: part.videoSampleEntryId,
-      };
-      await this.tryAddInitSegment(part.videoSampleEntryId, this.buf);
-    } else if (this.buf.state === "open") {
-      await this.tryAppendPart(this.buf);
+      const part = result.part;
+      if (!this.mediaSourceApi.isTypeSupported(part.mimeType)) {
+        console.warn("Mime type not supported:", part.mimeType);
+        return;
+      }
+      this.queue.push(part);
+      if (this.buf.state === "closed") {
+        const srcBuf = this.src.addSourceBuffer(part.mimeType);
+        srcBuf.mode = "segments";
+        srcBuf.addEventListener("updateend", this.bufUpdateEnd);
+        this.buf = { state: "open", srcBuf, busy: true, mimeType: part.mimeType, videoSampleEntryId: part.videoSampleEntryId };
+        await this.tryAddInitSegment(part.videoSampleEntryId, this.buf);
+      } else if (this.buf.state === "open") {
+        await this.tryAppendPart(this.buf);
+      }
+    } catch(e) {
+      console.error("Error processing blob:", e);
     }
   };
 
-  bufUpdateEnd = () => {
-    if (this.buf.state !== "open") {
-      console.error(
-        `${this.camera.shortName}: bufUpdateEnd in state ${this.buf.state}`,
-      );
-      return;
-    }
-    if (!this.buf.busy) {
-      this.error("bufUpdateEnd when not busy");
-      return;
-    }
+bufUpdateEnd = () => {
+    if (this.aborted || this.buf.state !== "open") return;
     this.buf.busy = false;
     this.tryTrimBuffer();
     this.tryAppendPart(this.buf);
   };
 
-  tryAppendPart = async (buf: BufferStateOpen) => {
-    if (buf.busy) {
-      return;
-    }
-
+tryAppendPart = async (buf: BufferStateOpen) => {
+    if (this.aborted || buf.busy || this.src.readyState === "closed" || this.src.readyState === "ended") return;
     const part = this.queue.shift();
-    if (part === undefined) {
-      return;
-    }
-
-    if (part.mimeType !== buf.mimeType) {
-      try {
-        buf.srcBuf.changeType(part.mimeType);
-      } catch (e) {
-        this.error(
-          `Failed to change MIME type (${buf.mimeType}->${part.mimeType}): ${e}`,
-        );
-        return;
-      }
-      buf.mimeType = part.mimeType;
-    }
+    if (part === undefined) return;
+    if (buf.state !== "open") return;
+    if (part.mimeType !== buf.mimeType) try { buf.srcBuf.changeType(part.mimeType); } catch { /* Ignore */ }
     if (part.videoSampleEntryId !== buf.videoSampleEntryId) {
-      console.info(
-        `${this.camera.shortName}: switching video sample entry ${buf.videoSampleEntryId}->${part.videoSampleEntryId}`,
-      );
       buf.busy = true;
       buf.videoSampleEntryId = part.videoSampleEntryId;
       this.queue.unshift(part);
       await this.tryAddInitSegment(part.videoSampleEntryId, buf);
       return;
     }
-
-    // Always put the new part at the end. SourceBuffer.mode "sequence" is
-    // supposed to generate timestamps automatically, but on Chrome 89.0.4389.90
-    // it doesn't appear to work as expected. So use SourceBuffer.mode
-    // "segments" and use the existing end as the timestampOffset.
     const b = buf.srcBuf.buffered;
     buf.srcBuf.timestampOffset = b.length > 0 ? b.end(b.length - 1) : 0;
-
-    try {
-      buf.srcBuf.appendBuffer(part.body);
-    } catch (e) {
-      if (!(e instanceof DOMException)) {
-        throw e;
-      }
-      // In particular, appendBuffer can throw QuotaExceededError.
-      // <https://developers.google.com/web/updates/2017/10/quotaexceedederror>
-      // tryTrimBuffer removes already-played stuff from the buffer to avoid
-      // this, but in theory even one GOP could be more than the total buffer
-      // size. At least report error properly.
-      this.error(`${e.name} while appending buffer`);
-      return;
-    }
-    buf.busy = true;
+    try { buf.srcBuf.appendBuffer(part.body); buf.busy = true; } catch { /* Ignore */ }
   };
 
-  tryTrimBuffer = () => {
-    if (
-      this.buf.state !== "open" ||
-      this.buf.busy ||
-      this.buf.srcBuf.buffered.length === 0
-    ) {
-      return;
-    }
-    const curTs = this.video.currentTime;
-
-    // TODO: call out key frames in the part headers. The "- 5" here is a guess
-    // to avoid removing anything from the current GOP.
+tryTrimBuffer = () => {
+    if (this.aborted || this.buf.state !== "open" || this.buf.busy || this.buf.srcBuf.buffered.length === 0) return;
     const sb = this.buf.srcBuf;
     const firstTs = sb.buffered.start(0);
-    if (firstTs < curTs - 5) {
-      sb.remove(firstTs, curTs - 5);
-      this.buf.busy = true;
+    if (firstTs < this.video.currentTime - 5) {
+      try { sb.remove(firstTs, this.video.currentTime - 5); this.buf.busy = true; } catch { /* Ignore */ }
     }
   };
 
-  bufEvent = (e: Event) => {
-    this.error(`SourceBuffer ${e.type}`);
-  };
-
-  videoPause = () => {
-    this.stopStream("pause");
-  };
-
-  videoPlay = () => {
-    this.startStream("play");
-  };
-
-  videoPlaying = () => {
-    if (this.buf.state !== "error") {
-      this.setPlaybackState({ state: "normal" });
-    }
-  };
-
+  videoPause = () => { this.stopStream("pause"); };
+  videoPlay = () => { this.startStream("play"); };
+  videoPlaying = () => { if (this.buf.state !== "error") this.setPlaybackState({ state: "normal" }); };
+  videoWaiting = () => { if (this.buf.state !== "error") this.setPlaybackState({ state: "waiting" }); };
   videoTimeUpdate = () => {};
 
-  videoWaiting = () => {
-    if (this.buf.state !== "error") {
-      this.setPlaybackState({ state: "waiting" });
-    }
-  };
-
   stopStream = (reason: string) => {
-    if (this.ws === undefined) {
-      return;
-    }
-    console.log(`${this.camera.shortName}: stopping stream: ${reason}`);
-    const NORMAL_CLOSURE = 1000; // https://developer.mozilla.org/en-US/docs/Web/API/CloseEvent
-    this.ws.close(NORMAL_CLOSURE);
-    this.ws.removeEventListener("close", this.onWsClose);
-    this.ws.removeEventListener("open", this.onWsOpen);
-    this.ws.removeEventListener("error", this.onWsError);
-    this.ws.removeEventListener("message", this.onWsMessage);
+    if (this.ws === undefined) return;
+    this.ws.close(1000);
     this.ws = undefined;
   };
 
@@ -424,129 +232,254 @@ class LiveCameraDriver {
   setPlaybackState: (state: PlaybackState) => void;
   setAspect: (aspect: [number, number]) => void;
   video: HTMLVideoElement;
-
   mediaSourceApi: typeof MediaSource;
   src: MediaSource;
   buf: BufferState = { state: "closed" };
   queue: Part[] = [];
-  queuedBytes: number = 0;
-
-  /// The object URL for the HTML video element, not the WebSocket URL.
   objectUrl: string;
-
   ws?: WebSocket;
+  aborted: boolean;
 }
 
-/**
- * A live view of a camera.
- *
- * Note there's a significant setup cost to creating a LiveCamera, so the parent
- * should use React's <tt>key</tt> attribute to avoid unnecessarily mounting
- * and unmounting a camera.
- */
 const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
   const [aspect, setAspect] = React.useState<[number, number]>([16, 9]);
   const videoRef = React.useRef<HTMLVideoElement | null>(null);
   const boxRef = React.useRef<HTMLElement | null>(null);
-  const [playbackState, setPlaybackState] = React.useState<PlaybackState>({
-    state: "normal",
-  });
+  const [playbackState, setPlaybackState] = React.useState<PlaybackState>({ state: "normal" });
 
   React.useLayoutEffect(() => {
-    fillAspect(boxRef.current!.getBoundingClientRect(), videoRef, aspect);
-  }, [boxRef, videoRef, aspect]);
-  useResizeObserver(
-    boxRef as React.RefObject<HTMLElement>,
-    (entry: ResizeObserverEntry) => {
-      fillAspect(entry.contentRect, videoRef, aspect);
-    },
-  );
+    if (boxRef.current && videoRef.current) fillAspect(boxRef.current.getBoundingClientRect(), videoRef, aspect);
+  }, [aspect, boxRef, videoRef]);
 
-  // Load the camera driver.
+  useResizeObserver(boxRef as React.RefObject<HTMLElement>, (entry) => {
+    if (videoRef.current) fillAspect(entry.contentRect, videoRef, aspect);
+  });
+
   React.useEffect(() => {
-    setPlaybackState({ state: "normal" });
+    if (camera && videoRef.current) {
+      const d = new LiveCameraDriver(mediaSourceApi, camera, setPlaybackState, setAspect, videoRef.current);
+      return () => d.unmount();
+    }
+  }, [camera, mediaSourceApi, videoRef]);
+
+  const [currentTime, setCurrentTime] = React.useState(new Date());
+  const [resolution, setResolution] = React.useState("");
+  const [streamType, setStreamType] = React.useState<string>("");
+  const [isRecording, setIsRecording] = React.useState(false);
+
+  React.useEffect(() => {
+    const timer = setInterval(() => setCurrentTime(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  React.useEffect(() => {
     const video = videoRef.current;
-    if (camera === null || video === null) {
-      return;
-    }
-    const d = new LiveCameraDriver(
-      mediaSourceApi,
-      camera,
-      setPlaybackState,
-      setAspect,
-      video,
-    );
-    return () => {
-      d.unmount();
+    if (!video) return;
+    const updateRes = () => { 
+      if (video.videoWidth > 0) {
+        setResolution(`${video.videoWidth}x${video.videoHeight}`);
+      }
     };
-  }, [mediaSourceApi, camera]);
+    video.addEventListener("loadedmetadata", updateRes);
+    video.addEventListener("resize", updateRes);
+    return () => {
+      video.removeEventListener("loadedmetadata", updateRes);
+      video.removeEventListener("resize", updateRes);
+    };
+  }, [videoRef]);
 
-  // Display circular progress after 100 ms of waiting.
-  const [showProgress, setShowProgress] = React.useState(false);
   React.useEffect(() => {
-    setShowProgress(false);
-    if (playbackState.state !== "waiting") {
-      return;
+    if (camera) {
+      const mainStream = camera.streams.main;
+      const subStream = camera.streams.sub;
+      const hasMain = mainStream && mainStream.config?.mode !== "off";
+      const hasSub = subStream && subStream.config?.mode !== "off";
+      setStreamType(hasSub ? "SUB" : hasMain ? "MAIN" : "");
+      setIsRecording(hasSub || hasMain ? true : false);
+    } else {
+      setIsRecording(false);
     }
-    const timerId = setTimeout(() => setShowProgress(true), 100);
-    return () => clearTimeout(timerId);
-  }, [playbackState]);
+  }, [camera]);
 
   return (
     <Box
       ref={boxRef}
       sx={{
-        width: "100%",
-        height: "100%",
-        position: "relative",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        "& video": {
-          width: "100%",
-          height: "100%",
-
-          objectFit: "contain",
-        },
-        "& .controls": {
-          position: "absolute",
-          width: "100%",
-          height: "100%",
-          zIndex: 1,
-        },
-        "& .progress-overlay": {
-          position: "absolute",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          width: "100%",
-          height: "100%",
-        },
-        "& .alert-overlay": {
-          position: "absolute",
-          display: "flex",
-          width: "100%",
-          height: "100%",
-          alignItems: "flex-end",
-          p: 1,
-          zIndex: 2,
-        },
+        width: "100%", height: "100%", position: "relative",
+        display: "flex", alignItems: "center", justifyContent: "center",
+        bgcolor: "#000", overflow: "hidden",
       }}
     >
-      <div className="controls">{chooser}</div>
-      {showProgress && (
-        <div className="progress-overlay">
-          <CircularProgress />
-        </div>
+      <video ref={videoRef} muted autoPlay playsInline style={{ width: "100%", height: "100%", objectFit: "contain", zIndex: 1 }} />
+
+      {/* HUD: Camera Name + REC Indicator (Top Left) */}
+      <Box sx={{ 
+        position: "absolute", top: 12, left: 15, zIndex: 10, pointerEvents: "none", 
+        display: 'flex', gap: 1
+      }}>
+        {/* Camera Name Badge */}
+        <Box sx={{ 
+          bgcolor: "rgba(0,0,0,0.85)", px: 2, py: 1, borderRadius: 1.5, 
+          border: '1px solid rgba(255,255,255,0.12)',
+          backdropFilter: 'blur(8px)',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)'
+        }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <Box sx={{ 
+              width: 8, height: 8, borderRadius: '50%', 
+              bgcolor: camera ? '#4caf50' : '#757575',
+              boxShadow: camera ? '0 0 8px rgba(76, 175, 80, 0.6)' : 'none',
+              animation: camera ? 'pulse 2s infinite' : 'none',
+              '@keyframes pulse': {
+                '0%': { opacity: 1 },
+                '50%': { opacity: 0.5 },
+                '100%': { opacity: 1 }
+              }
+            }} />
+            <Typography variant="caption" sx={{ 
+              fontWeight: 700, color: '#fff', fontFamily: "'Inter', 'system-ui', sans-serif", 
+              fontSize: '0.9rem', letterSpacing: 0.7, textTransform: 'uppercase',
+              whiteSpace: 'nowrap'
+            }}>
+              {camera?.shortName || "NO CAMERA"}
+            </Typography>
+          </Box>
+        </Box>
+        {/* REC Indicator */}
+        {isRecording && (
+          <Box sx={{ 
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            bgcolor: "rgba(244, 67, 54, 0.9)", 
+            px: 1.5, py: 1, borderRadius: 1.5,
+            border: '1px solid rgba(255,255,255,0.2)',
+            backdropFilter: 'blur(8px)',
+            boxShadow: '0 2px 8px rgba(244, 67, 54, 0.4)',
+            animation: 'recPulse 1.5s infinite',
+            '@keyframes recPulse': {
+              '0%': { opacity: 1 },
+              '50%': { opacity: 0.6 },
+              '100%': { opacity: 1 }
+            }
+          }}>
+            <Box sx={{ 
+              width: 10, height: 10, borderRadius: '50%', 
+              bgcolor: '#fff',
+              boxShadow: '0 0 6px rgba(255,255,255,0.8)'
+            }} />
+          </Box>
+        )}
+      </Box>
+
+      {/* HUD: Date/Time & Resolution (Top Right) */}
+      <Box sx={{ 
+        position: "absolute", top: 12, right: 15, zIndex: 10, pointerEvents: "none", 
+        bgcolor: "rgba(0,0,0,0.85)", px: 2, py: 1, borderRadius: 1.5, 
+        border: '1px solid rgba(255,255,255,0.12)',
+        backdropFilter: 'blur(8px)',
+        boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        minWidth: '160px'
+      }}>
+        {/* Date */}
+        <Box sx={{ 
+          color: '#bdbdbd', 
+          fontSize: "0.7rem", 
+          fontWeight: 600, 
+          fontFamily: "'Inter Mono', 'Monaco', monospace",
+          letterSpacing: 0.5,
+          mb: 0.5
+        }}>
+          {currentTime.toLocaleDateString('es-ES', { 
+            weekday: 'short',
+            day: '2-digit', month: '2-digit', year: 'numeric' 
+          }).toUpperCase()}
+        </Box>
+        {/* Time */}
+        <Box sx={{ 
+          color: '#4caf50', 
+          fontSize: "1rem", 
+          fontWeight: 700, 
+          fontFamily: "'Inter Mono', 'Monaco', monospace",
+          letterSpacing: 1,
+          mb: 1,
+          textShadow: '0 0 10px rgba(76, 175, 80, 0.3)'
+        }}>
+          {currentTime.toLocaleTimeString('es-ES', { hour12: false })}
+        </Box>
+        {/* Stream & Resolution */}
+        <Box sx={{ 
+          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+          pt: 0.75, borderTop: '1px solid rgba(255,255,255,0.15)'
+        }}>
+          <Box sx={{ 
+            display: 'flex', alignItems: 'center', gap: 0.5
+          }}>
+            <Box sx={{ 
+              width: 6, height: 6, borderRadius: '50%',
+              bgcolor: streamType === 'SUB' ? '#2196f3' : streamType === 'MAIN' ? '#ff9800' : '#757575'
+            }} />
+            <Box sx={{ color: streamType === 'SUB' ? '#2196f3' : streamType === 'MAIN' ? '#ff9800' : '#757575', fontSize: "0.65rem", fontWeight: 700, fontFamily: "monospace", letterSpacing: 0.5 }}>
+              {streamType || "N/A"}
+            </Box>
+          </Box>
+          <Box sx={{ color: '#9e9e9e', fontSize: "0.65rem", fontWeight: 600, fontFamily: "monospace", letterSpacing: 0.5 }}>
+            {resolution || (camera ? "LOAD" : "N/A")}
+          </Box>
+        </Box>
+      </Box>
+
+      {/* Connection Status (Bottom Left) */}
+      {camera && (
+        <Box sx={{ 
+          position: "absolute", bottom: 15, left: 15, zIndex: 10, pointerEvents: "none",
+          display: 'flex', alignItems: 'center', gap: 0.75
+        }}>
+          <Box sx={{ 
+            width: 6, height: 6, borderRadius: '50%', 
+            bgcolor: playbackState.state === 'normal' ? '#4caf50' : playbackState.state === 'waiting' ? '#ff9800' : '#f44336',
+            boxShadow: '0 0 6px currentColor'
+          }} />
+          <Typography variant="caption" sx={{ 
+            color: playbackState.state === 'normal' ? '#4caf50' : playbackState.state === 'waiting' ? '#ff9800' : '#f44336',
+            fontSize: '0.65rem', fontWeight: 700, fontFamily: "monospace", letterSpacing: 0.5, textTransform: 'uppercase'
+          }}>
+            {playbackState.state === 'normal' ? 'LIVE' : playbackState.state === 'waiting' ? 'BUFFER' : 'ERROR'}
+          </Typography>
+        </Box>
       )}
-      {playbackState.state === "error" && (
-        <div className="alert-overlay" style={{ pointerEvents: "none" }}>
-          <Alert severity="error" style={{ pointerEvents: "auto" }}>
-            {playbackState.message}
-          </Alert>
-        </div>
+
+      {/* Camera Selector (Bottom Center) */}
+      <Box
+        className="controls"
+        sx={{
+          position: "absolute", bottom: 15, left: "50%", transform: "translateX(-50%)",
+          zIndex: 20,
+          opacity: camera ? 0.2 : 1, // High visibility if no camera selected
+          "&:hover": { opacity: 1 },
+          transition: "opacity 0.4s ease-in-out",
+          bgcolor: camera ? 'transparent' : 'rgba(255,255,255,0.05)',
+          p: camera ? 0 : 4,
+          borderRadius: 2,
+          border: camera ? 'none' : '1px dashed rgba(255,255,255,0.2)',
+          textAlign: 'center'
+        }}
+      >
+        {!camera && <Typography variant="caption" sx={{ display: 'block', mb: 1, color: 'rgba(255,255,255,0.5)' }}>Click to assign camera</Typography>}
+        {chooser}
+      </Box>
+
+      {/* Loading Spinner */}
+      {playbackState.state === "waiting" && camera && (
+        <Box sx={{ position: "absolute", zIndex: 5, display: "flex", alignItems: "center", justifyContent: "center", width: "100%", height: "100%", bgcolor: 'rgba(0,0,0,0.4)' }}>
+          <CircularProgress size={40} thickness={4} sx={{ color: '#fff' }} />
+        </Box>
       )}
-      <video ref={videoRef} muted autoPlay playsInline />
+
+      {/* Error Message */}
+      {playbackState.state === "error" && camera && (
+        <Box sx={{ position: "absolute", bottom: 20, width: "80%", zIndex: 30 }}>
+          <Alert severity="error" variant="filled" sx={{ py: 0.5, borderRadius: 1, fontSize: '0.75rem', fontWeight: 600 }}>{playbackState.message}</Alert>
+        </Box>
+      )}
     </Box>
   );
 };

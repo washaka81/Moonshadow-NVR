@@ -10,6 +10,9 @@ credentials.*
 id_rsa*
 id_ed25519*
 auth.toml
+*.toml
+!config.toml
+!server/config.toml
 
 # --- OS Specific ---
 .DS_Store
@@ -100,6 +103,13 @@ __pycache__/
 /models/*.bin
 /models/hf_search_output.txt
 /models/*.log
+/models/*.onnx
+/models/*.onnx.data
+/models/*.pth
+/models/*.weights
+/models/*.tflite
+/models/*.h5
+/models/*.bin
 
 # --- Backups ---
 *.bak
@@ -107,3 +117,65 @@ __pycache__/
 *.tmp
 *.old
 server/src/detector.rs.backup
+
+# --- AI Training & Notebooks ---
+*.ipynb
+*.ipynb_checkpoints/
+models/training_*
+models/checkpoints/
+models/exports/
+models/tensorboard/
+models/wandb/
+models/*.pt
+models/yolov8n.pt
+
+# --- Videos & Recordings ---
+/Videos_Revisar/
+*.mp4
+*.avi
+*.mkv
+*.mov
+*.webm
+
+# --- Weights & Checkpoints ---
+*.pt
+*.pth.tar
+*.ckpt
+*.h5
+*.pb
+*.params
+
+# --- Local Configuration ---
+.local_config.toml
+*.local.toml
+config.local.toml
+
+# --- Debug & Profiling ---
+*.prof
+*.profdata
+coverage/
+profraw/
+*.dmp
+
+# --- AI Assistants ---
+.aider*
+.kilocode/
+.opencode/
+
+# --- Build Artifacts ---
+/target/
+ui/dist/
+*.so
+*.dll
+*.dylib
+
+# --- Test & Debug ---
+test-db-test/
+jkjlhjlk/
+mandelbrot_vulkan/
+models/chilean_plates_synthetic/
+models/chilean_plates_test/
+models/chilean_plates_test_formats/
+
+# Generated dataset scripts
+models/generate_synthetic_dataset.py

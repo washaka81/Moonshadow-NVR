@@ -31,7 +31,7 @@ pub mod rtp;
 #[doc(hidden)]
 pub mod testutil;
 
-pub use error::Error;
+pub use error::{Error, ErrorInt};
 
 /// Wraps the supplied `ErrorInt` and returns it as an `Err`.
 macro_rules! bail {
@@ -52,8 +52,6 @@ pub mod codec;
 #[doc(hidden)]
 pub mod rtsp;
 mod tokio;
-
-use error::ErrorInt;
 
 /// A received RTSP message.
 #[derive(Debug)]

@@ -65,7 +65,7 @@ motion detection or day/night status. They could also represent an external
 input such as a burglar alarm system's zone status. See
 [../ref/api.md](../ref/api.md). Note signals are still under development and
 not yet exposed in Moonshadow NVR's UI. See
-[#28](https://github.com/scottlamb/moonshadow-nvr/issues/28) for more
+[#28](https://github.com/washaka81/Moonshadow-NVR/issues/28) for more
 information.
 
 *stream:* the "main" or "sub" stream from a given camera. Moonshadow NVR expects

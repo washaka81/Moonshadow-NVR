@@ -5,12 +5,8 @@
 import Box from "@mui/material/Box";
 import Select, { SelectChangeEvent } from "@mui/material/Select";
 import MenuItem from "@mui/material/MenuItem";
-import React, { useCallback, useEffect, useReducer } from "react";
+import React from "react";
 import { Camera } from "../types";
-import { useSearchParams } from "react-router";
-import IconButton from "@mui/material/IconButton";
-import Tooltip from "@mui/material/Tooltip";
-import Fullscreen from "@mui/icons-material/Fullscreen";
 
 export interface Layout {
   className: string;
@@ -18,8 +14,7 @@ export interface Layout {
   name: string;
 }
 
-// These class names must match useStyles rules (below).
-const LAYOUTS: Layout[] = [
+export const LAYOUTS: Layout[] = [
   { className: "solo", cameras: 1, name: "1" },
   { className: "dual", cameras: 2, name: "2" },
   { className: "main-plus-five", cameras: 6, name: "Main + 5" },
@@ -28,11 +23,12 @@ const LAYOUTS: Layout[] = [
   { className: "three-by-two", cameras: 6, name: "3x2" },
   { className: "three-by-three", cameras: 9, name: "3x3" },
 ];
-const MAX_CAMERAS = 9;
 
 export interface MultiviewProps {
   cameras: Camera[];
   layoutIndex: number;
+  selected: Array<number | null>;
+  updateSelected: (op: SelectOp) => void;
   renderCamera: (
     camera: Camera | null,
     chooser: React.JSX.Element,
@@ -40,15 +36,10 @@ export interface MultiviewProps {
 }
 
 export interface MultiviewChooserProps {
-  /// An index into <tt>LAYOUTS</tt>.
   layoutIndex: number;
   onChoice: (selectedIndex: number) => void;
 }
 
-/**
- * Chooses the layout for a Multiview.
- * Styled for placement in the app menu bar.
- */
 export const MultiviewChooser = (props: MultiviewChooserProps) => {
   return (
     <Select
@@ -58,45 +49,29 @@ export const MultiviewChooser = (props: MultiviewChooserProps) => {
         props.onChoice(
           typeof e.target.value === "string"
             ? parseInt(e.target.value)
-            : e.target.value,
+            : (e.target.value as number),
         );
       }}
       size="small"
-      sx={{
-        // Hacky attempt to style for the app menu.
-        color: "inherit",
-        "& svg": {
-          color: "inherit",
-        },
-      }}
+      sx={{ color: "inherit", "& svg": { color: "inherit" } }}
     >
       {LAYOUTS.map((e, i) => (
-        <MenuItem key={e.className} value={i}>
-          {e.name}
-        </MenuItem>
+        <MenuItem key={e.className} value={i}>{e.name}</MenuItem>
       ))}
     </Select>
   );
 };
 
-/**
- * The cameras selected for the multiview.
- * This is always an array of length <tt>MAX_CAMERAS</tt>; only the first
- * LAYOUTS[layoutIndex].cameras are currently visible. There are no duplicates;
- * setting one element to a given camera unsets any others pointing to the same
- * camera.
- */
-type SelectedCameras = Array<number | null>;
-
-interface SelectOp {
+export const MAX_CAMERAS = 9;
+export type SelectedCameras = Array<number | null>;
+export interface SelectOp {
   selectedIndex: number;
   cameraIndex: number | null;
 }
 
-function selectedReducer(old: SelectedCameras, op: SelectOp): SelectedCameras {
-  const selected = [...old]; // shallow clone.
+export function selectedReducer(old: SelectedCameras, op: SelectOp): SelectedCameras {
+  const selected = Array.isArray(old) ? [...old] : Array(MAX_CAMERAS).fill(null);
   if (op.cameraIndex !== null) {
-    // de-dupe.
     for (let i = 0; i < selected.length; i++) {
       if (selected[i] === op.cameraIndex) {
         selected[i] = null;
@@ -107,78 +82,58 @@ function selectedReducer(old: SelectedCameras, op: SelectOp): SelectedCameras {
   return selected;
 }
 
-/**
- * Presents one or more camera views in one of several layouts.
- *
- * The parent should arrange for the multiview's outer div to be as large
- * as possible.
- */
-const Multiview = (props: MultiviewProps) => {
-  const [searchParams, setSearchParams] = useSearchParams();
-
-  const [selected, updateSelected] = useReducer(
-    selectedReducer,
-    searchParams.has("cams")
-      ? JSON.parse(searchParams.get("cams") || "")
-      : localStorage.getItem("camsSelected") !== null
-        ? JSON.parse(localStorage.getItem("camsSelected") || "")
-        : Array(MAX_CAMERAS).fill(null),
-  );
-
-  /**
-   * Save previously selected cameras to local storage.
-   */
-  useEffect(() => {
-    if (searchParams.has("cams"))
-      localStorage.setItem("camsSelected", searchParams.get("cams") || "");
-  }, [searchParams]);
-
-  const outerRef = React.useRef<HTMLDivElement>(null);
-  const layout = LAYOUTS[props.layoutIndex];
-
-  /**
-   * Toggle full screen.
-   */
-  const handleFullScreen = useCallback(() => {
-    if (outerRef.current) {
-      const elem = outerRef.current;
-      if (document.fullscreenElement) {
-        if (document.exitFullscreen) {
-          document.exitFullscreen();
-        }
-      } else {
-        if (elem.requestFullscreen) {
-          elem.requestFullscreen();
-        }
+export const getInitialSelected = (searchParams: URLSearchParams, cameras: Camera[]): SelectedCameras => {
+  let result: SelectedCameras | null = null;
+  try {
+    const fromUrl = searchParams.get("cams");
+    if (fromUrl) {
+      const parsed = JSON.parse(fromUrl);
+      if (Array.isArray(parsed)) {
+        result = parsed;
       }
     }
-  }, [outerRef]);
+    if (!result) {
+      const fromStorage = localStorage.getItem("camsSelected");
+      if (fromStorage) {
+        const parsed = JSON.parse(fromStorage);
+        if (Array.isArray(parsed)) result = parsed;
+      }
+    }
+  } catch (e) {
+    console.warn("Failed to parse selected cameras, clearing storage", e);
+    localStorage.removeItem("camsSelected");
+  }
+  // If we have a result from URL or storage, use it
+  if (result) return result;
+  // Auto-select all available cameras if nothing is selected
+  if (cameras.length > 0) {
+    const def = Array(MAX_CAMERAS).fill(null);
+    // Select all cameras up to MAX_CAMERAS
+    const camerasToSelect = Math.min(cameras.length, MAX_CAMERAS);
+    for (let i = 0; i < camerasToSelect; i++) {
+      def[i] = i;
+    }
+    return def;
+  }
+  return Array(MAX_CAMERAS).fill(null);
+};
 
-  const monoviews = selected.slice(0, layout.cameras).map((e, i) => {
-    // When a camera is selected, use the camera's index as the key.
-    // This allows swapping cameras' positions without tearing down their
-    // WebSocket connections and buffers.
-    //
-    // When no camera is selected, use the index within selected. (Actually,
-    // -1 minus the index, to disambiguate between the two cases.)
+
+const Multiview = ({ cameras, layoutIndex, selected, updateSelected, renderCamera }: MultiviewProps) => {
+  const outerRef = React.useRef<HTMLDivElement>(null);
+  
+  const currentLayout = LAYOUTS[layoutIndex] || LAYOUTS[0];
+
+  const monoviews = (selected || Array(MAX_CAMERAS).fill(null)).slice(0, currentLayout.cameras).map((e, i) => {
     const key = e ?? -1 - i;
-
     return (
       <Monoview
         key={key}
-        cameras={props.cameras}
+        cameras={cameras || []}
         cameraIndex={e}
-        renderCamera={props.renderCamera}
-        onSelect={(cameraIndex) => {
-          updateSelected({ selectedIndex: i, cameraIndex });
-          searchParams.set(
-            "cams",
-            JSON.stringify(
-              selectedReducer(selected, { selectedIndex: i, cameraIndex }),
-            ),
-          );
-          setSearchParams(searchParams);
-        }}
+        selectedIndex={i}
+        renderCamera={renderCamera}
+        updateSelected={updateSelected} // Pass the lifted updateSelected
       />
     );
   });
@@ -187,91 +142,26 @@ const Multiview = (props: MultiviewProps) => {
     <Box
       ref={outerRef}
       sx={{
-        flex: "1 0 0",
-        color: "white",
-        overflow: "hidden",
-
-        // TODO: this mid-level div can probably be removed.
-        "& > .mid": {
-          width: "100%",
-          height: "100%",
-          position: "relative",
-          display: "inline-block",
-        },
+        flex: "1 0 0", color: "white", overflow: "hidden",
+        "& > .mid": { width: "100%", height: "100%", position: "relative", display: "inline-block" },
       }}
     >
-      <Tooltip title="Toggle full screen">
-        <IconButton
-          size="small"
-          sx={{
-            position: "fixed",
-            background: "rgba(50,50,50,0.4) !important",
-            transition: "0.2s",
-            opacity: "0.4",
-            bottom: 10,
-            right: 10,
-            zIndex: 9,
-            color: "#fff",
-            ":hover": {
-              opacity: "1",
-            },
-          }}
-          onClick={handleFullScreen}
-        >
-          <Fullscreen />
-        </IconButton>
-      </Tooltip>
       <div className="mid">
         <Box
-          className={layout.className}
+          className={currentLayout.className}
           sx={{
-            // match parent's size without influencing it.
-            position: "absolute",
-            width: "100%",
-            height: "100%",
-
-            backgroundColor: "#000",
-            overflow: "hidden",
-            display: "grid",
-            gridGap: "0px",
-
-            // These class names must match LAYOUTS (above).
-            "&.solo": {
-              gridTemplateColumns: "100%",
-              gridTemplateRows: "100%",
-            },
+            position: "absolute", width: "100%", height: "100%",
+            backgroundColor: "#000", overflow: "hidden", display: "grid", gridGap: "1px",
+            "&.solo": { gridTemplateColumns: "100%", gridTemplateRows: "100%" },
             "&.dual": {
-              gridTemplateColumns: {
-                xs: "100%",
-                sm: "100%",
-                md: "repeat(2, calc(100% / 2))",
-              },
-              gridTemplateRows: {
-                xs: "50%",
-                sm: "50%",
-                md: "repeat(1, calc(100% / 1))",
-              },
+              gridTemplateColumns: { xs: "100%", sm: "100%", md: "repeat(2, 50%)" },
+              gridTemplateRows: { xs: "50%", sm: "50%", md: "100%" },
             },
-            "&.two-by-two": {
-              gridTemplateColumns: "repeat(2, calc(100% / 2))",
-              gridTemplateRows: "repeat(2, calc(100% / 2))",
-            },
-            "&.two-by-three": {
-              gridTemplateColumns: "repeat(2, calc(100% / 2))",
-              gridTemplateRows: "repeat(3, calc(100% / 3))",
-            },
-            "&.three-by-two": {
-              gridTemplateColumns: "repeat(3, calc(100% / 3))",
-              gridTemplateRows: "repeat(2, calc(100% / 2))",
-            },
-            "&.main-plus-five, &.three-by-three": {
-              gridTemplateColumns: "repeat(3, calc(100% / 3))",
-              gridTemplateRows: "repeat(3, calc(100% / 3))",
-            },
-            "&.main-plus-five > div:nth-of-type(1)": {
-              gridColumn: "span 2",
-              gridRow: "span 2",
-            },
+            "&.two-by-two": { gridTemplateColumns: "repeat(2, 50%)", gridTemplateRows: "repeat(2, 50%)" },
+            "&.two-by-three": { gridTemplateColumns: "repeat(2, 50%)", gridTemplateRows: "repeat(3, 33.33%)" },
+            "&.three-by-two": { gridTemplateColumns: "repeat(3, 33.33%)", gridTemplateRows: "repeat(2, 50%)" },
+            "&.main-plus-five, &.three-by-three": { gridTemplateColumns: "repeat(3, 33.33%)", gridTemplateRows: "repeat(3, 33.33%)" },
+            "&.main-plus-five > div:nth-of-type(1)": { gridColumn: "span 2", gridRow: "span 2" },
           }}
         >
           {monoviews}
@@ -284,22 +174,19 @@ const Multiview = (props: MultiviewProps) => {
 interface MonoviewProps {
   cameras: Camera[];
   cameraIndex: number | null;
-  onSelect: (cameraIndex: number | null) => void;
-  renderCamera: (
-    camera: Camera | null,
-    chooser: React.JSX.Element,
-  ) => React.JSX.Element;
+  selectedIndex: number; // The index of this monoview in the selected array
+  updateSelected: (op: SelectOp) => void;
+  renderCamera: (camera: Camera | null, chooser: React.JSX.Element) => React.JSX.Element;
 }
 
-/** A single pane of a Multiview, including its camera chooser. */
 const Monoview = (props: MonoviewProps) => {
   const handleChange = (event: SelectChangeEvent<string>) => {
-    const {
-      target: { value },
-    } = event;
-
-    props.onSelect(value === "null" ? null : parseInt(value));
+    const { target: { value } } = event;
+    props.updateSelected({ selectedIndex: props.selectedIndex, cameraIndex: value === "null" ? null : parseInt(value) });
   };
+
+  const cameras = Array.isArray(props.cameras) ? props.cameras : [];
+  const selectedCamera = (props.cameraIndex !== null && cameras[props.cameraIndex]) ? cameras[props.cameraIndex] : null;
 
   const chooser = (
     <Select
@@ -309,26 +196,49 @@ const Monoview = (props: MonoviewProps) => {
       size="small"
       sx={{
         transform: "scale(0.8)",
-        // Restyle to fit over the video (or black).
         backgroundColor: "rgba(50, 50, 50, 0.6)",
-        boxShadow: "0 0 10px rgba(0, 0, 0, 0.4)",
         color: "#fff",
-        "& svg": {
-          color: "inherit",
-        },
+        "& svg": { color: "inherit" },
       }}
     >
-      <MenuItem value="null">(none)</MenuItem>
-      {props.cameras.map((e, i) => (
-        <MenuItem key={i} value={i}>
-          {e.shortName}
-        </MenuItem>
+      <MenuItem value="null"><em>(none)</em></MenuItem>
+      {cameras.map((e, i) => (
+        <MenuItem key={i} value={i}>{e.shortName}</MenuItem>
       ))}
     </Select>
   );
-  return props.renderCamera(
-    props.cameraIndex === null ? null : props.cameras[props.cameraIndex],
-    chooser,
+
+  const handleDragOver = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault(); // Allow drop
+  };
+
+  const handleDrop = (event: React.DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    const droppedCameraId = event.dataTransfer.getData("cameraIndex");
+    if (droppedCameraId) {
+      props.updateSelected({ selectedIndex: props.selectedIndex, cameraIndex: parseInt(droppedCameraId) });
+    }
+  };
+
+  return (
+    <Box
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      sx={{
+        position: 'relative',
+        width: '100%',
+        height: '100%',
+        border: props.cameraIndex === null ? '2px dashed rgba(255,255,255,0.3)' : 'none',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+      }}
+    >
+      {selectedCamera === null && (
+        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '1.2rem' }}>Drop Camera Here</span>
+      )}
+      {props.renderCamera(selectedCamera, chooser)}
+    </Box>
   );
 };
 

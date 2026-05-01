@@ -12,50 +12,71 @@ import ErrorBoundary from "./ErrorBoundary";
 import { SnackbarProvider } from "./snackbars";
 import { AdapterDateFns } from "@mui/x-date-pickers/AdapterDateFns";
 import "./index.css";
-import { HashRouter } from "react-router";
+import { HashRouter } from "react-router-dom";
 import CssBaseline from "@mui/material/CssBaseline";
-import { grey } from "@mui/material/colors";
 
 const theme = createTheme({
   cssVariables: {
     colorSchemeSelector: "data",
   },
-  palette: {
-    contrastThreshold: 4.5,
-    header: "var(--mui-palette-primary-main)",
-    headerContrastText: "var(--mui-palette-primary-contrastText)",
-  },
   colorSchemes: {
     dark: {
       palette: {
-        contrastThreshold: 4.5,
-        primary: {
-          main: grey[200],
-        },
-        header: grey[800],
+        primary: { main: "#ffffff" },
+        background: { default: "#000000", paper: "#0a0a0a" },
+        header: "#000000",
         headerContrastText: "#ffffff",
-        secondary: {
-          main: "#e65100",
-        },
+      },
+    },
+    light: {
+      palette: {
+        primary: { main: "#000000" },
+        background: { default: "#ffffff", paper: "#ffffff" },
+        header: "#ffffff",
+        headerContrastText: "#000000",
+      },
+    },
+  },
+  typography: {
+    fontFamily: "'Inter', 'Roboto', sans-serif",
+    button: { textTransform: "none", fontWeight: 500 },
+  },
+  shape: { borderRadius: 4 },
+  components: {
+    MuiCssBaseline: {
+      styleOverrides: {
+        body: { backgroundColor: "#000000", color: "#eeeeee", margin: 0 },
+      },
+    },
+    MuiButton: {
+      defaultProps: { disableElevation: true },
+      styleOverrides: {
+        root: { borderColor: "rgba(255,255,255,0.2)", "&:hover": { borderColor: "#ffffff" } },
+      },
+    },
+    MuiPaper: {
+      styleOverrides: {
+        root: { backgroundImage: "none", border: "1px solid rgba(255,255,255,0.05)", boxShadow: "none" },
       },
     },
   },
 });
+
 const container = document.getElementById("root");
 const root = createRoot(container!);
 root.render(
   <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <ErrorBoundary>
-        <LocalizationProvider dateAdapter={AdapterDateFns}>
-          <SnackbarProvider autoHideDuration={5000}>
-            <HashRouter>
+    <HashRouter>
+      <ThemeProvider theme={theme}>
+        <CssBaseline />
+        <ErrorBoundary>
+          <LocalizationProvider dateAdapter={AdapterDateFns}>
+            <SnackbarProvider autoHideDuration={5000}>
               <App />
-            </HashRouter>
-          </SnackbarProvider>
-        </LocalizationProvider>
-      </ErrorBoundary>
-    </ThemeProvider>
+            </SnackbarProvider>
+          </LocalizationProvider>
+        </ErrorBoundary>
+      </ThemeProvider>
+    </HashRouter>
   </React.StrictMode>,
 );

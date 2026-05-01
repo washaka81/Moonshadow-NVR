@@ -12,6 +12,7 @@ mod static_file;
 mod users;
 mod view;
 mod websocket;
+mod admin;
 
 use self::accept::ConnData;
 use self::path::Path;
@@ -32,6 +33,7 @@ use hyper::body::Bytes;
 use std::net::IpAddr;
 use std::sync::Arc;
 use tracing::warn;
+use tracing::info;
 use tracing::Instrument;
 use url::form_urlencoded;
 use uuid::Uuid;
@@ -52,6 +54,8 @@ fn from_base_error(err: &base::Error) -> Response<Body> {
         InvalidArgument => StatusCode::BAD_REQUEST,
         FailedPrecondition => StatusCode::PRECONDITION_FAILED,
         NotFound => StatusCode::NOT_FOUND,
+        DeadlineExceeded => StatusCode::GATEWAY_TIMEOUT,
+        Unavailable => StatusCode::SERVICE_UNAVAILABLE,
         _ => StatusCode::INTERNAL_SERVER_ERROR,
     };
     plain_response(status_code, err.to_string())
@@ -153,6 +157,7 @@ pub struct Config<'a> {
     pub time_zone_name: String,
     pub allow_unauthenticated_permissions: Option<db::Permissions>,
     pub privileged_unix_uid: Option<nix::unistd::Uid>,
+    pub reload_tx: tokio::sync::mpsc::Sender<()>,
 }
 
 pub struct Service {
@@ -163,6 +168,7 @@ pub struct Service {
     allow_unauthenticated_permissions: Option<db::Permissions>,
     trust_forward_hdrs: bool,
     privileged_unix_uid: Option<nix::unistd::Uid>,
+    reload_tx: tokio::sync::mpsc::Sender<()>,
 }
 
 /// Useful HTTP `Cache-Control` values to set on successful (HTTP 200) API responses.
@@ -191,6 +197,7 @@ impl Service {
             trust_forward_hdrs: config.trust_forward_hdrs,
             time_zone_name: config.time_zone_name,
             privileged_unix_uid: config.privileged_unix_uid,
+            reload_tx: config.reload_tx,
         })
     }
 
@@ -267,6 +274,13 @@ impl Service {
                 ),
                 _ => bail!(InvalidArgument, msg("method not allowed")),
             },
+            Path::CamerasReload => match *req.method() {
+                http::Method::POST => (
+                    CacheControl::PrivateDynamic,
+                    self.reload_cameras(req, caller).await?,
+                ),
+                _ => bail!(InvalidArgument, msg("method not allowed")),
+            },
             Path::StreamRecordings(uuid, type_) => (
                 CacheControl::PrivateDynamic,
                 self.stream_recordings(&req, uuid, type_)?,
@@ -286,6 +300,14 @@ impl Service {
             Path::AiEvents => (
                 CacheControl::PrivateDynamic,
                 ai_events::ai_events(req, caller, self.db.clone()).await?,
+            ),
+            Path::SysInfo => (
+                CacheControl::PrivateDynamic,
+                self.sysinfo(&req, Ok(caller)).await?,
+            ),
+            Path::StreamProbe => (
+                CacheControl::PrivateDynamic,
+                self.stream_probe(req, caller).await?,
             ),
             Path::Login => (
                 CacheControl::PrivateDynamic,
@@ -430,8 +452,47 @@ impl Service {
                 signals: (&db, days),
                 signal_types: &db,
                 permissions: caller.permissions.into(),
+                system_info: Some(self::admin::get_sysinfo_json()),
             },
         )
+    }
+
+    async fn sysinfo(&self, req: &Request<::hyper::body::Incoming>, caller: Result<Caller, Error>) -> ResponseResult {
+        let _caller = caller?;
+        serve_json(req, &self::admin::get_sysinfo_json())
+    }
+
+    async fn stream_probe(&self, req: Request<::hyper::body::Incoming>, caller: Caller) -> ResponseResult {
+        if !caller.permissions.read_camera_configs {
+            bail!(PermissionDenied, msg("read_camera_configs required"));
+        }
+        let (_, body) = into_json_body(req).await?;
+        let req: json::StreamProbeRequest = parse_json_body(&body)?;
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let url = url::Url::parse(&req.url).map_err(|e| err!(InvalidArgument, msg("invalid url"), source(e.to_string())))?;
+        
+        let session = tokio::time::timeout(
+            std::time::Duration::from_secs(3),
+            retina::client::Session::describe(
+                url,
+                retina::client::SessionOptions::default(),
+            ),
+        )
+        .await
+        .map_err(|_| err!(DeadlineExceeded, msg("timeout describing stream")))?
+        .map_err(|e| err!(Unknown, msg("failed to describe stream"), source(e.to_string())))?;
+
+        let codec = session.streams().iter()
+            .find(|s| s.media() == "video")
+            .map(|s| s.encoding_name().to_string());
+
+        let resp = json::StreamProbeResponse {
+            codec,
+            transport: "tcp/udp".to_string(), // Simplified for now
+        };
+
+        serve_json(&http::Request::new(()), &resp)
     }
 
     fn camera(&self, req: &Request<::hyper::body::Incoming>, uuid: Uuid) -> ResponseResult {
@@ -547,7 +608,9 @@ impl Service {
         require_csrf_if_session(&caller, req.csrf)?;
 
         let mut main_url = None;
+        let mut main_codec = None;
         let mut sub_url = None;
+        let mut sub_codec = None;
 
         let auth_str = match (&req.username, &req.password) {
             (Some(u), Some(p)) if !u.is_empty() => format!("{}:{}@", u, p),
@@ -585,7 +648,7 @@ impl Service {
             for path in paths_main {
                 let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
                 if let Ok(url) = url::Url::parse(&url_str) {
-                    if let Ok(Ok(_)) = tokio::time::timeout(
+                    if let Ok(Ok(session)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
                         retina::client::Session::describe(
                             url,
@@ -594,7 +657,10 @@ impl Service {
                     )
                     .await
                     {
-                        main_url = Some(url_str.replace(&auth_str, "")); // Return without auth in string, UI adds it to the config
+                        main_url = Some(url_str.replace(&auth_str, ""));
+                        main_codec = session.streams().iter()
+                            .find(|s| s.media() == "video")
+                            .map(|s| s.encoding_name().to_string());
                         break;
                     }
                 }
@@ -603,7 +669,7 @@ impl Service {
             for path in paths_sub {
                 let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
                 if let Ok(url) = url::Url::parse(&url_str) {
-                    if let Ok(Ok(_)) = tokio::time::timeout(
+                    if let Ok(Ok(session)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
                         retina::client::Session::describe(
                             url,
@@ -613,6 +679,9 @@ impl Service {
                     .await
                     {
                         sub_url = Some(url_str.replace(&auth_str, ""));
+                        sub_codec = session.streams().iter()
+                            .find(|s| s.media() == "video")
+                            .map(|s| s.encoding_name().to_string());
                         break;
                     }
                 }
@@ -627,9 +696,29 @@ impl Service {
             sub_url = Some(format!("rtsp://{}:554/stream2", req.ip));
         }
 
-        let resp = json::AutodetectResponse { main_url, sub_url };
+        let resp = json::AutodetectResponse { main_url, main_codec, sub_url, sub_codec };
 
         serve_json(&http::Request::new(()), &resp)
+    }
+
+    async fn reload_cameras(
+        &self,
+        _req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+    ) -> ResponseResult {
+        if !caller.permissions.admin_users {
+            bail!(PermissionDenied, msg("admin_users required"));
+        }
+
+        info!("Reloading cameras from database");
+        let _ = self.reload_tx.send(()).await;
+
+        #[derive(serde::Serialize)]
+        struct ReloadResponse {
+            msg: String,
+        }
+
+        serve_json(&http::Request::new(()), &ReloadResponse { msg: "OK".to_string() })
     }
 
     fn camera_subset_to_change(&self, c: json::CameraSubset, dir_id: i32) -> db::CameraChange {
@@ -934,6 +1023,7 @@ mod tests {
         ) -> Server {
             let db = TestDb::new(base::clock::RealClocks {}).await;
             let (shutdown_tx, shutdown_rx) = futures::channel::oneshot::channel::<()>();
+            let (reload_tx, _) = tokio::sync::mpsc::channel(1);
             let service = Arc::new(
                 super::Service::new(super::Config {
                     db: db.db.clone(),
@@ -942,6 +1032,7 @@ mod tests {
                     trust_forward_hdrs: true,
                     time_zone_name: "".to_owned(),
                     privileged_unix_uid: None,
+                    reload_tx,
                 })
                 .unwrap(),
             );

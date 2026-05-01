@@ -265,7 +265,7 @@ simplest approach will be adopted initially and adapted as necessary.
 ### Time discontinuities
 
 If the local system's wall clock time jumps during a recording ([as has
-happened](https://github.com/scottlamb/moonshadow-nvr/issues/9#issuecomment-322663674)),
+happened](https://github.com/washaka81/Moonshadow-NVR/issues/9#issuecomment-322663674)),
 Moonshadow NVR will continue to use the initial wall clock time for as long as
 the recording lasts. This can result in some unfortunate behaviors:
 

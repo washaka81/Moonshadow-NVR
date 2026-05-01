@@ -57,4 +57,5 @@ export interface AiEvent {
   camera_id: number;
   type_: string;
   value: string;
+  video_link?: string;
 }

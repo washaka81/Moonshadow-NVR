@@ -269,7 +269,7 @@ Version 6 adds over version 5:
     SourceBuffer.
 *   decoupled "wall time" and "media time" of recordings, as a step toward
     implementing audio support without giving up clock frequency adjustment. See
-    [this comment](https://github.com/scottlamb/moonshadow-nvr/issues/34#issuecomment-651548468).
+    [this comment](https://github.com/washaka81/Moonshadow-NVR/issues/34#issuecomment-651548468).
 
 On upgrading to this version, sessions will be revoked.
 

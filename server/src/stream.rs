@@ -93,6 +93,30 @@ pub struct RealOpener;
 
 pub const OPENER: RealOpener = RealOpener;
 
+fn map_retina_error(e: retina::Error) -> Error {
+    use retina::ErrorInt::*;
+    let kind = match e.0.as_ref() {
+        InvalidArgument(_) => base::ErrorKind::InvalidArgument,
+        RtspResponseError { status, .. } => {
+            let code: u16 = (*status).into();
+            match code {
+                401 | 407 => base::ErrorKind::Unauthenticated,
+                403 => base::ErrorKind::PermissionDenied,
+                404 => base::ErrorKind::NotFound,
+                _ => base::ErrorKind::Unknown,
+            }
+        }
+        ConnectError(_) | RtspReadError { .. } | UdpRecvError { .. } | WriteError { .. } => {
+            base::ErrorKind::Unavailable
+        }
+        Timeout => base::ErrorKind::DeadlineExceeded,
+        FailedPrecondition(_) => base::ErrorKind::FailedPrecondition,
+        Internal(_) => base::ErrorKind::Internal,
+        _ => base::ErrorKind::Unknown,
+    };
+    err!(kind, source(e)).into()
+}
+
 #[async_trait]
 impl Opener for RealOpener {
     async fn open(
@@ -125,7 +149,7 @@ impl Opener for RealOpener {
 /// Experimentally, it appears faster to have one thread hand-off per frame via
 /// `handle.block_on(handle.spawn(...))` rather than the same without the
 /// `handle.spawn(...)`. See
-/// [#206](https://github.com/scottlamb/moonshadow-nvr/issues/206).
+/// [#206](https://github.com/washaka81/Moonshadow-NVR/issues/206).
 struct RetinaStream {
     label: String,
     session: Demuxed,
@@ -161,46 +185,71 @@ fn params_to_sample_entry(
 
 impl RetinaStream {
     /// Plays to first frame. No timeout; that's the caller's responsibility.
-    async fn play(label: String, url: Url, options: Options) -> Result<Self, Error> {
-        let mut session = retina::client::Session::describe(url, options.session)
-            .await
-            .map_err(|e| err!(Unknown, source(e)))?;
-        tracing::debug!("connected to {:?}, tool {:?}", &label, session.tool());
-        let video_i = session
-            .streams()
-            .iter()
-            .position(|s| {
-                s.media() == "video" && matches!(s.encoding_name(), "h264" | "h265" | "jpeg")
-            })
-            .ok_or_else(|| {
-                err!(
-                    FailedPrecondition,
-                    msg("couldn't find supported video stream")
-                )
-            })?;
-        session
-            .setup(video_i, options.setup)
-            .await
-            .map_err(|e| err!(Unknown, source(e)))?;
-        let session = session
-            .play(retina::client::PlayOptions::default())
-            .await
-            .map_err(|e| err!(Unknown, source(e)))?;
-        let mut session = session.demuxed().map_err(|e| err!(Unknown, source(e)))?;
+async fn play(label: String, url: Url, options: Options) -> Result<Self, Error> {
+    let mut session = retina::client::Session::describe(url, options.session)
+        .await
+        .map_err(map_retina_error)?;
+    tracing::info!("RTSP connected to {:?}, tool {:?}", &label, session.tool());
+    tracing::info!("RTSP streams: {:?}", session.streams().iter().map(|s| format!("{}: {}", s.media(), s.encoding_name())).collect::<Vec<_>>());
+    let video_i = session
+        .streams()
+        .iter()
+        .position(|s| {
+            s.media() == "video" && matches!(s.encoding_name(), "h264" | "h265" | "jpeg")
+        })
+        .ok_or_else(|| {
+            err!(
+                FailedPrecondition,
+                msg("couldn't find supported video stream")
+            )
+        })?;
+    tracing::info!("RTSP selected video stream index: {}", video_i);
+    
+    // Setup ALL streams (video + audio) to avoid unassigned channel issues
+    // Some cameras don't send video until all streams are set up
+    let total_streams = session.streams().len();
+    tracing::info!("RTSP total streams: {}, setting up all...", total_streams);
+    
+    for i in 0..total_streams {
+        // Use the same setup options for all streams
+        match session.setup(i, options.setup.clone()).await {
+            Ok(_) => tracing::info!("RTSP setup completed for stream {}", i),
+            Err(e) => tracing::warn!("RTSP setup failed for stream {}: {:?}", i, e),
+        }
+    }
+    
+    let session = session
+        .play(
+            retina::client::PlayOptions::default()
+                .initial_timestamp(retina::client::InitialTimestampPolicy::Permissive),
+        )
+        .await
+        .map_err(map_retina_error)?;
+        let mut session = session.demuxed().map_err(map_retina_error)?;
 
-        // First frame.
-        let first_frame = loop {
-            match Pin::new(&mut session).next().await {
-                None => bail!(Unavailable, msg("stream closed before first frame")),
-                Some(Err(e)) => bail!(Unknown, msg("unable to get first frame"), source(e)),
-                Some(Ok(CodecItem::VideoFrame(v))) => {
-                    if v.is_random_access_point() {
-                        break v;
-                    }
-                }
-                Some(Ok(_)) => {}
+// First frame.
+    tracing::info!("RTSP waiting for first keyframe...");
+    let first_frame = loop {
+        match Pin::new(&mut session).next().await {
+            None => bail!(Unavailable, msg("stream closed before first frame")),
+            Some(Err(e)) => {
+                let e = map_retina_error(e);
+                bail!(e.kind(), msg("unable to get first frame"), source(e));
             }
-        };
+            Some(Ok(CodecItem::VideoFrame(v))) => {
+                tracing::info!("RTSP received first frame: key={}, loss={}", v.is_random_access_point(), v.loss());
+                if v.is_random_access_point() {
+                    tracing::info!("RTSP first frame is keyframe, breaking loop");
+                    break v;
+                } else {
+                    tracing::warn!("RTSP first frame is not a keyframe, waiting...");
+                }
+            }
+            Some(Ok(item)) => {
+                tracing::debug!("RTSP received non-video item: {:?}", item);
+            }
+        }
+    };
         let video_params = match session.streams()[video_i].parameters() {
             Some(retina::codec::ParametersRef::Video(v)) => v.clone(),
             Some(_) => unreachable!(),
@@ -230,7 +279,7 @@ impl RetinaStream {
                 .next()
                 .await
                 .transpose()
-                .map_err(|e| err!(Unknown, source(e)))?
+                .map_err(map_retina_error)?
             {
                 None => bail!(Unavailable, msg("end of stream")),
                 Some(CodecItem::VideoFrame(v)) => {

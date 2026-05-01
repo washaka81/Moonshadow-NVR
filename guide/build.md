@@ -6,7 +6,7 @@ binaries, see the [installation instructions](install.md) instead.
 
 This document doesn't spell out as many details as the installation
 instructions. Please ask on Moonshadow NVR's [issue
-tracker](https://github.com/scottlamb/moonshadow-nvr/issues) or
+tracker](https://github.com/washaka81/Moonshadow-NVR/issues) or
 [mailing list](https://groups.google.com/d/forum/moonshadow-nvr-users) when
 stuck. Please also send pull requests to improve this doc.
 
@@ -17,12 +17,12 @@ stuck. Please also send pull requests to improve this doc.
 
 ## Downloading
 
-See the [github page](https://github.com/scottlamb/moonshadow-nvr) (in case
+See the [github page](https://github.com/washaka81/Moonshadow-NVR) (in case
 you're not reading this text there already). You can download the
 bleeding-edge version from the commandline via git:
 
 ```console
-$ git clone https://github.com/scottlamb/moonshadow-nvr.git
+$ git clone https://github.com/washaka81/Moonshadow-NVR.git
 $ cd moonshadow-nvr
 ```
 

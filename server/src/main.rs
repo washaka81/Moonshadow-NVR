@@ -20,6 +20,8 @@ mod slices;
 mod stream;
 mod streamer;
 mod web;
+mod vulkan_check;
+mod vulkan_engine;
 
 #[cfg(feature = "bundled-ui")]
 mod bundled_ui;
@@ -42,6 +44,7 @@ enum Args {
     Sql(#[bpaf(external(cmds::sql::args))] cmds::sql::Args),
     Ts(#[bpaf(external(cmds::ts::args))] cmds::ts::Args),
     Upgrade(#[bpaf(external(cmds::upgrade::args))] cmds::upgrade::Args),
+    Benchmark(#[bpaf(external(cmds::benchmark::args))] cmds::benchmark::Args),
 }
 
 impl Args {
@@ -55,6 +58,7 @@ impl Args {
             Args::Sql(a) => cmds::sql::run(a),
             Args::Ts(a) => cmds::ts::run(a),
             Args::Upgrade(a) => cmds::upgrade::run(a),
+            Args::Benchmark(a) => cmds::benchmark::run(a),
         }
     }
 }

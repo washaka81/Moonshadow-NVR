@@ -1,68 +1,84 @@
 # Moonshadow NVR 🌙🛡️
 
-[![CI](https://github.com/washaka81/Moonshadow-NVR/workflows/CI/badge.svg)](https://github.com/washaka81/Moonshadow-NVR/actions)
 [![License](https://img.shields.io/badge/License-GPL--3.0--or--later-blue.svg)](LICENSE.txt)
+[![Rust](https://img.shields.io/badge/Rust-1.91+-orange.svg)](https://www.rust-lang.org)
+[![React](https://img.shields.io/badge/UI-React_18-61dafb.svg)](https://reactjs.org/)
 
-Moonshadow NVR is an intelligent, high-performance, and open-source Network Video Recorder. Based on the original Moonfire NVR by Scott Lamb, it has been evolved into a security system with built-in AI capabilities and hardware-accelerated computer vision.
-
-## 🔧 Latest CI Improvements (2026-04-17)
-
-The CI/CD pipeline has been fully stabilized with fixes across both Rust backend and TypeScript/React frontend:
-
-- **Rust Backend:** Fixed schema version mismatches in database upgrade tests, corrected formatting with `cargo fmt`, and resolved test assumptions in command modules.
-- **Frontend Configuration:** Migrated ESLint to Flat Config format (v9.39.4), resolving plugin incompatibilities with `react-hooks` and `minimatch`.
-- **Frontend Code:** Enforced deep imports for Material-UI to reduce bundle size and removed unused catch variables to satisfy linting rules.
-- **Compatibility:** Ensured builds pass across Node.js (20, 22, 24, 25) and Rust (stable, 1.91, nightly) matrices.
-
-## 🚀 Key Evolutions in Moonshadow NVR
-
-### 🧠 Intelligent AI Engine
-*   **Person Re-Identification (ReID)**: Recognizes and tracks individuals across multiple camera streams using OSNet.
-*   **License Plate Recognition (LPR)**: Integrated LPRNet for real-time license plate detection and decoding (supporting Chinese and Chilean formats).
-*   **Smart Event Correlation**: Detection events are automatically mapped to the video timeline in the UI.
-*   **Adaptive Sampling**: Dynamic processing modes (Off, Low, Medium, High, Auto) to balance accuracy and power consumption.
-
-### ⚡ Hardware Acceleration
-Powered by **ONNX Runtime (`ort`)**, Moonshadow NVR automatically optimizes inference based on your hardware:
-1.  **NVIDIA TensorRT / CUDA**: Maximum performance for high-end GPUs.
-2.  **Intel OpenVINO**: Optimized for Intel iGPUs, CPUs, and NPUs.
-3.  **CPU Fallback**: Universal support for any architecture.
-
-### 🖥️ Modern Interfaces
-*   **Interactive TUI Dashboard**: A completely redesigned terminal interface for configuration. No more boring wizards—manage cameras, directories, and users with a fluid, tabbed dashboard.
-*   **Enhanced Web UI**:
-    *   **Live Multiview**: View multiple streams simultaneously.
-    *   **AI Timelines**: Recordings now feature "AI Chips" (🚗 Plates, 👤 Persons) for instant visual navigation of events.
-    *   **Autodetect RTSP**: One-click camera setup—the system automatically scans for valid RTSP paths.
+**Moonshadow NVR** is a high-performance, intelligent Network Video Recorder built with **Rust** and **React**. Designed to run on modern Linux systems, it offers rock-solid RTSP recording, ultra-low latency WebRTC viewing, and integrated hardware-accelerated AI for object detection and License Plate Recognition (LPR).
 
 ---
 
-## 📸 Screenshots
+## ✨ Features
 
-*Coming soon: Updated screenshots of the TUI Dashboard and AI Timeline.*
+- **🚀 High-Performance Rust Core:** Direct-to-disk recording and efficient memory management ensuring low CPU overhead.
+- **🧠 Integrated AI Acceleration:** Native support for OpenVINO, Vulkan Compute, and CUDA to power real-time object detection (YOLO), LPR, and Person Re-Identification.
+- **💻 Interactive TUI Configuration:** A fully-featured Terminal User Interface to easily manage cameras, users, and storage pools without editing raw config files.
+- **🌐 Modern Web Dashboard:** A sleek React-based UI for live multi-camera viewing, timeline playback, AI event filtering, and system monitoring.
+- **📊 Advanced System Monitor:** Real-time hardware metrics (CPU Cores, RAM, Swap, Disk, GPU/VRAM load, and Temperatures) directly in the web dashboard.
+- **📡 Universal Streaming:** Integrated MediaMTX proxy for seamless sub-second latency viewing via WebRTC.
 
 ---
 
-## ⚙️ Core Features
-*   **Efficient Recording**: Saves H.264 streams directly to disk without re-encoding, keeping CPU usage extremely low (e.g., <10% on a Raspberry Pi 2 for 6 streams).
-*   **Hybrid Storage**: Video frames are stored in a simple directory structure, while metadata is managed in a high-performance SQLite database.
-*   **On-the-fly MP4**: Construct `.mp4` files for any time range instantly for export or viewing.
-*   **RTSP Robustness**: Built-in "Retina Patch" to handle non-standard RTSP headers from various camera manufacturers (Dahua, Hikvision, etc.).
+## 🛠️ Automated Deployment (Arch Linux / CachyOS)
 
-## 📖 Documentation
+Moonshadow NVR includes a robust suite of shell scripts to automate deployment, build processes, and service orchestration on modern Arch-based distributions.
 
-*   [**Installation Guide**](guide/install.md)
-*   [**Building from Source**](guide/build.md)
-*   [**UI Development**](guide/developing-ui.md)
-*   [**Securing Your NVR**](guide/secure.md)
-*   [**API Reference**](ref/api.md)
-*   [**Configuration Reference**](ref/config.md)
+### 1. Installation
+
+Clone the repository and run the automated installer. The installer detects your OS, installs necessary dependencies (including NVIDIA/CUDA support if hardware is detected), builds both the Rust backend and React frontend, and sets up a `systemd` service.
+
+```bash
+git clone https://github.com/washaka81/Moonshadow-NVR.git
+cd Moonshadow-NVR
+sudo ./install.sh
+```
+
+### 2. Configuration
+
+Moonshadow comes with a built-in Terminal UI (TUI) to easily configure your cameras, users, and AI hardware settings.
+
+```bash
+./configure-tui.sh
+```
+
+### 3. Running the Server
+
+If you used `./install.sh`, the NVR is already configured as a systemd service:
+
+```bash
+sudo systemctl enable moonshadow-nvr
+sudo systemctl start moonshadow-nvr
+```
+
+To run it manually (for debugging or development), use the start script which automatically manages the MediaMTX proxy, checks AI models, and sets process priorities:
+
+```bash
+./start-server.sh
+```
+
+**Access the Web Interface at:** `http://<your-server-ip>:8080`
+
+---
+
+## 📁 Repository Structure
+
+- `server/`: The core Rust application handling RTSP ingestion, MP4 writing, AI inference via ONNX Runtime, and the HTTP API.
+- `ui/`: The modern React/Material-UI frontend dashboard.
+- `bin/`: Pre-compiled or downloaded binaries (e.g., MediaMTX).
+- `models/`: *[Optional]* Directory to place `.onnx` models (`yolov8n.onnx`, `LPRNet.onnx`) for AI acceleration.
+
+---
 
 ## 🤝 Contributing
-Contributions are welcome! Whether it's adding new AI models, improving the TUI, or enhancing the web interface, please see our [Contributing Guide](CONTRIBUTING.md).
+
+We welcome contributions! Please feel free to submit Pull Requests or open Issues to discuss potential improvements. See [CONTRIBUTING.md](CONTRIBUTING.md) for more details.
 
 ## 📄 License
+
 Moonshadow NVR is licensed under [GPL-3.0-or-later](LICENSE.txt) with a linking exception for OpenSSL.
 
 ---
+
 *Started by Scott Lamb & evolved by the Moonshadow Community.*
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/I2I21X53HM)

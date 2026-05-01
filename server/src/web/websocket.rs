@@ -58,7 +58,12 @@ where
                 )
                 .await;
                 handler(&mut ws).await;
-                let _ = ws.close(None).await;
+                let _ = ws
+                    .close(Some(tungstenite::protocol::frame::CloseFrame {
+                        code: tungstenite::protocol::frame::coding::CloseCode::Normal,
+                        reason: "".into(),
+                    }))
+                    .await;
             }
             .instrument(span),
         )

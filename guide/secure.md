@@ -94,7 +94,7 @@ Noobs](https://ipcamtalk.com/threads/vpn-primer-for-noobs.14601/).
 ## 1. Install a webserver
 
 Moonshadow NVR's builtin webserver doesn't yet support `https` (see [issue
-\#27](https://github.com/scottlamb/moonshadow-nvr/issues/27)), so you'll need to
+\#27](https://github.com/washaka81/Moonshadow-NVR/issues/27)), so you'll need to
 proxy through a webserver that does. If Moonshadow NVR will be sharing an
 `https` port with anything else, you'll need to set up the webserver to proxy
 to all of these interfaces as well.

@@ -49,7 +49,7 @@ ownUidIsPrivileged = true
 on behalf of Moonshadow NVR. This can speed startup of services that depend on them and allow
 Moonshadow to bind to privileged ports (80 or 443) without root privileges. The latter is
 expected to be more useful once
-[moonshadow-nvr#27](https://github.com/scottlamb/moonshadow-nvr/issues/27) is
+[moonshadow-nvr#27](https://github.com/washaka81/Moonshadow-NVR/issues/27) is
 complete and Moonshadow is suitable for direct use as an Internet-facing webserver.
 
 To set this up, you'll need an additional systemd unit file for each socket and

@@ -224,6 +224,11 @@ impl<'a, C: Clocks, S: AsRef<str>, F: FnOnce(&'static Location<'static>) -> S + 
             start: clocks.monotonic(),
         }
     }
+
+    /// Suppresses the warning if the operation took too long.
+    pub fn cancel(&mut self) {
+        self.label_f.take();
+    }
 }
 
 impl<'a, C, S, F> Drop for TimerGuard<'a, C, S, F>
@@ -235,8 +240,9 @@ where
     fn drop(&mut self) {
         let elapsed = self.clocks.monotonic() - self.start;
         if elapsed.as_secs() >= 1 {
-            let label_f = self.label_f.take().unwrap();
-            warn!("{} took {:?}!", label_f(self.location).as_ref(), elapsed);
+            if let Some(label_f) = self.label_f.take() {
+                warn!("{} took {:?}!", label_f(self.location).as_ref(), elapsed);
+            }
         }
     }
 }

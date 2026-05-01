@@ -423,6 +423,16 @@ create table signal_change (
   changes blob not null
 );
 
+-- AI events with links to recordings.
+create table ai_event (
+  camera_id integer not null references camera (id),
+  timestamp_90k integer not null,
+  event_type text not null,
+  payload text not null,
+  video_link text,
+  primary key (camera_id, timestamp_90k, event_type)
+);
+
 -- AI metadata for advanced detections (ReID and LPR).
 create table ai_metadata (
   time_90k integer not null,
@@ -434,4 +444,4 @@ create table ai_metadata (
 );
 
 insert into version (id, unix_time,                           notes)
-             values (8,  cast(strftime('%s', 'now') as int), 'db creation');
+             values (9,  cast(strftime('%s', 'now') as int), 'db creation');

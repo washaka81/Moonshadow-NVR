@@ -18,7 +18,7 @@ export default defineConfig({
 
         // Moonshadow NVR needs WebSocket connections for live connections (and
         // likely more in the future:
-        // <https://github.com/scottlamb/moonshadow-nvr/issues/40>.)
+        // <https://github.com/washaka81/Moonshadow-NVR/issues/40>.)
         ws: true,
         changeOrigin: true,
 

@@ -85,6 +85,22 @@ pub struct GlobalConfig {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub signals: BTreeMap<u32, SignalConfig>,
 
+    /// AI Acceleration settings.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub hardware_acceleration: bool,
+
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub vulkan_preprocessing: bool,
+
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub openvino_repair: bool,
+
+    #[serde(default)]
+    pub ai_mode: String,
+
+    #[serde(default)]
+    pub model_path: String,
+
     #[serde(flatten)]
     pub unknown: BTreeMap<String, Value>,
 }

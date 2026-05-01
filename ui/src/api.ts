@@ -192,6 +192,11 @@ export async function toplevel(init: RequestInit) {
   return resp;
 }
 
+/** Fetches real-time system telemetry. */
+export async function sysinfo(init: RequestInit) {
+  return await json<any>("/api/admin/sysinfo", init);
+}
+
 export interface LoginRequest {
   username: string;
   password: string;
@@ -452,12 +457,37 @@ export async function recordings(req: RecordingsRequest, init: RequestInit) {
  * only the portion of the recording which overlaps with the given half-open
  * interval.
  */
+export interface StreamProbeRequest {
+  csrf?: string;
+  url: string;
+}
+
+export interface StreamProbeResponse {
+  codec?: string;
+  transport: string;
+}
+
+/** Probes a specific stream URL. */
+export async function streamProbe(
+  req: StreamProbeRequest,
+  init: RequestInit,
+) {
+  return await json<StreamProbeResponse>("/api/stream-probe", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
+  });
+}
+
 export function recordingUrl(
   cameraUuid: string,
   stream: StreamType,
   r: RecordingSpecifier,
   timestampTrack: boolean,
-  trimToRange90k?: [number, number],
+  trimToRange90k?: [number, number] | null,
 ): string {
   let s = `${r.startId}`;
   if (r.endId !== undefined) {
@@ -467,11 +497,11 @@ export function recordingUrl(
     s += `@${r.openId}`; // disambiguate.
   }
   let rel = "";
-  if (trimToRange90k !== undefined && r.startTime90k < trimToRange90k[0]) {
+  if (trimToRange90k != null && r.startTime90k < trimToRange90k[0]) {
     rel += trimToRange90k[0] - r.startTime90k;
   }
   rel += "-";
-  if (trimToRange90k !== undefined && r.endTime90k > trimToRange90k[1]) {
+  if (trimToRange90k != null && r.endTime90k > trimToRange90k[1]) {
     rel += trimToRange90k[1] - r.startTime90k;
   } else if (r.growing) {
     // View just the portion described by recording, not anything added later.
@@ -482,6 +512,20 @@ export function recordingUrl(
   }
   return withQuery(`/api/cameras/${cameraUuid}/${stream}/view.mp4`, {
     s,
+    ts: timestampTrack,
+  });
+}
+
+export function absoluteTimeUrl(
+  cameraUuid: string,
+  stream: StreamType,
+  startTime90k: number,
+  endTime90k: number,
+  timestampTrack: boolean,
+): string {
+  return withQuery(`/api/cameras/${cameraUuid}/${stream}/view.mp4`, {
+    startTime90k,
+    endTime90k,
     ts: timestampTrack,
   });
 }
@@ -586,7 +630,9 @@ export interface AutodetectRequest {
 
 export interface AutodetectResponse {
   mainUrl?: string;
+  mainCodec?: string;
   subUrl?: string;
+  subCodec?: string;
 }
 
 /** Autodetects camera stream URLs. */

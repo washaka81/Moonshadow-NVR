@@ -191,12 +191,13 @@ pub fn run(args: Args) -> Result<i32, Error> {
 async fn async_run(args: Args, config: &ConfigFile) -> Result<i32, Error> {
     let (shutdown_tx, shutdown_rx) = base::shutdown::channel();
     let mut shutdown_tx = Some(shutdown_tx);
+    let (reload_tx, reload_rx) = tokio::sync::mpsc::channel(1);
 
     tokio::pin! {
         let int = signal(SignalKind::interrupt())?;
         let term = signal(SignalKind::terminate())?;
         let quit = signal(SignalKind::quit())?;
-        let inner = inner(args.read_only, config, args.model, args.reid_model, args.lpr_model, args.ai_mode, args.hardware_acceleration, args.optimize_for_device, shutdown_rx);
+        let inner = inner(args.read_only, config, args.model, args.reid_model, args.lpr_model, args.ai_mode, args.hardware_acceleration, args.optimize_for_device, shutdown_rx, reload_rx, reload_tx);
     }
 
     tokio::select! {
@@ -313,6 +314,8 @@ async fn inner(
     hardware_acceleration: bool,
     optimize_for_device: bool,
     shutdown_rx: base::shutdown::Receiver,
+    mut reload_rx: tokio::sync::mpsc::Receiver<()>,
+    reload_tx: tokio::sync::mpsc::Sender<()>,
 ) -> Result<i32, Error> {
     let clocks = clock::RealClocks {};
     let (_db_dir, conn) = super::open_conn(
@@ -325,6 +328,33 @@ async fn inner(
     )?;
     let db = Arc::new(db::Database::new(clocks, conn, !read_only)?);
     info!("Database is loaded.");
+
+    info!("=== Moonshadow NVR Configuration ===");
+    let l = db.lock();
+    let camera_count = l.cameras_by_id().len();
+    info!("Cameras configured: {}", camera_count);
+
+    for (id, camera) in l.cameras_by_id() {
+        let id = *id;
+        info!("Camera #{}: {} - {}", id, camera.short_name, camera.config.description);
+        let streams = l.streams_by_id().values().filter(|s| {
+            s.inner.lock().camera_id == id
+        });
+        for stream in streams {
+            let stream_inner = stream.inner.lock();
+            if let Some(url) = &stream_inner.config.url {
+                info!("  Stream {:?}: {} ({}), retain: {} bytes",
+                    stream_inner.type_,
+                    url,
+                    stream_inner.config.rtsp_transport,
+                    stream_inner.config.retain_bytes);
+            } else {
+                info!("  Stream {:?}: disabled", stream_inner.type_);
+            }
+        }
+    }
+    drop(l);
+    info!("=====================================");
 
     let flusher = if !read_only {
         let (channel, join) = db::lifecycle::start_flusher(db.clone());
@@ -341,20 +371,69 @@ async fn inner(
         .collect();
     db.open_sample_file_dirs(&dirs_to_open).await?;
     info!("Directories are opened.");
+
+    // Auto-add recording directory if none exists
+    {
+        let l = db.lock();
+        if l.sample_file_dirs_by_id().is_empty() {
+            drop(l);
+            let recordings_path = std::path::PathBuf::from("/home/ale/Videos/Moonshadow-NVR");
+            info!("Checking for recordings directory: {:?}", recordings_path);
+            info!("Directory exists: {}", recordings_path.exists());
+            if recordings_path.exists() {
+                info!("Attempting to add recording directory...");
+                match db.add_sample_file_dir(recordings_path).await {
+                    Ok(dir_id) => {
+                        info!("Added recording directory with ID: {}", dir_id);
+                        // Assign this directory to all streams that don't have one
+                        let streams_to_update: Vec<i32> = {
+                            let l = db.lock();
+                            l.streams_by_id().values()
+                                .filter(|s| s.inner.lock().sample_file_dir.is_none())
+                                .map(|s| s.inner.lock().id)
+                                .collect()
+                        };
+                        for stream_id in streams_to_update {
+                            let mut l = db.lock();
+                            l.set_stream_sample_file_dir(stream_id, Some(dir_id)).unwrap();
+                        }
+                    }
+                    Err(e) => info!("Failed to add directory: {}", e),
+                }
+            }
+        }
+    }
+
     db::lifecycle::abandon(&db).await?;
     db::lifecycle::initial_rotation(&db).await?;
     info!("Initial rotation is complete.");
 
     let mut detection_tx = None;
     if let Some(path) = model_path {
-        let detector = Arc::new(crate::detector::Detector::new(
+        let detector_ai_mode = match ai_mode {
+            AiMode::Off => crate::detector::AiMode::Off,
+            AiMode::Low => crate::detector::AiMode::Low,
+            AiMode::Medium => crate::detector::AiMode::Medium,
+            AiMode::High => crate::detector::AiMode::High,
+            AiMode::Auto => crate::detector::AiMode::Auto,
+        };
+        
+        let (vulkan_pre, ov_repair) = {
+            let l = db.lock();
+            let cfg = l.global_config();
+            (cfg.vulkan_preprocessing, cfg.openvino_repair)
+        };
+
+        let detector = Arc::new(tokio::sync::Mutex::new(crate::detector::Detector::new(
             &path,
             reid_model_path.as_deref(),
             lpr_model_path.as_deref(),
-            ai_mode,
+            detector_ai_mode,
             hardware_acceleration,
+            vulkan_pre,
+            ov_repair,
             optimize_for_device,
-        )?);
+        )?));
         let (tx, rx) = tokio::sync::mpsc::channel(10);
         detection_tx = Some(tx);
         let worker = crate::detector::DetectionWorker::new(detector, rx, db.clocks());
@@ -376,66 +455,105 @@ async fn inner(
     };
     info!("Resolved timezone: {}", &time_zone_name);
 
-    // Start a streamer for each stream.
-    let mut streamers = tokio::task::JoinSet::new();
-    let mut session_groups_by_camera: FastHashMap<i32, Arc<retina::client::SessionGroup>> =
-        FastHashMap::default();
+    // Manage streamers in a separate task to allow reloads.
     if !read_only {
-        // Start up streams.
-        let l = db.lock();
-        let env = Box::leak(Box::new(streamer::Environment {
-            clocks: db.clocks(),
-            sample_entries: l.sample_entries().clone(),
-            opener: &crate::stream::OPENER,
-            shutdown_rx: shutdown_rx.clone(),
-            detection_tx,
-        }));
-        let streams = l.streams_by_id().len();
-        for (i, (_id, stream)) in l.streams_by_id().iter().enumerate() {
-            let locked = stream.inner.lock();
-            if locked.config.mode != db::json::STREAM_MODE_RECORD {
-                continue;
-            }
-            if locked.sample_file_dir.is_none() {
-                warn!(
-                    "Stream {} set to record but has no sample file dir id",
-                    locked.id
-                );
-                continue;
-            }
-            let camera = l.cameras_by_id().get(&locked.camera_id).unwrap();
-            let rotate_offset_sec = streamer::ROTATE_INTERVAL_SEC * i as i64 / streams as i64;
-            let session_group = session_groups_by_camera
-                .entry(camera.id)
-                .or_insert_with(|| {
-                    Arc::new(SessionGroup::default().named(camera.short_name.clone()))
-                })
-                .clone();
-            let mut streamer = streamer::Streamer::new(
-                env,
-                camera,
-                stream.clone(),
-                &locked,
-                session_group,
-                rotate_offset_sec,
-                streamer::ROTATE_INTERVAL_SEC,
-            )?;
-            let span = tracing::info_span!("streamer", stream = streamer.short_name());
-            streamers
-                .build_task()
-                .name(&format!("s-{}", streamer.short_name()))
-                .spawn(
-                    async move {
-                        info!("starting");
-                        streamer.run().await;
-                        info!("ending");
+        let db = db.clone();
+        let shutdown_rx = shutdown_rx.clone();
+        let detection_tx = detection_tx.clone();
+        tokio::spawn(async move {
+            loop {
+                let mut streamers = tokio::task::JoinSet::new();
+                let mut session_groups_by_camera: FastHashMap<i32, Arc<retina::client::SessionGroup>> =
+                    FastHashMap::default();
+                
+                {
+                    // Start up streams.
+                    let l = db.lock();
+                    let env = Box::leak(Box::new(streamer::Environment {
+                        clocks: db.clocks(),
+                        sample_entries: l.sample_entries().clone(),
+                        opener: &crate::stream::OPENER,
+                        shutdown_rx: shutdown_rx.clone(),
+                        detection_tx: detection_tx.clone(),
+                    }));
+                    let streams_count = l.streams_by_id().len();
+                    for (i, (_id, stream)) in l.streams_by_id().iter().enumerate() {
+                        let locked = stream.inner.lock();
+                        if locked.config.mode.is_empty() || locked.config.mode == "off" {
+                            continue;
+                        }
+                        if locked.sample_file_dir.is_none() {
+                            warn!(
+                                "Stream {} has mode {:?} but has no sample file dir id",
+                                locked.id, locked.config.mode
+                            );
+                            continue;
+                        }
+                        let camera = l.cameras_by_id().get(&locked.camera_id).unwrap();
+                        let rotate_offset_sec = streamer::ROTATE_INTERVAL_SEC * i as i64 / streams_count as i64;
+                        let session_group = session_groups_by_camera
+                            .entry(camera.id)
+                            .or_insert_with(|| {
+                                Arc::new(SessionGroup::default().named(camera.short_name.clone()))
+                            })
+                            .clone();
+                        match streamer::Streamer::new(
+                            env,
+                            camera,
+                            stream.clone(),
+                            &locked,
+                            session_group,
+                            rotate_offset_sec,
+                            streamer::ROTATE_INTERVAL_SEC,
+                        ) {
+                            Ok(mut streamer) => {
+                                let span = tracing::info_span!("streamer", stream = streamer.short_name());
+                                streamers
+                                    .build_task()
+                                    .name(&format!("s-{}", streamer.short_name()))
+                                    .spawn(
+                                        async move {
+                                            info!("starting");
+                                            streamer.run().await;
+                                            info!("ending");
+                                        }
+                                        .instrument(span),
+                                    )
+                                    .expect("creating streamer task should succeed");
+                            }
+                            Err(e) => {
+                                error!("Failed to create streamer for {}: {}", locked.id, e);
+                            }
+                        }
                     }
-                    .instrument(span),
-                )
-                .expect("creating streamer task should succeed");
-        }
-        drop(l);
-    };
+                }
+
+                tokio::select! {
+                    msg = reload_rx.recv() => {
+                        if msg.is_none() { break; }
+                        info!("Reload signal received, restarting streamers...");
+                        streamers.abort_all();
+                        while streamers.join_next().await.is_some() {}
+                        if let Err(e) = db.reload() {
+                            error!("Failed to reload database: {}", e);
+                        }
+                        // Loop continues and restarts streamers with new config
+                    }
+                    _ = shutdown_rx.as_future() => {
+                        info!("Shutdown signal received, stopping streamers...");
+                        streamers.abort_all();
+                        while streamers.join_next().await.is_some() {}
+                        break;
+                    }
+                    Some(result) = streamers.join_next() => {
+                        if let Err(e) = result {
+                            error!("Streamer task panicked: {}", e);
+                        }
+                    }
+                }
+            }
+        });
+    }
 
     // Start the web interface(s).
     let own_euid = nix::unistd::Uid::effective();
@@ -451,6 +569,7 @@ async fn inner(
             trust_forward_hdrs: bind.trust_forward_headers,
             time_zone_name: time_zone_name.to_owned(),
             privileged_unix_uid: bind.own_uid_is_privileged.then_some(own_euid),
+            reload_tx: reload_tx.clone(),
         })?);
         let mut listener = make_listener(&bind.address, &mut preopened)?;
         let addr = bind.address.clone();
@@ -509,24 +628,12 @@ async fn inner(
         }
     }
 
-    info!("Shutting down streamers, directory pools, and flusher.");
-    while let Some(res) = streamers.join_next().await {
-        if res.is_err() {
-            tracing::error!("streamer panicked; look for previous panic message");
-        }
-    }
+    info!("Shutting down directory pools and flusher.");
     if let Some(flusher) = flusher {
         let dirs: Vec<_> = db.lock().sample_file_dirs_by_id().keys().cloned().collect();
         db.close_sample_file_dirs(&dirs).await?;
         drop(flusher.channel);
         flusher.join.await.unwrap();
-    }
-
-    info!("Waiting for TEARDOWN requests to complete.");
-    for g in session_groups_by_camera.values() {
-        if let Err(err) = g.await_teardown().await {
-            error!(%err, "teardown failed");
-        }
     }
 
     info!("Exiting.");

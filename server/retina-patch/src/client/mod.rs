@@ -663,7 +663,7 @@ impl SessionOptions {
 }
 
 /// Per-stream options decided at `SETUP` time.
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct SetupOptions {
     transport: Transport,
     frame_format: Option<crate::codec::FrameFormat>,

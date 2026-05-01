@@ -52,27 +52,32 @@ pub async fn ai_events(
         }
     }
 
-    let db_guard = db.lock();
-    let rows = db_guard
-        .query_ai_metadata(
-            type_filter.as_deref(),
-            camera_id_filter,
-            start_time_90k,
-            end_time_90k,
-            limit,
-        )
-        .map_err(|e| err!(e, msg("failed to query AI metadata")))?;
-    drop(db_guard);
+    let mut sql = "SELECT camera_id, timestamp_90k, event_type, payload, video_link FROM ai_event WHERE 1=1".to_string();
+    if type_filter.is_some() { sql.push_str(" AND event_type = ?"); }
+    if camera_id_filter.is_some() { sql.push_str(" AND camera_id = ?"); }
+    if start_time_90k.is_some() { sql.push_str(" AND timestamp_90k >= ?"); }
+    if end_time_90k.is_some() { sql.push_str(" AND timestamp_90k < ?"); }
+    sql.push_str(" ORDER BY timestamp_90k DESC LIMIT ?");
 
-    let events: Vec<json::AiEvent> = rows
-        .into_iter()
-        .map(|row| json::AiEvent {
-            time_90k: row.time_90k,
-            camera_id: row.camera_id,
-            type_: row.type_,
-            value: row.value,
-        })
-        .collect();
+    let events = {
+        let l = db.lock();
+        let mut params: Vec<&dyn rusqlite::ToSql> = Vec::new();
+        if let Some(t) = &type_filter { params.push(t); }
+        if let Some(c) = &camera_id_filter { params.push(c); }
+        if let Some(st) = &start_time_90k { params.push(st); }
+        if let Some(et) = &end_time_90k { params.push(et); }
+        params.push(&limit);
+
+        l.execute_raw_query(&sql, &params, |row| {
+            Ok(json::AiEvent {
+                camera_id: row.get(0)?,
+                time_90k: row.get(1)?,
+                type_: row.get(2)?,
+                value: row.get(3)?,
+                video_link: Some(row.get(4)?),
+            })
+        })?
+    };
 
     serve_json(&req, &json::AiEventsResponse { events })
 }

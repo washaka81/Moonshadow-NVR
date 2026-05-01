@@ -7,7 +7,6 @@
 use std::sync::Arc;
 
 use base::{bail, err, Error};
-use bytes::Bytes;
 use futures::SinkExt;
 use http::header;
 use tokio_tungstenite::tungstenite;
@@ -17,13 +16,6 @@ use uuid::Uuid;
 use crate::mp4;
 
 use super::{websocket::WebSocketStream, Caller, Service};
-
-/// Interval at which to send keepalives if there are no frames.
-///
-/// Chrome appears to time out WebSockets after 60 seconds of inactivity.
-/// If the camera is disconnected or not sending frames, we'd like to keep
-/// the connection open so everything will recover when the camera comes back.
-const KEEPALIVE_AFTER_IDLE: tokio::time::Duration = tokio::time::Duration::from_secs(30);
 
 impl Service {
     pub(super) async fn stream_live_m4s(
@@ -89,47 +81,54 @@ impl Service {
         };
         let mut sub_rx = stream.frames();
 
-        let mut keepalive = tokio::time::interval(KEEPALIVE_AFTER_IDLE);
-        keepalive.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Delay);
+        // Timeout for initial frame - if no frames arrive within 30 seconds, close connection
+        let initial_timeout = tokio::time::Duration::from_secs(30);
+        let mut first_frame = true;
 
         loop {
-            tokio::select! {
-                biased;
-
-                next = sub_rx.next() => {
-                    match next {
-                        Ok((_n, frame)) => {
-                            keepalive.reset_after(KEEPALIVE_AFTER_IDLE);
-                            if !self.stream_live_m4s_chunk(
-                                open_id,
-                                stream_id,
-                                ws,
-                                frame,
-                            ).await? {
-                                return Ok(());
-                            }
-                        }
-                        Err(db::stream::DroppedFramesError { last, next }) => {
-                            let next_key_frame = sub_rx.reset().expect("should have key frame after drop");
-                            let behind = next.get() - last.get();
-                            let key_frame_gap = next_key_frame.get() - next.get();
-                            debug!("subscriber fell {behind} frames behind `recent_frames`; will jump {key_frame_gap} frames further to next key frame");
-                            if ws.send(tungstenite::Message::Text(
-                                serde_json::to_string(&crate::json::LiveM4sMessage::Dropped {
-                                    frames: next_key_frame.get() - last.get(),
-                                }).expect("should serialize")
-                                .into(),
-                            ))
-                            .await.is_err()
-                            {
-                                return Ok(());
-                            }
-                        }
+            // Apply timeout for first frame only
+            let next = if first_frame {
+                match tokio::time::timeout(initial_timeout, sub_rx.next()).await {
+                    Ok(result) => result,
+                    Err(_) => {
+                        bail!(
+                            DeadlineExceeded,
+                            msg("timeout waiting for initial frame on {}/{}", uuid, stream_type)
+                        );
                     }
                 }
+            } else {
+                sub_rx.next().await
+            };
 
-                _ = keepalive.tick() => {
-                    if ws.send(tungstenite::Message::Ping(Bytes::new())).await.is_err() {
+            match next {
+                Ok((_n, frame)) => {
+                    if first_frame {
+                        first_frame = false;
+                    }
+                    if !self
+                        .stream_live_m4s_chunk(open_id, stream_id, ws, frame)
+                        .await?
+                    {
+                        return Ok(());
+                    }
+                }
+                Err(db::stream::DroppedFramesError { last, next }) => {
+                    let next_key_frame = sub_rx.reset().expect("should have key frame after drop");
+                    let behind = next.get() - last.get();
+                    let key_frame_gap = next_key_frame.get() - next.get();
+                    debug!("subscriber fell {behind} frames behind `recent_frames`; will jump {key_frame_gap} frames further to next key frame");
+                    if ws
+                        .send(tungstenite::Message::Text(
+                            serde_json::to_string(&crate::json::LiveM4sMessage::Dropped {
+                                frames: next_key_frame.get() - last.get(),
+                            })
+                            .expect("should serialize")
+                            .into(),
+                        ))
+                        .await
+                        .is_err()
+                    {
                         return Ok(());
                     }
                 }
@@ -176,8 +175,7 @@ impl Service {
                 },
             )?;
         }
-        let row =
-            row.ok_or_else(|| err!(Internal, msg("unable to find recording for {live:?}")))?;
+        let row = row.ok_or_else(|| err!(Internal, msg("unable to find recording for {live:?}")))?;
         tracing::debug!("have row to match frame");
         use http_serve::Entity;
         let mp4 = builder.build(self.db.clone())?;
@@ -187,12 +185,12 @@ impl Service {
         let (prev_media_duration, prev_runs) = row.prev_media_duration_and_runs.unwrap();
         let hdr = format!(
             "Content-Type: {}\r\n\
-            X-Recording-Start: {}\r\n\
-            X-Recording-Id: {}.{}\r\n\
-            X-Media-Time-Range: {}-{}\r\n\
-            X-Prev-Media-Duration: {}\r\n\
-            X-Runs: {}\r\n\
-            X-Video-Sample-Entry-Id: {}\r\n\r\n",
+             X-Recording-Start: {}\r\n\
+             X-Recording-Id: {}.{}\r\n\
+             X-Media-Time-Range: {}-{}\r\n\
+             X-Prev-Media-Duration: {}\r\n\
+             X-Runs: {}\r\n\
+             X-Video-Sample-Entry-Id: {}\r\n\r\n",
             mime_type.to_str().unwrap(),
             row.start.0,
             open_id,
@@ -206,9 +204,6 @@ impl Service {
         let mut v = hdr.into_bytes();
         mp4.append_into_vec(&mut v).await?;
         tracing::debug!("sending frame msg");
-        Ok(ws
-            .send(tungstenite::Message::Binary(v.into()))
-            .await
-            .is_ok())
+        Ok(ws.send(tungstenite::Message::Binary(v.into())).await.is_ok())
     }
 }

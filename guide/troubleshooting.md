@@ -1,7 +1,7 @@
 # Troubleshooting <!-- omit in toc -->
 
 Here are some tips for diagnosing various problems with Moonshadow NVR. Feel free
-to open an [issue](https://github.com/scottlamb/moonshadow-nvr/issues) if you
+to open an [issue](https://github.com/washaka81/Moonshadow-NVR/issues) if you
 need more help.
 
 * [Viewing Moonshadow NVR's logs](#viewing-moonshadow-nvrs-logs)
@@ -364,12 +364,12 @@ Here's what you can do:
 *   *recover*: restart Moonshadow NVR to pick up the new timestamp.
 *   *prevent*: add a RTC module or fresh battery so your clock is correct
     at boot time. There's a
-    [guide](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup#realtime-clock-on-raspberry-pi)
+    [guide](https://github.com/washaka81/Moonshadow-NVR/wiki/System-setup#realtime-clock-on-raspberry-pi)
     on the wiki.
 
 Currently Moonshadow NVR doesn't have any logic to detect this happening or
 mechanism to fix old timestamps after the fact. Ideas and help welcome; see
-[issue #9](https://github.com/scottlamb/moonshadow-nvr/issues/9).
+[issue #9](https://github.com/washaka81/Moonshadow-NVR/issues/9).
 
 ### Configuration interface problems
 
@@ -385,7 +385,7 @@ gyscos/Cursive#13. As a workaround, try setting the environment variable
 
 Some cheap USB SATA adapters don't appear to work reliably in UAS mode under
 Linux. If you see errors like the following, try [disabling
-UAS](https://github.com/scottlamb/moonshadow-nvr/wiki/System-setup#disable-uas).
+UAS](https://github.com/washaka81/Moonshadow-NVR/wiki/System-setup#disable-uas).
 Unfortunately your filesystem is likely to have corruption, so after disabling UAS,
 run a `fsck` and then `moonshadow-nvr check` to try recovering.
 

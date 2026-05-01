@@ -23,6 +23,7 @@ mod v4_to_v5;
 mod v5_to_v6;
 mod v6_to_v7;
 mod v7_to_v8;
+mod v8_to_v9;
 
 #[derive(Debug)]
 pub struct Args<'a> {
@@ -60,6 +61,7 @@ fn upgrade(
         v5_to_v6::run,
         v6_to_v7::run,
         v7_to_v8::run,
+        v8_to_v9::run,
     ];
 
     {

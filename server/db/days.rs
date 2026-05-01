@@ -508,7 +508,7 @@ mod tests {
     /// adjusts the start downward after receiving the first frame. This should be fixed, but in the
     /// meantime, handle this gracefully. In particular, we must not call
     /// `jiff::Timestamp::from_second(Time::MAX.unix_seconds()).expect("...")`.
-    /// <https://github.com/scottlamb/moonshadow-nvr/issues/346>
+    /// <https://github.com/washaka81/Moonshadow-NVR/issues/346>
     #[test]
     fn adjust_with_max_to_max() {
         testutil::init();

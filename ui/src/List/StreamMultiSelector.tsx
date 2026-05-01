@@ -7,7 +7,8 @@ import { Camera, Stream, StreamType } from "../types";
 import Checkbox from "@mui/material/Checkbox";
 import { ToplevelResponse } from "../api";
 import Paper from "@mui/material/Paper";
-import { useTheme } from "@mui/material/styles";
+import Typography from "@mui/material/Typography";
+import Divider from "@mui/material/Divider";
 
 interface Props {
   toplevel: ToplevelResponse;
@@ -15,9 +16,7 @@ interface Props {
   setSelected: (selected: Set<number>) => void;
 }
 
-/** Returns a table which allows selecting zero or more streams. */
 const StreamMultiSelector = ({ toplevel, selected, setSelected }: Props) => {
-  const theme = useTheme();
   const setStream = (s: Stream, checked: boolean) => {
     const updated = new Set(selected);
     if (checked) {
@@ -27,99 +26,101 @@ const StreamMultiSelector = ({ toplevel, selected, setSelected }: Props) => {
     }
     setSelected(updated);
   };
+
   const toggleType = (st: StreamType) => {
     const updated = new Set(selected);
-    let foundAny = false;
-    for (const sid of selected) {
-      const s = toplevel.streams.get(sid);
-      if (s === undefined) {
-        continue;
-      }
-      if (s.streamType === st) {
-        updated.delete(s.id);
-        foundAny = true;
+    let allSelected = true;
+    for (const c of toplevel.cameras) {
+      const s = c.streams[st];
+      if (s !== undefined && !selected.has(s.id)) {
+        allSelected = false;
+        break;
       }
     }
-    if (!foundAny) {
-      for (const c of toplevel.cameras) {
-        if (c.streams[st] !== undefined) {
-          updated.add(c.streams[st as StreamType]!.id);
-        }
-      }
-    }
-    setSelected(updated);
-  };
-  const toggleCamera = (c: Camera) => {
-    const updated = new Set(selected);
-    let foundAny = false;
-    for (const st in c.streams) {
-      const s = c.streams[st as StreamType]!;
-      if (selected.has(s.id)) {
-        updated.delete(s.id);
-        foundAny = true;
-      }
-    }
-    if (!foundAny) {
-      for (const st in c.streams) {
-        updated.add(c.streams[st as StreamType]!.id);
+
+    for (const c of toplevel.cameras) {
+      const s = c.streams[st];
+      if (s !== undefined) {
+        if (allSelected) updated.delete(s.id);
+        else updated.add(s.id);
       }
     }
     setSelected(updated);
   };
 
-  const cameraRows = toplevel.cameras.map((c) => {
-    function checkbox(st: StreamType) {
-      const s = c.streams[st];
-      if (s === undefined) {
-        return <Checkbox color="secondary" disabled />;
+  const toggleCamera = (c: Camera) => {
+    const updated = new Set(selected);
+    let allSelected = true;
+    for (const st in c.streams) {
+      const s = c.streams[st as StreamType];
+      if (s !== undefined && !selected.has(s.id)) {
+        allSelected = false;
+        break;
       }
-      return (
-        <Checkbox
-          size="small"
-          checked={selected.has(s.id)}
-          color="secondary"
-          onChange={(event) => setStream(s, event.target.checked)}
-        />
-      );
     }
-    return (
-      <tr key={c.uuid}>
-        <td onClick={() => toggleCamera(c)}>{c.shortName}</td>
-        <td>{checkbox("main")}</td>
-        <td>{checkbox("sub")}</td>
-      </tr>
-    );
-  });
+
+    for (const st in c.streams) {
+      const s = c.streams[st as StreamType];
+      if (s !== undefined) {
+        if (allSelected) updated.delete(s.id);
+        else updated.add(s.id);
+      }
+    }
+    setSelected(updated);
+  };
+
   return (
-    <Paper sx={{ padding: theme.spacing(1) }}>
-      <Box
-        component="table"
-        sx={{
-          fontSize: "0.9rem",
-          "& td:first-of-type": {
-            paddingRight: "3px",
-          },
-          "& td:not(:first-of-type)": {
-            textAlign: "center",
-          },
-          "& .MuiCheckbox-root": {
-            padding: "3px",
-          },
-          "@media (pointer: fine)": {
-            "& .MuiCheckbox-root": {
-              padding: "0px",
-            },
-          },
-        }}
-      >
-        <thead>
-          <tr>
-            <td />
-            <td onClick={() => toggleType("main")}>main</td>
-            <td onClick={() => toggleType("sub")}>sub</td>
-          </tr>
-        </thead>
-        <tbody>{cameraRows}</tbody>
+    <Paper sx={{ p: 1.5, borderRadius: 2 }}>
+      <Box sx={{ display: 'flex', alignItems: 'center', mb: 1, px: 0.5 }}>
+        <Typography variant="caption" sx={{ flex: 1, fontWeight: 700, color: 'text.secondary', textTransform: 'uppercase' }}>
+          Cameras
+        </Typography>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Typography 
+            variant="caption" 
+            onClick={() => toggleType("main")}
+            sx={{ cursor: 'pointer', fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+          >
+            MAIN
+          </Typography>
+          <Typography 
+            variant="caption" 
+            onClick={() => toggleType("sub")}
+            sx={{ cursor: 'pointer', fontWeight: 700, color: 'primary.main', '&:hover': { textDecoration: 'underline' } }}
+          >
+            SUB
+          </Typography>
+        </Box>
+      </Box>
+      <Divider sx={{ mb: 1 }} />
+      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+        {toplevel.cameras.map((c) => (
+          <Box key={c.uuid} sx={{ display: 'flex', alignItems: 'center', py: 0.25, '&:hover': { bgcolor: 'rgba(0,0,0,0.02)' }, borderRadius: 1, px: 0.5 }}>
+            <Typography 
+              variant="body2" 
+              onClick={() => toggleCamera(c)}
+              sx={{ flex: 1, cursor: 'pointer', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
+            >
+              {c.shortName}
+            </Typography>
+            <Box sx={{ display: 'flex', gap: 1 }}>
+              {["main", "sub"].map((st) => {
+                const s = c.streams[st as StreamType];
+                return (
+                  <Checkbox
+                    key={st}
+                    size="small"
+                    disabled={s === undefined}
+                    checked={s !== undefined && selected.has(s.id)}
+                    color="primary"
+                    sx={{ p: 0.5 }}
+                    onChange={(e) => s && setStream(s, e.target.checked)}
+                  />
+                );
+              })}
+            </Box>
+          </Box>
+        ))}
       </Box>
     </Paper>
   );

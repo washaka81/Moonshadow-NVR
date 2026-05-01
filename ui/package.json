@@ -18,7 +18,8 @@
     "react-dom": "^19.2.4",
     "react-hook-form": "^7.71.1",
     "react-hook-form-mui": "^8.2.0",
-    "react-router": "^7"
+    "react-router": "^7",
+    "react-router-dom": "^7.14.2"
   },
   "scripts": {
     "check-format": "prettier --check --ignore-path .prettierignore .",
@@ -39,6 +40,7 @@
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
+    "@types/react-router-dom": "^5.3.3",
     "@vitejs/plugin-legacy": "^6.0.0",
     "@vitejs/plugin-react-swc": "^4.0.0",
     "@vitest/eslint-plugin": "^1.6.9",

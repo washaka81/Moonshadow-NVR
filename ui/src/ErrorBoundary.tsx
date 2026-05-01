@@ -79,7 +79,7 @@ class MoonshadowErrorBoundary extends React.Component<Props, State> {
 
           <p>
             Please open{" "}
-            <a href="https://github.com/scottlamb/moonshadow-nvr/issues">
+            <a href="https://github.com/washaka81/Moonshadow-NVR/issues">
               Moonshadow NVR's issue tracker
             </a>{" "}
             and see if this problem has already been reported.

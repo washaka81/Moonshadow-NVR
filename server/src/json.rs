@@ -36,6 +36,9 @@ pub struct TopLevel<'a> {
 
     #[serde(serialize_with = "TopLevel::serialize_signal_types")]
     pub signal_types: &'a db::LockedDatabase,
+
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub system_info: Option<serde_json::Value>,
 }
 
 #[derive(Debug, Serialize)]
@@ -678,7 +681,25 @@ pub struct AutodetectRequest<'a> {
 #[serde(rename_all = "camelCase")]
 pub struct AutodetectResponse {
     pub main_url: Option<String>,
+    pub main_codec: Option<String>,
     pub sub_url: Option<String>,
+    pub sub_codec: Option<String>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct StreamProbeRequest<'a> {
+    #[serde(borrow)]
+    pub csrf: Option<&'a str>,
+    pub url: String,
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct StreamProbeResponse {
+    pub codec: Option<String>,
+    pub transport: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -722,18 +743,16 @@ pub struct StreamSubset {
 }
 
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AiEvent {
     pub time_90k: i64,
     pub camera_id: i32,
-    #[serde(rename = "type")]
     pub type_: String,
     pub value: String,
+    pub video_link: Option<String>,
 }
 
 /// Response to `GET /api/ai/events`.
 #[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
 pub struct AiEventsResponse {
     pub events: Vec<AiEvent>,
 }

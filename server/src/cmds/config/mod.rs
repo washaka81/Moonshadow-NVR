@@ -5,7 +5,9 @@
 //! Interactive CLI configuration interface.
 
 pub mod cameras;
+pub mod dirs_tui;
 pub mod tui;
+pub mod users_tui;
 
 use base::clock;
 use base::Error;
@@ -24,7 +26,6 @@ pub struct Args {
 
 pub fn run(args: Args) -> Result<i32, Error> {
     let (_db_dir, mut conn) = super::open_conn(&args.db_dir, super::OpenMode::Create)?;
-
     let cur_ver = db::get_schema_version(&conn)?;
     if cur_ver.is_none() {
         println!("{}", style("🗄️  Initializing database...").cyan());
@@ -41,7 +42,7 @@ pub fn run(args: Args) -> Result<i32, Error> {
 
     let db = Arc::new(db::Database::new(clock::RealClocks {}, conn, true)?);
 
-    tui::run_main_menu(&db)?;
+    tui::run_main_menu(&db, &args.db_dir)?;
 
     Ok(0)
 }
