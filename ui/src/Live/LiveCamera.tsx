@@ -163,6 +163,7 @@ class LiveCameraDriver {
       if (message.type === "error") {
         this.error(`Server: ${message.message}`);
       } else if (message.type === "dropped") {
+        // ignore
       }
       return;
     }

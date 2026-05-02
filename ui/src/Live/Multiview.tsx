@@ -109,7 +109,7 @@ export const getInitialSelected = (
         if (Array.isArray(parsed)) result = parsed;
       }
     }
-  } catch (e) {
+  } catch {
     localStorage.removeItem("camsSelected");
   }  // If we have a result from URL or storage, use it
   if (result) return result;

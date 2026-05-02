@@ -81,7 +81,7 @@ const Live = ({ cameras, Frame }: LiveProps) => {
         const parsed = Number.parseInt(stored, 10);
         if (!isNaN(parsed)) return parsed;
       }
-    } catch (e) {
+    } catch {
       localStorage.removeItem("multiviewLayoutIndex");
     }
     return getAutoLayoutIndex();
