@@ -2445,7 +2445,7 @@ impl<C: Clocks + Clone> DatabaseGuard<'_, C> {
     ///
     /// On success, for each affected sample file directory with a flush watcher set, sends a
     /// `Flush` event.
-    pub(crate) fn flush(&mut self, reason: &str) -> Result<(), Error> {
+    pub fn flush(&mut self, reason: &str) -> Result<(), Error> {
         self.db.flush(self.clocks, reason)
     }
 

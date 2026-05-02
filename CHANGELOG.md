@@ -8,6 +8,18 @@ upgrades, e.g. `v0.6.x` -> `v0.7.x`. The config file format and
 [API](ref/api.md) currently have no stability guarantees, so they may change
 even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 
+## v0.0.2 (2026-05-01)
+
+*   **Integrated Multi-Backend AI Acceleration**: Added support for NPU (Intel Core Ultra), ARM ACL (Raspberry Pi), and NVIDIA CUDA alongside OpenVINO and Vulkan.
+*   **Dynamic LPR Training Hub**: New automated feedback loop for License Plate Recognition using real captures and synthetic data with real fonts.
+*   **Enhanced Face Recognition**: Added YOLOv8-Face detection and identity management system.
+*   **Behavioral Heatmaps**: Implemented Dwell-Time based heatmaps for suspicious behavior analysis.
+*   **Advanced TUI Configuration**: Redesigned Terminal UI with granular AI feature toggles and hardware prioritization.
+*   **Automated Model Management**: New installer logic for automatic AI model and font acquisition.
+*   **Bug Fixes**: Resolved critical issues in storage pool creation, directory empty-check logic, and database permissions.
+*   **Factory Reset**: Improved robustness of the system reset command with dynamic binary path detection.
+*   **UI Improvements**: Enhanced Live View with real-time HUD and status indicators.
+
 ## v0.7.31 (2026-03-13)
 
 *   support changing video sample parameters in live view.

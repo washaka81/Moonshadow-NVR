@@ -100,6 +100,20 @@ At the top level, before any `[[binds]]` lines, the following
 keys are understood:
 
 *   `dbDir`: path to the SQLite database directory. Defaults to `/var/lib/moonshadow-nvr/db`.
+
+### AI and Hardware Settings (Stored in Database)
+While most AI settings are managed via the TUI and stored in the database, they correspond to the following logic:
+
+*   **hardwareAcceleration**: (bool) Enable/Disable multi-backend acceleration (NPU/GPU/CPU).
+*   **vulkanPreprocessing**: (bool) Enable iGPU-based parallel frame resizing.
+*   **aiMode**: (string) "low", "medium", "high", or "auto".
+*   **enableObjectDetection**: (bool) Master toggle for person/vehicle detection.
+*   **enableLpr**: (bool) Enable License Plate Recognition.
+*   **enableFaceRecognition**: (bool) Enable Face Registration and Identity management.
+*   **enableHeatmap**: (bool) Enable behavioral Dwell-Time heatmaps.
+*   **preferNpu**: (bool) Force use of Neural Processing Unit if available.
+*   **preferTpu**: (bool) Force use of Tensor Processing Unit.
+
 *   `uiDir`: UI to serve; can be a path. Defaults to the special value
     `uiDir = { bundled = true }` if a UI was built into the binary, or
     `/usr/local/lib/moonshadow-nvr/ui` otherwise. Release builds have UIs

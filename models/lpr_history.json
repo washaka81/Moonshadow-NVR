@@ -1,0 +1,10 @@
+[
+  {
+    "timestamp": 1714560000,
+    "country": "chile",
+    "hit_rate": 0.0,
+    "samples_real": 0,
+    "samples_synthetic": 0,
+    "event": "Initial setup"
+  }
+]

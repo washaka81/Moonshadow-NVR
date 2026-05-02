@@ -13,11 +13,12 @@
 ## ✨ Key Features
 
 - **🚀 High-Performance Rust Core:** Optimized direct-to-disk recording (H.264/H.265) and efficient memory management, ensuring minimal CPU overhead even with multiple high-bitrate 4K streams.
-- **🧠 Integrated AI Acceleration:** Native, multi-backend support for **ONNX Runtime**, **OpenVINO**, **Vulkan Compute**, and **NVIDIA CUDA**. Powering real-time YOLOv8 object detection, Chilean/Universal LPR, and Person Re-Identification.
+- **🧠 Integrated AI Acceleration:** Native, multi-backend support for **ONNX Runtime**, **OpenVINO (NPU/GPU/CPU)**, **ARM ACL (Compute Library)**, **Vulkan Compute**, and **NVIDIA CUDA**. Powering real-time YOLOv8 object detection, Chilean/Universal LPR, Face ID, and Suspicious Behavior Heatmaps.
 - **📡 Low-Latency Streaming:** Seamless multi-camera live viewing with sub-second latency via **WebRTC** and **MediaMTX** proxy integration.
-- **📊 Real-Time System Monitor:** Detailed hardware telemetry (CPU Cores, RAM/Swap, Disk IO, GPU/VRAM load, and Temperatures) accessible directly from your web dashboard.
-- **💻 Interactive TUI Configuration:** A robust **Terminal User Interface** to manage cameras, users, storage pools, and AI settings without manually editing complex configuration files.
-- **🌐 Modern Web Dashboard:** Sleek, responsive React-based interface with intelligent timeline playback, AI event filtering (Person, Vehicle, Plate), and easy MP4 downloads.
+- **📊 Real-Time System Monitor:** Detailed hardware telemetry (CPU Cores, RAM/Swap, Disk IO, GPU/NPU/VRAM load, and Temperatures) accessible directly from your web dashboard.
+- **💻 Interactive TUI Configuration:** A robust **Terminal User Interface** to manage cameras, users, storage pools, and granular AI settings (Individual feature toggles, NPU/TPU preference).
+- **🌐 Modern Web Dashboard:** Sleek, responsive React-based interface with intelligent timeline playback, AI event filtering (Person, Vehicle, Plate, Face), and real-time behavior heatmaps.
+- **🔄 Dynamic LPR Training:** Automated feedback loop that uses real captures and synthetic data (with real fonts) to continuously improve license plate recognition accuracy.
 
 ---
 

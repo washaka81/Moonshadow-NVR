@@ -19,7 +19,11 @@ pub struct UserCard {
     pub id: i32,
     pub username: String,
     pub view_video: bool,
+    pub read_camera_configs: bool,
+    pub update_signals: bool,
     pub admin_users: bool,
+    pub view_ai_events: bool,
+    pub manage_ai: bool,
 }
 
 pub async fn run_users_menu_shared(
@@ -44,6 +48,10 @@ pub async fn run_users_menu_shared(
                                         let mut l = db.lock();
                                         if let Err(e) = l.delete_user(id) {
                                             state.status_msg = format!("❌ Error: {}", e);
+                                            return Ok(());
+                                        }
+                                        if let Err(e) = l.flush("TUI user delete") {
+                                            state.status_msg = format!("❌ Flush Error: {}", e);
                                             return Ok(());
                                         }
                                     }
@@ -83,6 +91,18 @@ pub async fn run_users_menu_shared(
                                 state.menu_input4 = TextInput::new(
                                     if u.admin_users { "y" } else { "n" }.to_string(),
                                 );
+                                state.menu_input5 = TextInput::new(
+                                    if u.read_camera_configs { "y" } else { "n" }.to_string(),
+                                );
+                                state.menu_input6 = TextInput::new(
+                                    if u.update_signals { "y" } else { "n" }.to_string(),
+                                );
+                                state.menu_input7 = TextInput::new(
+                                    if u.view_ai_events { "y" } else { "n" }.to_string(),
+                                );
+                                state.menu_input8 = TextInput::new(
+                                    if u.manage_ai { "y" } else { "n" }.to_string(),
+                                );
                                 state.edit_user = Some(u);
                             }
                         }
@@ -106,12 +126,16 @@ async fn handle_user_input(
     db: &Arc<db::Database>,
 ) -> io::Result<()> {
     match key.code {
-        KeyCode::Tab => state.menu_tab = (state.menu_tab + 1) % 4,
+        KeyCode::Tab => state.menu_tab = (state.menu_tab + 1) % 8,
         KeyCode::Char(c) => match state.menu_tab {
             0 => state.menu_input.insert_char(c),
             1 => state.menu_input2.insert_char(c),
             2 => state.menu_input3.insert_char(c),
             3 => state.menu_input4.insert_char(c),
+            4 => state.menu_input5.insert_char(c),
+            5 => state.menu_input6.insert_char(c),
+            6 => state.menu_input7.insert_char(c),
+            7 => state.menu_input8.insert_char(c),
             _ => {}
         },
         KeyCode::Backspace => match state.menu_tab {
@@ -119,21 +143,25 @@ async fn handle_user_input(
             1 => state.menu_input2.backspace(),
             2 => state.menu_input3.backspace(),
             3 => state.menu_input4.backspace(),
+            4 => state.menu_input5.backspace(),
+            5 => state.menu_input6.backspace(),
+            6 => state.menu_input7.backspace(),
+            7 => state.menu_input8.backspace(),
             _ => {}
         },
         KeyCode::Enter => {
             let user = state.menu_input.get_content().to_string();
             let pass = state.menu_input2.get_content().to_string();
-            let can_v = state
-                .menu_input3
-                .get_content()
-                .to_lowercase()
-                .starts_with('y');
-            let is_a = state
-                .menu_input4
-                .get_content()
-                .to_lowercase()
-                .starts_with('y');
+            
+            let parse_yn = |ti: &TextInput| ti.get_content().to_lowercase().starts_with('y');
+            
+            let can_v = parse_yn(&state.menu_input3);
+            let is_a = parse_yn(&state.menu_input4);
+            let can_r = parse_yn(&state.menu_input5);
+            let can_u = parse_yn(&state.menu_input6);
+            let can_ae = parse_yn(&state.menu_input7);
+            let can_mai = parse_yn(&state.menu_input8);
+
             if !user.is_empty() {
                 let mut l = db.lock();
                 if state.show_add_menu {
@@ -143,8 +171,17 @@ async fn handle_user_input(
                     }
                     ch.permissions.view_video = can_v;
                     ch.permissions.admin_users = is_a;
+                    ch.permissions.read_camera_configs = can_r;
+                    ch.permissions.update_signals = can_u;
+                    ch.permissions.view_ai_events = can_ae;
+                    ch.permissions.manage_ai = can_mai;
+
                     if let Err(e) = l.apply_user_change(ch) {
                         state.status_msg = format!("❌ Error: {}", e);
+                        return Ok(());
+                    }
+                    if let Err(e) = l.flush("TUI user add") {
+                        state.status_msg = format!("❌ Flush Error: {}", e);
                         return Ok(());
                     }
                 } else if let Some(u) = &state.edit_user {
@@ -155,8 +192,17 @@ async fn handle_user_input(
                         }
                         ch.permissions.view_video = can_v;
                         ch.permissions.admin_users = is_a;
+                        ch.permissions.read_camera_configs = can_r;
+                        ch.permissions.update_signals = can_u;
+                        ch.permissions.view_ai_events = can_ae;
+                        ch.permissions.manage_ai = can_mai;
+                        
                         if let Err(e) = l.apply_user_change(ch) {
                             state.status_msg = format!("❌ Error: {}", e);
+                            return Ok(());
+                        }
+                        if let Err(e) = l.flush("TUI user edit") {
+                            state.status_msg = format!("❌ Flush Error: {}", e);
                             return Ok(());
                         }
                     }
@@ -200,10 +246,11 @@ fn ui(frame: &mut Frame, state: &mut UserAppState) {
                 Style::default()
             };
             ListItem::new(format!(
-                "  {} [Video: {}, Admin: {}]",
+                "  {} [Video: {}, Admin: {}, AI: {}]",
                 u.username,
                 if u.view_video { "Y" } else { "N" },
-                if u.admin_users { "Y" } else { "N" }
+                if u.admin_users { "Y" } else { "N" },
+                if u.view_ai_events { "Y" } else { "N" }
             ))
             .style(style)
         })
@@ -236,12 +283,16 @@ fn ui(frame: &mut Frame, state: &mut UserAppState) {
 }
 
 fn render_user_modal(frame: &mut Frame, area: Rect, state: &mut UserAppState) {
-    let area = centered_rect(60, 50, area);
+    let area = centered_rect(70, 90, area);
     frame.render_widget(Clear, area);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
+        .margin(1)
         .constraints([
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
@@ -253,12 +304,20 @@ fn render_user_modal(frame: &mut Frame, area: Rect, state: &mut UserAppState) {
         "Password (blank to keep current)",
         "View Video (y/n)",
         "Admin (y/n)",
+        "Read Camera Configs (y/n)",
+        "Update Signals (y/n)",
+        "View AI Events (y/n)",
+        "Manage AI Settings (y/n)",
     ];
     let inputs = [
         &state.menu_input,
         &state.menu_input2,
         &state.menu_input3,
         &state.menu_input4,
+        &state.menu_input5,
+        &state.menu_input6,
+        &state.menu_input7,
+        &state.menu_input8,
     ];
     frame.render_widget(
         Block::default()
@@ -267,7 +326,7 @@ fn render_user_modal(frame: &mut Frame, area: Rect, state: &mut UserAppState) {
             .border_style(Style::default().fg(Color::Yellow)),
         area,
     );
-    for i in 0..4 {
+    for i in 0..8 {
         let b = Block::default()
             .borders(Borders::ALL)
             .title(labels[i])
@@ -371,6 +430,10 @@ struct UserAppState {
     menu_input2: TextInput,
     menu_input3: TextInput,
     menu_input4: TextInput,
+    menu_input5: TextInput,
+    menu_input6: TextInput,
+    menu_input7: TextInput,
+    menu_input8: TextInput,
     status_msg: String,
 }
 impl UserAppState {
@@ -387,6 +450,10 @@ impl UserAppState {
             menu_input2: TextInput::new(String::new()),
             menu_input3: TextInput::new(String::new()),
             menu_input4: TextInput::new(String::new()),
+            menu_input5: TextInput::new(String::new()),
+            menu_input6: TextInput::new(String::new()),
+            menu_input7: TextInput::new(String::new()),
+            menu_input8: TextInput::new(String::new()),
             status_msg: String::new(),
         }
     }
@@ -398,6 +465,10 @@ impl UserAppState {
         self.menu_input2.clear();
         self.menu_input3.clear();
         self.menu_input4.clear();
+        self.menu_input5.clear();
+        self.menu_input6.clear();
+        self.menu_input7.clear();
+        self.menu_input8.clear();
         self.menu_tab = 0;
     }
     fn next(&mut self) {
@@ -427,7 +498,11 @@ async fn load_users(db: &Arc<db::Database>) -> Vec<UserCard> {
             id,
             username: user.username.clone(),
             view_video: user.permissions.view_video,
+            read_camera_configs: user.permissions.read_camera_configs,
+            update_signals: user.permissions.update_signals,
             admin_users: user.permissions.admin_users,
+            view_ai_events: user.permissions.view_ai_events,
+            manage_ai: user.permissions.manage_ai,
         });
     }
     res

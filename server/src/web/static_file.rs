@@ -81,7 +81,7 @@ impl Ui {
                 let Some(e) = ui.lookup(path, req.headers(), cache_control, content_type) else {
                     bail!(NotFound, msg("static file not found"));
                 };
-                Ok(http_serve::serve(e, &req))
+                Ok(http_serve::serve(e, req))
             }
         }
     }

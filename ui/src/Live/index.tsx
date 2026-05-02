@@ -82,7 +82,6 @@ const Live = ({ cameras, Frame }: LiveProps) => {
         if (!isNaN(parsed)) return parsed;
       }
     } catch (e) {
-      console.warn("Failed to parse layout index, clearing storage", e);
       localStorage.removeItem("multiviewLayoutIndex");
     }
     return getAutoLayoutIndex();

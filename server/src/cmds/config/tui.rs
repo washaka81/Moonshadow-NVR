@@ -229,10 +229,13 @@ async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String 
 
     // 2. Reset database (delete and re-init)
     let db_path = db_dir.join("db");
+    let current_exe = std::env::current_exe().unwrap_or_else(|_| PathBuf::from("moonshadow-nvr"));
 
     let cmd = format!(
-        "rm -f {}* && target/debug/moonshadow-nvr init",
-        db_path.display()
+        "rm -f {}* && {} init --db-dir {}",
+        db_path.display(),
+        current_exe.display(),
+        db_dir.display()
     );
     match std::process::Command::new("sh")
         .arg("-c")
@@ -240,7 +243,8 @@ async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String 
         .status()
     {
         Ok(s) if s.success() => "✅ System Reset Successful. Restart NVR.".to_string(),
-        _ => "❌ Reset failed. Database might be busy.".to_string(),
+        Ok(s) => format!("❌ Reset failed (exit code: {}). Database might be busy.", s),
+        Err(e) => format!("❌ Reset failed to start: {}", e),
     }
 }
 
@@ -295,13 +299,13 @@ async fn run_hardware_app(
                     match key.code {
                         KeyCode::Esc | KeyCode::Char('q') => break,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            hw_state.selected = (hw_state.selected + 1) % 6
+                            hw_state.selected = (hw_state.selected + 1) % 12
                         }
                         KeyCode::Up | KeyCode::Char('k') => {
                             hw_state.selected = if hw_state.selected > 0 {
                                 hw_state.selected - 1
                             } else {
-                                5
+                                11
                             }
                         }
                         KeyCode::Char(' ') | KeyCode::Enter => match hw_state.selected {
@@ -312,19 +316,34 @@ async fn run_hardware_app(
                                 hw_state.ai_mode = match hw_state.ai_mode.as_str() {
                                     "low" => "medium".to_string(),
                                     "medium" => "high".to_string(),
+                                    "high" => "auto".to_string(),
                                     _ => "low".to_string(),
                                 };
                             }
-                            5 => {
+                            4 => hw_state.enable_detection = !hw_state.enable_detection,
+                            5 => hw_state.enable_lpr = !hw_state.enable_lpr,
+                            6 => hw_state.enable_face = !hw_state.enable_face,
+                            7 => hw_state.enable_heatmap = !hw_state.enable_heatmap,
+                            8 => hw_state.prefer_npu = !hw_state.prefer_npu,
+                            9 => hw_state.prefer_tpu = !hw_state.prefer_tpu,
+                            11 => {
                                 let mut l = db.lock();
                                 let mut cfg = l.global_config().clone();
                                 cfg.hardware_acceleration = hw_state.accel;
                                 cfg.vulkan_preprocessing = hw_state.vulkan_pre;
                                 cfg.openvino_repair = hw_state.ov_repair;
                                 cfg.ai_mode = hw_state.ai_mode.clone();
+                                cfg.enable_object_detection = hw_state.enable_detection;
+                                cfg.enable_lpr = hw_state.enable_lpr;
+                                cfg.enable_face_recognition = hw_state.enable_face;
+                                cfg.enable_heatmap = hw_state.enable_heatmap;
+                                cfg.prefer_npu = hw_state.prefer_npu;
+                                cfg.prefer_tpu = hw_state.prefer_tpu;
                                 cfg.model_path = hw_state.model.get_content().to_string();
                                 if let Err(e) = l.set_global_config(cfg) {
                                     hw_state.status_msg = format!("❌ Error: {}", e);
+                                } else if let Err(e) = l.flush("TUI config save") {
+                                    hw_state.status_msg = format!("❌ Flush Error: {}", e);
                                 } else {
                                     hw_state.status_msg =
                                         "✅ Global configuration saved".to_string();
@@ -332,10 +351,10 @@ async fn run_hardware_app(
                             }
                             _ => {}
                         },
-                        KeyCode::Char(c) if hw_state.selected == 4 => {
+                        KeyCode::Char(c) if hw_state.selected == 10 => {
                             hw_state.model.insert_char(c);
                         }
-                        KeyCode::Backspace if hw_state.selected == 4 => {
+                        KeyCode::Backspace if hw_state.selected == 10 => {
                             hw_state.model.backspace();
                         }
                         _ => {}
@@ -354,6 +373,14 @@ struct HardwareState {
     ov_repair: bool,
     ai_mode: String,
     model: TextInput,
+    // New AI features
+    enable_detection: bool,
+    enable_lpr: bool,
+    enable_face: bool,
+    enable_heatmap: bool,
+    // Advanced Hardware
+    prefer_npu: bool,
+    prefer_tpu: bool,
     status_msg: String,
 }
 impl HardwareState {
@@ -375,6 +402,12 @@ impl HardwareState {
             } else {
                 cfg.model_path.clone()
             }),
+            enable_detection: cfg.enable_object_detection,
+            enable_lpr: cfg.enable_lpr,
+            enable_face: cfg.enable_face_recognition,
+            enable_heatmap: cfg.enable_heatmap,
+            prefer_npu: cfg.prefer_npu,
+            prefer_tpu: cfg.prefer_tpu,
             status_msg: String::new(),
         }
     }
@@ -399,19 +432,43 @@ fn render_hardware_screen(frame: &mut Frame, state: &mut HardwareState) {
 
     let options = [
         format!(
-            "  Hardware Accel (OpenVINO Native): [{}]",
+            "  [Accel] OpenVINO Hardware (NPU/GPU/CPU): [{}]",
             if state.accel { "X" } else { " " }
         ),
         format!(
-            "  Vulkan Pre-processing (iGPU Parallel): [{}]",
+            "  [Preproc] Vulkan iGPU Parallel Pre-proc: [{}]",
             if state.vulkan_pre { "X" } else { " " }
         ),
         format!(
-            "  Repair OpenVINO Bridge (Auto-fix): [{}]",
+            "  [Fix] Repair OpenVINO Bridge (Auto-fix): [{}]",
             if state.ov_repair { "X" } else { " " }
         ),
-        format!("  AI Processing Mode: < {} >", state.ai_mode),
-        format!("  Model Path: {}", state.model.get_content()),
+        format!("  [Mode] AI Processing Speed: < {} >", state.ai_mode),
+        format!(
+            "  [Detect] Object Detection (Person/Vehicle): [{}]",
+            if state.enable_detection { "X" } else { " " }
+        ),
+        format!(
+            "  [LPR] License Plate Recognition (Chile): [{}]",
+            if state.enable_lpr { "X" } else { " " }
+        ),
+        format!(
+            "  [Face] Face Registration & Identities: [{}]",
+            if state.enable_face { "X" } else { " " }
+        ),
+        format!(
+            "  [Heatmap] Suspicious Behavior (Dwell): [{}]",
+            if state.enable_heatmap { "X" } else { " " }
+        ),
+        format!(
+            "  [NPU] Prefer Neural Processing Unit: [{}]",
+            if state.prefer_npu { "X" } else { " " }
+        ),
+        format!(
+            "  [TPU] Prefer Tensor Processing Unit: [{}]",
+            if state.prefer_tpu { "X" } else { " " }
+        ),
+        format!("  [Model] Path: {}", state.model.get_content()),
         "  💾 Save and Back".to_string(),
     ];
 
@@ -594,6 +651,9 @@ pub async fn run_cameras_app(
                                     {
                                         let mut l = db.lock();
                                         let _ = l.delete_camera(id);
+                                        if let Err(e) = l.flush("TUI camera delete") {
+                                            state.status_msg = format!("❌ Flush Error: {}", e);
+                                        }
                                     }
                                     state.refresh(db.clone());
                                 }
@@ -632,9 +692,9 @@ pub async fn run_cameras_app(
                                     state.menu_input4 = TextInput::new(c.config.password.clone());
                                     if let Some(s_id) = c.streams[0] {
                                         if let Some(s) = l.streams_by_id().get(&s_id) {
+                                            let s_lock = s.inner.lock();
                                             state.menu_input5 = TextInput::new(
-                                                s.inner
-                                                    .lock()
+                                                s_lock
                                                     .config
                                                     .url
                                                     .as_ref()
@@ -642,11 +702,14 @@ pub async fn run_cameras_app(
                                                     .unwrap_or_default(),
                                             );
                                             state.menu_input7 = TextInput::new(
-                                                (s.inner.lock().config.retain_bytes
+                                                (s_lock.config.retain_bytes
                                                     / 1024
                                                     / 1024
                                                     / 1024)
                                                     .to_string(),
+                                            );
+                                            state.menu_input8 = TextInput::new(
+                                                if s_lock.config.mode == "record" { "y" } else { "n" }.to_string()
                                             );
                                         }
                                     }
@@ -688,7 +751,7 @@ fn handle_camera_input(
     db: &Arc<db::Database>,
 ) -> io::Result<()> {
     match key.code {
-        KeyCode::Tab => state.menu_tab = (state.menu_tab + 1) % 7,
+        KeyCode::Tab => state.menu_tab = (state.menu_tab + 1) % 8,
         KeyCode::Char(c) => match state.menu_tab {
             0 => state.menu_input.insert_char(c),
             1 => state.menu_input2.insert_char(c),
@@ -697,6 +760,7 @@ fn handle_camera_input(
             4 => state.menu_input5.insert_char(c),
             5 => state.menu_input6.insert_char(c),
             6 => state.menu_input7.insert_char(c),
+            7 => state.menu_input8.insert_char(c),
             _ => {}
         },
         KeyCode::Backspace => match state.menu_tab {
@@ -707,19 +771,24 @@ fn handle_camera_input(
             4 => state.menu_input5.backspace(),
             5 => state.menu_input6.backspace(),
             6 => state.menu_input7.backspace(),
+            7 => state.menu_input8.backspace(),
             _ => {}
         },
         KeyCode::Enter => {
             let mut l = db.lock();
             let first_dir_id = l.sample_file_dirs_by_id().keys().next().copied();
+            let mut has_storage_warning = false;
             if first_dir_id.is_none() {
-                state.status_msg =
-                    "⚠️ Warning: No storage pools configured. Recordings will not be saved."
-                        .to_string();
-                return Ok(());
+                has_storage_warning = true;
             }
             let retain_gb: u64 = state.menu_input7.get_content().parse().unwrap_or(0);
             let retain_bytes = (retain_gb * 1024 * 1024 * 1024) as i64;
+            
+            let mode = if state.menu_input8.get_content().to_lowercase().starts_with('y') {
+                "record".to_string()
+            } else {
+                String::new()
+            };
 
             if state.show_add_menu {
                 let name = state.menu_input.get_content().to_string();
@@ -736,14 +805,14 @@ fn handle_camera_input(
                     };
                     if let Ok(u) = url::Url::parse(state.menu_input5.get_content()) {
                         ch.streams[0].config.url = Some(u);
-                        ch.streams[0].config.mode = "record".to_owned();
+                        ch.streams[0].config.mode = mode.clone();
                         ch.streams[0].config.rtsp_transport = "tcp".to_owned();
                         ch.streams[0].sample_file_dir_id = first_dir_id;
                         ch.streams[0].config.retain_bytes = retain_bytes;
                     }
                     if let Ok(u) = url::Url::parse(state.menu_input6.get_content()) {
                         ch.streams[1].config.url = Some(u);
-                        ch.streams[1].config.mode = "record".to_owned();
+                        ch.streams[1].config.mode = mode.clone();
                         ch.streams[1].config.rtsp_transport = "tcp".to_owned();
                         ch.streams[1].sample_file_dir_id = first_dir_id;
                         ch.streams[1].config.retain_bytes = retain_bytes;
@@ -763,7 +832,7 @@ fn handle_camera_input(
                     if !u1.is_empty() {
                         if let Ok(u) = url::Url::parse(u1) {
                             ch.streams[0].config.url = Some(u);
-                            ch.streams[0].config.mode = "record".to_owned();
+                            ch.streams[0].config.mode = mode.clone();
                             ch.streams[0].config.rtsp_transport = "tcp".to_owned();
                             ch.streams[0].sample_file_dir_id = first_dir_id;
                             ch.streams[0].config.retain_bytes = retain_bytes;
@@ -777,7 +846,7 @@ fn handle_camera_input(
                     if !u2.is_empty() {
                         if let Ok(u) = url::Url::parse(u2) {
                             ch.streams[1].config.url = Some(u);
-                            ch.streams[1].config.mode = "record".to_owned();
+                            ch.streams[1].config.mode = mode.clone();
                             ch.streams[1].config.rtsp_transport = "tcp".to_owned();
                             ch.streams[1].sample_file_dir_id = first_dir_id;
                             ch.streams[1].config.retain_bytes = retain_bytes;
@@ -793,12 +862,20 @@ fn handle_camera_input(
                     }
                 }
             }
+            if let Err(e) = l.flush("TUI camera save") {
+                state.status_msg = format!("❌ Flush Error: {}", e);
+                return Ok(());
+            }
             drop(l);
             state.refresh(db.clone());
             state.show_add_menu = false;
             state.edit_camera = None;
             state.clear_menu_inputs();
-            state.status_msg = "✅ Saved successfully".to_string();
+            if has_storage_warning {
+                state.status_msg = "✅ Saved, but NO STORAGE POOL configured. Recordings won't be saved.".to_string();
+            } else {
+                state.status_msg = "✅ Saved successfully".to_string();
+            }
         }
         _ => {}
     }
@@ -819,6 +896,7 @@ struct AppState {
     menu_input5: TextInput,
     menu_input6: TextInput,
     menu_input7: TextInput,
+    menu_input8: TextInput,
     status_msg: String,
 }
 impl AppState {
@@ -838,6 +916,7 @@ impl AppState {
             menu_input5: TextInput::new(String::new()),
             menu_input6: TextInput::new(String::new()),
             menu_input7: TextInput::new("10".to_string()),
+            menu_input8: TextInput::new("y".to_string()),
             status_msg: String::new(),
         }
     }
@@ -852,6 +931,7 @@ impl AppState {
         self.menu_input5.clear();
         self.menu_input6.clear();
         self.menu_input7 = TextInput::new("10".to_string());
+        self.menu_input8 = TextInput::new("y".to_string());
         self.menu_tab = 0;
     }
     fn next(&mut self) {
@@ -956,12 +1036,13 @@ fn ui(frame: &mut Frame, state: &mut AppState) {
 }
 
 fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
-    let area = centered_rect(65, 85, area);
+    let area = centered_rect(65, 90, area);
     frame.render_widget(Clear, area);
     let chunks = Layout::default()
         .direction(Direction::Vertical)
-        .margin(2)
+        .margin(1)
         .constraints([
+            Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
             Constraint::Length(3),
@@ -979,6 +1060,7 @@ fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
         "Main URL",
         "Sub URL",
         "Retention (Gigabytes)",
+        "Record (y/n)",
     ];
     let inputs = [
         &state.menu_input,
@@ -988,6 +1070,7 @@ fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
         &state.menu_input5,
         &state.menu_input6,
         &state.menu_input7,
+        &state.menu_input8,
     ];
     frame.render_widget(
         Block::default()
@@ -996,7 +1079,7 @@ fn render_camera_modal(frame: &mut Frame, area: Rect, state: &mut AppState) {
             .border_style(Style::default().fg(Color::Yellow)),
         area,
     );
-    for i in 0..7 {
+    for i in 0..8 {
         let b = Block::default()
             .borders(Borders::ALL)
             .title(labels[i])

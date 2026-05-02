@@ -89,9 +89,26 @@ pub struct Args {
     #[bpaf(long, argument("PATH"))]
     lpr_model: Option<PathBuf>,
 
+    /// Path to YOLOv8-Face ONNX model for face detection.
+    #[bpaf(long, argument("PATH"))]
+    face_model: Option<PathBuf>,
+
     /// AI processing mode for intelligent surveillance.
     #[bpaf(long("ai-mode"), argument("MODE"), fallback(AiMode::Medium))]
     ai_mode: AiMode,
+
+    /// Individual AI Features
+    #[bpaf(long("enable-detection"), argument("BOOL"), fallback(true))]
+    enable_detection: bool,
+
+    #[bpaf(long("enable-lpr"), argument("BOOL"), fallback(true))]
+    enable_lpr: bool,
+
+    #[bpaf(long("enable-face"), argument("BOOL"), fallback(false))]
+    enable_face: bool,
+
+    #[bpaf(long("enable-heatmap"), argument("BOOL"), fallback(true))]
+    enable_heatmap: bool,
 
     /// Enable hardware acceleration (OpenVINO) if available.
     #[bpaf(long("hardware-acceleration"), argument("BOOL"), fallback(true))]
@@ -197,7 +214,24 @@ async fn async_run(args: Args, config: &ConfigFile) -> Result<i32, Error> {
         let int = signal(SignalKind::interrupt())?;
         let term = signal(SignalKind::terminate())?;
         let quit = signal(SignalKind::quit())?;
-        let inner = inner(args.read_only, config, args.model, args.reid_model, args.lpr_model, args.ai_mode, args.hardware_acceleration, args.optimize_for_device, shutdown_rx, reload_rx, reload_tx);
+        let inner = inner(
+            args.read_only,
+            config,
+            args.model,
+            args.reid_model,
+            args.lpr_model,
+            args.face_model,
+            args.ai_mode,
+            args.enable_detection,
+            args.enable_lpr,
+            args.enable_face,
+            args.enable_heatmap,
+            args.hardware_acceleration,
+            args.optimize_for_device,
+            shutdown_rx,
+            reload_rx,
+            reload_tx,
+        );
     }
 
     tokio::select! {
@@ -310,7 +344,12 @@ async fn inner(
     model_path: Option<PathBuf>,
     reid_model_path: Option<PathBuf>,
     lpr_model_path: Option<PathBuf>,
+    face_model_path: Option<PathBuf>,
     ai_mode: AiMode,
+    _enable_detection: bool,
+    enable_lpr: bool,
+    enable_face: bool,
+    enable_heatmap: bool,
     hardware_acceleration: bool,
     optimize_for_device: bool,
     shutdown_rx: base::shutdown::Receiver,
@@ -383,11 +422,10 @@ async fn inner(
         let l = db.lock();
         if l.sample_file_dirs_by_id().is_empty() {
             drop(l);
-            let recordings_path = std::path::PathBuf::from("/home/ale/Videos/Moonshadow-NVR");
+            let recordings_path = config.db_dir.parent().unwrap_or(Path::new("/")).to_path_buf();
             info!("Checking for recordings directory: {:?}", recordings_path);
-            info!("Directory exists: {}", recordings_path.exists());
             if recordings_path.exists() {
-                info!("Attempting to add recording directory...");
+                info!("Attempting to auto-add recording directory: {:?}", recordings_path);
                 match db.add_sample_file_dir(recordings_path).await {
                     Ok(dir_id) => {
                         info!("Added recording directory with ID: {}", dir_id);
@@ -406,7 +444,7 @@ async fn inner(
                                 .unwrap();
                         }
                     }
-                    Err(e) => info!("Failed to add directory: {}", e),
+                    Err(e) => info!("Failed to auto-add directory: {}", e),
                 }
             }
         }
@@ -436,6 +474,7 @@ async fn inner(
             &path,
             reid_model_path.as_deref(),
             lpr_model_path.as_deref(),
+            face_model_path.as_deref(),
             detector_ai_mode,
             hardware_acceleration,
             vulkan_pre,
@@ -444,7 +483,14 @@ async fn inner(
         )?));
         let (tx, rx) = tokio::sync::mpsc::channel(10);
         detection_tx = Some(tx);
-        let worker = crate::detector::DetectionWorker::new(detector, rx, db.clocks());
+        let worker = crate::detector::DetectionWorker::new(
+            detector,
+            rx,
+            enable_lpr,
+            enable_face,
+            enable_heatmap,
+            db.clocks(),
+        );
         let db_clone = db.clone();
         tokio::task::Builder::new()
             .name("detection-worker")

@@ -375,3 +375,28 @@ runs Moonshadow NVR.
 
 Once the web interface seems to be working, read through [securing Moonshadow
 NVR](secure.md).
+
+## AI and Advanced Features Setup
+
+Moonshadow NVR now includes advanced AI capabilities like Face ID, LPR, and behavioral heatmaps.
+
+### 1. Model Acquisition
+The installer script handles model downloads automatically. If you need to refresh them:
+```console
+$ sudo ./install.sh # It will detect missing models and download them
+```
+
+### 2. LPR Dynamic Training
+To improve License Plate Recognition for your specific cameras:
+```console
+$ python3 lpr_training_hub.py status    # Check current accuracy
+$ python3 lpr_training_hub.py schedule  # Enable weekly auto-training
+```
+
+### 3. Hardware Acceleration
+The system supports NPU, iGPU, and ARM ACL. You can configure these in the TUI:
+```console
+$ ./configure-tui.sh -> Hardware & AI Configuration
+```
+Enable **Accel** and select your preferred device (NPU, GPU, or TPU).
+

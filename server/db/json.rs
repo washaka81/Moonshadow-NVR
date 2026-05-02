@@ -101,6 +101,24 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub model_path: String,
 
+    // Individual AI Features
+    #[serde(default)]
+    pub enable_object_detection: bool,
+    #[serde(default)]
+    pub enable_lpr: bool,
+    #[serde(default)]
+    pub enable_face_recognition: bool,
+    #[serde(default)]
+    pub enable_heatmap: bool,
+
+    // Advanced Hardware Targets
+    #[serde(default)]
+    pub prefer_npu: bool,
+    #[serde(default)]
+    pub prefer_tpu: bool,
+    #[serde(default)]
+    pub specific_gpu_id: Option<String>,
+
     #[serde(flatten)]
     pub unknown: BTreeMap<String, Value>,
 }

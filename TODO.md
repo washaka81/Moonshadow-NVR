@@ -2,31 +2,32 @@
 
 ## AI/ML Training
 
-### License Plate Recognition (LPR)
-- [ ] **Train AI for Chilean license plates**
-  - Collect more Chilean plate samples with varied lighting conditions
-  - Generate synthetic data with different fonts, angles, and backgrounds
-  - Train YOLOv8 detection model for plate localization
-  - Train LPRNet recognition model optimized for Chilean format (NNNNNN-XX or similar)
-  - Validate against real-world Chilean plates (different provinces, years, conditions)
-  - Export to ONNX format for production use
+### License Plate Recognition (LPR) (Completed)
+- [x] **Train AI for Chilean license plates**
+  - [x] Collect more Chilean plate samples with varied lighting conditions
+  - [x] Generate synthetic data with different fonts, angles, and backgrounds
+  - [x] Train LPRNet recognition model optimized for Chilean format
+  - [x] Export to ONNX format for production use
   
-- [ ] Dataset expansion
-  - Current models: `LPRNet_chilean_fixed.onnx`, `chilean_lpr_enhanced.onnx`
-  - Need: More diverse samples from different regions of Chile
-  - Consider: Night vision, rain, dirt, partial occlusion scenarios
-
-- [ ] Model optimization
-  - Quantization for edge devices
-  - Performance tuning for Intel iGPU (current hardware)
-  - TensorRT optimization for NVIDIA deployment
+### Advanced AI Features
+- [ ] **Continuous Face Re-ID improvement**
+  - [ ] Implement incremental learning for registered identities
+  - [ ] Optimize facial landmarks detection for low-light conditions
+- [ ] **Behavioral Analytics**
+  - [ ] Add "Loitering" alert based on Heatmap Dwell-Time
+  - [ ] Detect "Falling" or "Fighting" using Pose Estimation
+- [ ] **Multi-Backend Expansion**
+  - [ ] Optimize for Hailo-8 NPU and Google Coral TPU
+  - [ ] ARM ACL fine-tuning for Raspberry Pi 5
 
 ## Documentation
 - [ ] Add installation screenshots
-- [ ] Create video tutorial for initial setup
+- [x] Document new AI Training Hub (`lpr_training_hub.py`)
+- [x] Document Multi-Backend hardware support
 - [ ] Document RTSP camera compatibility list
 
 ## Testing
+- [x] Multi-backend verification (NPU/GPU/CPU)
 - [ ] Multi-camera stress test (>10 streams)
 - [ ] Long-term stability test (7+ days)
 - [ ] Disk space exhaustion recovery

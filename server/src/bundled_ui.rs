@@ -96,15 +96,13 @@ impl Ui {
         cache_control: &'static str,
         content_type: &'static str,
     ) -> Option<Entity> {
-        let Some(set) = self.0.get(path) else {
-            return None;
-        };
+        let set = self.0.get(path)?;
         let auto_gzip;
         if let Some(ref gzipped) = set.gzipped {
             auto_gzip = true;
             if http_serve::should_gzip(hdrs) {
                 return Some(Entity {
-                    file: &gzipped,
+                    file: gzipped,
                     auto_gzip,
                     is_gzipped: true,
                     cache_control,

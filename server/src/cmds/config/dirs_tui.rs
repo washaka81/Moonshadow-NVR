@@ -35,6 +35,10 @@ pub async fn run_dirs_menu_shared(
         if event::poll(Duration::from_millis(50))? {
             if let Event::Key(key) = event::read()? {
                 if key.kind == KeyEventKind::Press {
+                    if !state.status_msg.is_empty() {
+                        state.status_msg.clear();
+                        continue;
+                    }
                     if state.confirm_delete.is_some() {
                         match key.code {
                             KeyCode::Char('y') | KeyCode::Char('s') | KeyCode::Enter => {
@@ -58,7 +62,18 @@ pub async fn run_dirs_menu_shared(
                                             }
                                         }
                                     }
-                                    let _ = db.delete_sample_file_dir(id).await;
+                                    match db.delete_sample_file_dir(id).await {
+                                        Ok(_) => {
+                                            state.status_msg = "✅ Directory deleted successfully".to_string();
+                                        }
+                                        Err(e) => {
+                                            state.status_msg = format!("❌ Error: {}", e);
+                                        }
+                                    }
+                                    {
+                                        let mut l = db.lock();
+                                        let _ = l.flush("TUI dir delete");
+                                    }
                                     state.refresh(db.clone()).await;
                                 }
                                 state.confirm_delete = None;
@@ -118,14 +133,31 @@ async fn handle_dir_input(
             let mut path = state.menu_input.get_content().to_string();
             if path.is_empty() {
                 let user = std::env::var("USER").unwrap_or_else(|_| "ale".to_string());
-                path = format!("/home/{}/Videos/Moonshadow-NVR", user);
+                path = format!("/home/{}/Videos/Moonshadow-NVR/recordings", user);
             }
             if state.show_add_menu {
-                let _ = db.add_sample_file_dir(path.into()).await;
-            } else if let Some(d) = &state.edit_dir {
-                if db.add_sample_file_dir(path.into()).await.is_ok() {
-                    let _ = db.delete_sample_file_dir(d.id).await;
+                match db.add_sample_file_dir(path.into()).await {
+                    Ok(_) => {
+                        state.status_msg = "✅ Directory added successfully".to_string();
+                    }
+                    Err(e) => {
+                        state.status_msg = format!("❌ Error: {}", e);
+                    }
                 }
+            } else if let Some(d) = &state.edit_dir {
+                match db.add_sample_file_dir(path.into()).await {
+                    Ok(_) => {
+                        let _ = db.delete_sample_file_dir(d.id).await;
+                        state.status_msg = "✅ Directory updated successfully".to_string();
+                    }
+                    Err(e) => {
+                        state.status_msg = format!("❌ Error: {}", e);
+                    }
+                }
+            }
+            {
+                let mut l = db.lock();
+                let _ = l.flush("TUI dir save");
             }
             state.refresh(db.clone()).await;
             state.show_add_menu = false;
@@ -223,6 +255,20 @@ fn ui(frame: &mut Frame, state: &mut DirAppState) {
     }
     if state.confirm_delete.is_some() {
         render_delete_modal(frame, frame.area());
+    }
+    if !state.status_msg.is_empty() {
+        let area = centered_rect(60, 20, frame.area());
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(format!("\n{}\n\nPress any key", state.status_msg))
+                .alignment(Alignment::Center)
+                .block(
+                    Block::default()
+                        .borders(Borders::ALL)
+                        .border_style(Style::default().fg(Color::Yellow)),
+                ),
+            area,
+        );
     }
 }
 
@@ -323,6 +369,7 @@ struct DirAppState {
     edit_dir: Option<DirCard>,
     confirm_delete: Option<i32>,
     menu_input: TextInput,
+    status_msg: String,
 }
 impl DirAppState {
     async fn new(db: Arc<db::Database>) -> Self {
@@ -334,6 +381,7 @@ impl DirAppState {
             edit_dir: None,
             confirm_delete: None,
             menu_input: TextInput::new(String::new()),
+            status_msg: String::new(),
         }
     }
     async fn refresh(&mut self, db: Arc<db::Database>) {

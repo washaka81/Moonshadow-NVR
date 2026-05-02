@@ -128,19 +128,13 @@ class LiveCameraDriver {
     const loc = window.location;
     const proto = loc.protocol === "https:" ? "wss" : "ws";
     const url = `${proto}://${loc.host}/api/cameras/${this.camera.uuid}/${streamType}/live.m4s`;
-    console.log(`[LiveCamera] Connecting to ${streamType} stream: ${url}`);
     this.ws = new WebSocket(url);
     this.ws.addEventListener("open", () => {
-      console.log(`[LiveCamera] WebSocket opened to ${streamType} stream`);
     });
     this.ws.addEventListener("close", (e) => {
-      console.log(
-        `[LiveCamera] WebSocket closed: code=${e.code}, reason=${e.reason}`,
-      );
       this.error(`Connection closed (${e.code})`);
     });
     this.ws.addEventListener("error", (e) => {
-      console.error(`[LiveCamera] WebSocket error:`, e);
       this.error("Connection failed");
     });
     this.ws.addEventListener("message", this.onWsMessage);
@@ -167,15 +161,12 @@ class LiveCameraDriver {
     if (typeof e.data === "string") {
       const message = JSON.parse(e.data) as Message;
       if (message.type === "error") {
-        console.error(`[LiveCamera] Server error: ${message.message}`);
         this.error(`Server: ${message.message}`);
       } else if (message.type === "dropped") {
-        console.warn(`[LiveCamera] Dropped ${message.frames} frames`);
       }
       return;
     }
     // Process blob immediately without chaining to avoid backlog
-    console.log(`[LiveCamera] Received blob: ${e.data.size} bytes`);
     this.processWsBlob(e.data as Blob);
   };
 
@@ -191,12 +182,10 @@ class LiveCameraDriver {
       const raw = new Uint8Array(await blob.arrayBuffer());
       const result = parsePart(raw);
       if (result.status === "error") {
-        console.warn("Failed to parse blob:", result.errorMessage);
         return;
       }
       const part = result.part;
       if (!this.mediaSourceApi.isTypeSupported(part.mimeType)) {
-        console.warn("Mime type not supported:", part.mimeType);
         return;
       }
       this.queue.push(part);

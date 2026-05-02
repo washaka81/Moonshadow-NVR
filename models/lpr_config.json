@@ -1,0 +1,27 @@
+{
+  "active_country": "chile",
+  "countries": {
+    "chile": {
+      "formats": ["ABCD12", "ABC123", "AB1234"],
+      "letters": "BCDFGHJKLPRSTVWXYZ",
+      "digits": "0123456789",
+      "fonts": [
+        {
+          "name": "ChileanPlate.ttf",
+          "url": "https://github.com/matthieua/License-Plate-Recognition/raw/master/fonts/UKNumberPlate.ttf"
+        }
+      ]
+    },
+    "germany": {
+      "formats": ["L-LL-NNNN"],
+      "letters": "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
+      "digits": "0123456789",
+      "fonts": [
+        {
+          "name": "FE-FONT.ttf",
+          "url": "https://github.com/sirius-ai/LPRNet_Pytorch/raw/master/data/NotoSansCJK-Regular.ttc"
+        }
+      ]
+    }
+  }
+}

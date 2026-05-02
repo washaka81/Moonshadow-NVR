@@ -167,10 +167,32 @@ if [[ ! -f "$BIN_DIR/mediamtx" ]]; then
     rm -rf "$TEMP_DIR"
 fi
 
-# 8. Download default AI model if missing
+# 8. Download AI models if missing
+log "Checking and downloading AI models..."
+mkdir -p "$MODEL_DIR"
+
+# YOLOv8 Object Detection (Default)
 if [[ ! -f "$MODEL_DIR/yolov8n.onnx" ]]; then
-    log "Downloading default YOLOv8n object detection model..."
+    log "Downloading YOLOv8n object detection model..."
     curl -L -o "$MODEL_DIR/yolov8n.onnx" "https://github.com/ultralytics/assets/releases/download/v8.2.0/yolov8n.onnx" || warn "Failed to download default AI model."
+fi
+
+# LPRNet Chile (License Plate)
+if [[ ! -f "$MODEL_DIR/LPRNet_chilean_fixed.onnx" ]]; then
+    log "Downloading LPRNet Chile model..."
+    curl -L -o "$MODEL_DIR/LPRNet_chilean_fixed.onnx" "https://huggingface.co/washaka/moonshadow-models/resolve/main/LPRNet_chilean_fixed.onnx" || warn "Failed to download LPR model."
+fi
+
+# YOLOv8 Face (Face Detection)
+if [[ ! -f "$MODEL_DIR/yolov8n-face.onnx" ]]; then
+    log "Downloading YOLOv8-Face detection model..."
+    curl -L -o "$MODEL_DIR/yolov8n-face.onnx" "https://huggingface.co/washaka/moonshadow-models/resolve/main/yolov8n-face.onnx" || warn "Failed to download Face model."
+fi
+
+# OSNet (Person Re-ID / Recognition)
+if [[ ! -f "$MODEL_DIR/osnet_x0_25_msmt17.onnx" ]]; then
+    log "Downloading OSNet Re-ID model..."
+    curl -L -o "$MODEL_DIR/osnet_x0_25_msmt17.onnx" "https://huggingface.co/onnx-community/osnet_x0_25_msmt17/resolve/main/model.onnx" || warn "Failed to download Re-ID model."
 fi
 
 # 9. Install Binaries and Assets

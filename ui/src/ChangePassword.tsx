@@ -108,7 +108,6 @@ const ChangePassword = ({ user, open, handleClose }: Props) => {
   }, [loading, handleClose, snackbars, setError]);
   const onSuccess = (data: FormData) => {
     // Suppress concurrent attempts.
-    console.log("onSuccess", data);
     if (loading !== null) {
       return;
     }

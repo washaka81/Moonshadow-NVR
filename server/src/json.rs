@@ -614,6 +614,12 @@ pub struct Permissions {
 
     #[serde(default)]
     pub admin_users: bool,
+
+    #[serde(default)]
+    pub view_ai_events: bool,
+
+    #[serde(default)]
+    pub manage_ai: bool,
 }
 
 impl From<Permissions> for db::schema::Permissions {
@@ -623,6 +629,8 @@ impl From<Permissions> for db::schema::Permissions {
             read_camera_configs: p.read_camera_configs,
             update_signals: p.update_signals,
             admin_users: p.admin_users,
+            view_ai_events: p.view_ai_events,
+            manage_ai: p.manage_ai,
             special_fields: Default::default(),
         }
     }
@@ -635,6 +643,8 @@ impl From<db::schema::Permissions> for Permissions {
             read_camera_configs: p.read_camera_configs,
             update_signals: p.update_signals,
             admin_users: p.admin_users,
+            view_ai_events: p.view_ai_events,
+            manage_ai: p.manage_ai,
         }
     }
 }

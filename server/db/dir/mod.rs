@@ -584,12 +584,13 @@ impl Pool {
         let (tx, rx) = tokio::sync::oneshot::channel();
         let span = info_span!("run", operation_name = "mark_deleted");
         let inner = move |ctx: WorkerCtx<'_>| {
-            if !ctx.is_empty()? {
+            if let Some(other) = ctx.is_empty()? {
                 bail!(
                     FailedPrecondition,
                     msg(
-                        "sample file directory {} is not empty",
+                        "sample file directory {} is not empty (found: {})",
                         ctx.0.shared.config.path.display(),
+                        other,
                     )
                 );
             }
@@ -873,14 +874,17 @@ impl Worker {
         })?;
         let dir_meta = read_meta(&dir).map_err(|e| err!(e, msg("unable to read meta file")))?;
         shared.config.check_consistent(&dir_meta)?;
-        if create && !Self::is_empty(&dir)? {
-            bail!(
-                FailedPrecondition,
-                msg(
-                    "can't create dir at path {} with existing files",
-                    shared.config.path.display(),
-                ),
-            );
+        if create {
+            if let Some(other) = Self::is_empty(&dir)? {
+                bail!(
+                    FailedPrecondition,
+                    msg(
+                        "can't create dir at path {} with existing file/dir: {}",
+                        shared.config.path.display(),
+                        other,
+                    ),
+                );
+            }
         }
         if let Some(o) = shared.config.current_open {
             let mut meta = schema::DirMeta::new();
@@ -910,18 +914,20 @@ impl Worker {
         }
     }
 
-    /// Determines if the directory is empty, aside from metadata.
-    fn is_empty(dir: &fs::Dir) -> Result<bool, Error> {
+    /// Determines if the directory is empty, aside from metadata and database.
+    /// Returns the name of the first offending file if not empty.
+    fn is_empty(dir: &fs::Dir) -> Result<Option<String>, Error> {
         let mut dir = dir.opendir()?;
         for e in dir.iter() {
             let e = e?;
             match e.file_name().to_bytes() {
                 b"." | b".." => continue,
                 b"meta" => continue, // existing metadata is fine.
-                _ => return Ok(false),
+                b"db" | b"db-wal" | b"db-shm" => continue, // database files are fine.
+                other => return Ok(Some(String::from_utf8_lossy(other).into_owned())),
             }
         }
-        Ok(true)
+        Ok(None)
     }
 
     fn collect_garbage(
@@ -992,7 +998,7 @@ impl WorkerCtx<'_> {
         nix::fcntl::renameat(Some(self.0.dir.0), from, Some(self.0.dir.0), to).map_err(Into::into)
     }
 
-    pub(crate) fn is_empty(&self) -> Result<bool, Error> {
+    pub(crate) fn is_empty(&self) -> Result<Option<String>, Error> {
         Worker::is_empty(&self.0.dir)
     }
 
@@ -1062,5 +1068,28 @@ mod tests {
             data.len(),
             FIXED_DIR_META_LEN
         );
+    }
+
+    #[test]
+    fn is_empty() {
+        let tmp = tempfile::tempdir().unwrap();
+        let dir = fs::Dir::open(tmp.path(), false).unwrap();
+        assert!(Worker::is_empty(&dir).unwrap().is_none());
+
+        // meta should be ignored
+        std::fs::File::create(tmp.path().join("meta")).unwrap();
+        assert!(Worker::is_empty(&dir).unwrap().is_none());
+
+        // database files should be ignored
+        std::fs::create_dir(tmp.path().join("db")).unwrap();
+        assert!(Worker::is_empty(&dir).unwrap().is_none());
+        std::fs::File::create(tmp.path().join("db-wal")).unwrap();
+        assert!(Worker::is_empty(&dir).unwrap().is_none());
+        std::fs::File::create(tmp.path().join("db-shm")).unwrap();
+        assert!(Worker::is_empty(&dir).unwrap().is_none());
+
+        // other files should not be ignored
+        std::fs::File::create(tmp.path().join("other")).unwrap();
+        assert_eq!(Worker::is_empty(&dir).unwrap(), Some("other".to_string()));
     }
 }

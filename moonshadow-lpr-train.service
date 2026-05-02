@@ -1,0 +1,9 @@
+[Unit]
+Description=Moonshadow NVR LPR Dynamic Training
+After=network.target
+
+[Service]
+Type=oneshot
+User=ale
+WorkingDirectory=/home/ale/proyectos/moonshadow-nvr
+ExecStart=/usr/bin/python3 /home/ale/proyectos/moonshadow-nvr/lpr_training_hub.py train

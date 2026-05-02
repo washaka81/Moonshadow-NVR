@@ -93,11 +93,10 @@ impl VulkanEngine {
         let physical_device = instance
             .enumerate_physical_devices()
             .ok()?
-            .filter(|p| {
+            .find(|p| {
                 p.properties().device_type == PhysicalDeviceType::IntegratedGpu
                     || p.properties().device_type == PhysicalDeviceType::DiscreteGpu
-            })
-            .next()?;
+            })?;
 
         info!(
             "--- VULKAN ENGINE: Using Device: {} ---",
@@ -220,7 +219,7 @@ impl VulkanEngine {
         )
         .ok()?;
 
-        let layout = self.pipeline.layout().set_layouts().get(0).unwrap();
+        let layout = self.pipeline.layout().set_layouts().first().unwrap();
         let descriptor_set = PersistentDescriptorSet::new(
             &self.descriptor_set_allocator,
             layout.clone(),
@@ -263,7 +262,7 @@ impl VulkanEngine {
             .ok()?
             .push_constants(self.pipeline.layout().clone(), 0, push_constants)
             .ok()?
-            .dispatch([(target_w + 7) / 8, (target_h + 7) / 8, 1])
+            .dispatch([target_w.div_ceil(8), target_h.div_ceil(8), 1])
             .ok()?;
 
         let command_buffer = builder.build().ok()?;

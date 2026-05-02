@@ -68,4 +68,6 @@ message Permissions {
   bool read_camera_configs = 2;
   bool update_signals = 3;
   bool admin_users = 4;
+  bool view_ai_events = 5;
+  bool manage_ai = 6;
 }

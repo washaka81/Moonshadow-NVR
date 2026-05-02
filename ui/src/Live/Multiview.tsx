@@ -110,10 +110,8 @@ export const getInitialSelected = (
       }
     }
   } catch (e) {
-    console.warn("Failed to parse selected cameras, clearing storage", e);
     localStorage.removeItem("camsSelected");
-  }
-  // If we have a result from URL or storage, use it
+  }  // If we have a result from URL or storage, use it
   if (result) return result;
   // Auto-select all available cameras if nothing is selected
   if (cameras.length > 0) {

@@ -1,6 +1,6 @@
 [package]
 name = "moonshadow-nvr"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["Scott Lamb <slamb@slamb.org>", "Alejandro Fonda <alejandro.fonda@gmail.com>"]
 edition = "2021"
 resolver = "2"

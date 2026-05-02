@@ -123,7 +123,6 @@ export class SnackbarProvider
     this.setState((state) => {
       const snack = state.queue[0];
       if (snack?.key !== key) {
-        console.warn(`Active snack is ${snack?.key}; expected ${key}`);
         return null; // no change.
       }
       const newSnack: Enqueued = { ...snack, open: false };

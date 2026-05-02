@@ -7,8 +7,10 @@ use base::{err, Error};
 use image::{DynamicImage, GenericImageView, Pixel};
 use ndarray::Array4;
 use ort::session::Session;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Instant;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
@@ -43,14 +45,18 @@ pub struct Detector {
     reid_model: Option<Session>,
     #[allow(dead_code)]
     lpr_model: Option<Session>,
+    #[allow(dead_code)]
+    face_model: Option<Session>,
     vulkan_engine: Option<VulkanEngine>,
 }
 
 impl Detector {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         model_path: &Path,
         reid_model_path: Option<&Path>,
         lpr_model_path: Option<&Path>,
+        face_model_path: Option<&Path>,
         _ai_mode: AiMode,
         hardware_acceleration: bool,
         vulkan_preprocessing: bool,
@@ -73,55 +79,64 @@ impl Detector {
 
         let mut builder = Session::builder()
             .map_err(|e| err!(Unknown, msg("fail EP builder"), source(e.to_string())))?;
+        
         if hardware_acceleration {
-            info!("--- AI LOG: Engaging Hardware Acceleration ---");
+            info!("--- AI LOG: Engaging Multi-Backend Hardware Acceleration ---");
 
-            // Log Vulkan status for informational purposes as requested by user
-            let _ = crate::vulkan_check::verify_vulkan_gpu();
+            // 1. Detect NPU (Intel Core Ultra, etc) via OpenVINO
+            let ep_npu = ort::ep::OpenVINO::default()
+                .with_device_type("NPU")
+                .with_dynamic_shapes(true)
+                .build();
+            if let Ok(new_builder) = builder.clone().with_execution_providers([ep_npu]) {
+                builder = new_builder;
+                info!("--- AI LOG: NPU Accelerator registered successfully ---");
+            }
 
-            // Attempt to load OpenVINO, but fallback gracefully if the shared library is missing
-            let mut ep_registered = false;
-
-            // Try OpenVINO GPU
+            // 2. Detect GPU (Integrated or Discrete) via OpenVINO
             let ep_gpu = ort::ep::OpenVINO::default()
                 .with_device_type("GPU")
                 .with_dynamic_shapes(true)
                 .build();
             if let Ok(new_builder) = builder.clone().with_execution_providers([ep_gpu]) {
                 builder = new_builder;
-                ep_registered = true;
-                info!("--- AI LOG: OpenVINO (GPU) Execution Provider registered successfully ---");
+                info!("--- AI LOG: GPU Accelerator registered successfully ---");
             }
 
-            // If GPU failed, try OpenVINO CPU
-            if !ep_registered {
-                let ep_cpu = ort::ep::OpenVINO::default()
-                    .with_device_type("CPU")
-                    .with_dynamic_shapes(true)
-                    .build();
-                if let Ok(new_builder) = builder.clone().with_execution_providers([ep_cpu]) {
+            // 3. Check for CUDA if NVIDIA GPU is present
+            let ep_cuda = ort::ep::CUDA::default().build();
+            if let Ok(new_builder) = builder.clone().with_execution_providers([ep_cuda]) {
+                builder = new_builder;
+                info!("--- AI LOG: NVIDIA CUDA Accelerator registered successfully ---");
+            }
+
+            // 4. Check for CoreML (macOS) - just in case
+            let ep_coreml = ort::ep::CoreML::default().build();
+            if let Ok(new_builder) = builder.clone().with_execution_providers([ep_coreml]) {
+                builder = new_builder;
+                info!("--- AI LOG: CoreML Accelerator registered successfully ---");
+            }
+
+            // 5. Check for ARM ACL (Compute Library) - Optimized for Raspberry Pi / ARM
+            #[cfg(target_arch = "aarch64")]
+            {
+                let ep_acl = ort::ep::ACL::default().build();
+                if let Ok(new_builder) = builder.clone().with_execution_providers([ep_acl]) {
                     builder = new_builder;
-                    ep_registered = true;
-                    info!(
-                        "--- AI LOG: OpenVINO (CPU) Execution Provider registered successfully ---"
-                    );
+                    info!("--- AI LOG: ARM ACL Accelerator registered successfully ---");
                 }
             }
 
-            if !ep_registered {
-                warn!("--- AI LOG: OpenVINO Provider missing or failed to load. Falling back to CPU ---");
-                // Always ensure CPU fallback is available
-                let ep_fallback = ort::ep::CPU::default().build();
-                builder = builder
-                    .with_execution_providers([ep_fallback])
-                    .map_err(|e| {
-                        err!(Unknown, msg("fail CPU EP fallback"), source(e.to_string()))
-                    })?;
-            }
+            // Always add CPU as fallback
+            let ep_cpu = ort::ep::CPU::default().build();
+            builder = builder.with_execution_providers([ep_cpu]).map_err(|e| {
+                err!(Unknown, msg("fail CPU EP fallback"), source(e.to_string()))
+            })?;
         }
+
         let detection_model = builder
             .commit_from_file(model_path)
-            .map_err(|e| err!(Unknown, msg("fail load model"), source(e.to_string())))?;
+            .map_err(|e| err!(Unknown, msg("fail load detection model"), source(e.to_string())))?;
         info!("--- AI LOG: YOLOv8 model loaded ---");
 
         let reid_model = if let Some(path) = reid_model_path {
@@ -146,10 +161,22 @@ impl Detector {
             None
         };
 
+        let face_model = if let Some(path) = face_model_path {
+            Some(
+                Session::builder()
+                    .map_err(|e| err!(Unknown, msg("fail face builder"), source(e.to_string())))?
+                    .commit_from_file(path)
+                    .map_err(|e| err!(Unknown, msg("fail face model"), source(e.to_string())))?,
+            )
+        } else {
+            None
+        };
+
         Ok(Self {
             detection_model,
             reid_model,
             lpr_model,
+            face_model,
             vulkan_engine,
         })
     }
@@ -357,7 +384,7 @@ impl Detector {
                 }
             }
 
-            if max_idx != blank_idx && max_idx >= 31 && max_idx <= 66 {
+            if max_idx != blank_idx && (31..=66).contains(&max_idx) {
                 let ch = if max_idx <= 40 {
                     (b'0' + (max_idx - 31) as u8) as char
                 } else {
@@ -394,6 +421,32 @@ impl Detector {
     }
 }
 
+fn is_valid_chilean_format(plate: &str) -> bool {
+    // Basic Chile formats: ABCD12, ABC123, AB1234
+    // We strip dots/dashes if any
+    let clean: String = plate.chars().filter(|c| c.is_alphanumeric()).collect();
+    if clean.len() != 6 {
+        return false;
+    }
+
+    let chars: Vec<char> = clean.chars().collect();
+    
+    // AB1234 (Format 2)
+    if chars[0..2].iter().all(|c| c.is_alphabetic()) && chars[2..6].iter().all(|c| c.is_numeric()) {
+        return true;
+    }
+    // ABCD12 (Format 1)
+    if chars[0..4].iter().all(|c| c.is_alphabetic()) && chars[4..6].iter().all(|c| c.is_numeric()) {
+        return true;
+    }
+    // ABC123 (Format 3 - Motos)
+    if chars[0..3].iter().all(|c| c.is_alphabetic()) && chars[3..6].iter().all(|c| c.is_numeric()) {
+        return true;
+    }
+
+    false
+}
+
 fn format_chilean_plate(raw: &str) -> String {
     let chars: Vec<char> = raw.chars().collect();
     if chars.len() != 6 {
@@ -425,6 +478,10 @@ pub struct DetectionWorker<C: Clocks + Clone> {
     detector: Arc<tokio::sync::Mutex<Detector>>,
     receiver: mpsc::Receiver<(Vec<u8>, i32, i64, Arc<db::Stream>)>,
     prev_image: Option<DynamicImage>,
+    heatmaps: HashMap<i32, SuspiciousHeatmap>,
+    enable_lpr: bool,
+    enable_face: bool,
+    enable_heatmap: bool,
     _phantom: std::marker::PhantomData<C>,
 }
 
@@ -432,18 +489,26 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
     pub fn new(
         detector: Arc<tokio::sync::Mutex<Detector>>,
         receiver: mpsc::Receiver<(Vec<u8>, i32, i64, Arc<db::Stream>)>,
+        enable_lpr: bool,
+        enable_face: bool,
+        enable_heatmap: bool,
         _clocks: C,
     ) -> Self {
         Self {
             detector,
             receiver,
             prev_image: None,
+            heatmaps: HashMap::new(),
+            enable_lpr,
+            enable_face,
+            enable_heatmap,
             _phantom: std::marker::PhantomData,
         }
     }
 
     pub async fn run(mut self, db: Arc<db::Database<C>>) {
-        info!("--- AI LOG: Worker Service Online ---");
+        info!("--- AI LOG: Worker Service Online (LPR: {}, Face: {}, Heatmap: {}) ---", 
+            self.enable_lpr, self.enable_face, self.enable_heatmap);
         while let Some((data, camera_id, time_90k, stream)) = self.receiver.recv().await {
             if let Ok(image) = self.decode_any_codec_to_image(&data, camera_id) {
                 if self.has_motion(&image) {
@@ -451,9 +516,28 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                         let mut det_lock = self.detector.lock().await;
                         det_lock.detect(&image).unwrap_or_default()
                     };
+                    
+                    if self.enable_heatmap {
+                        let heatmap = self.heatmaps.entry(camera_id)
+                            .or_insert_with(|| SuspiciousHeatmap::new(32, 24));
+                        heatmap.update(&detections);
+                    }
+
                     if !detections.is_empty() {
-                        self.process_detections(&image, &detections, time_90k, &stream, &db)
-                            .await;
+                        let db_clone = db.clone();
+                        let detector_clone = self.detector.clone();
+                        let image_clone = image.clone();
+                        let detections_clone = detections.clone();
+                        let (cam_id, cam_uuid) = {
+                            let l = db.lock();
+                            let cam_id = stream.inner.lock().camera_id;
+                            let uuid = l.cameras_by_id().get(&cam_id).map(|c| c.uuid.to_string()).unwrap_or_default();
+                            (cam_id, uuid)
+                        };
+                        
+                        tokio::task::spawn(async move {
+                            Self::process_detections_static(detector_clone, image_clone, detections_clone, time_90k, cam_id, cam_uuid, db_clone).await;
+                        });
                     }
                 }
                 self.prev_image = Some(image);
@@ -465,27 +549,18 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
         true
     }
 
-    async fn process_detections(
-        &mut self,
-        image: &DynamicImage,
-        detections: &[Detection],
+    async fn process_detections_static(
+        detector: Arc<tokio::sync::Mutex<Detector>>,
+        image: DynamicImage,
+        detections: Vec<Detection>,
         time_90k: i64,
-        stream: &Arc<db::Stream>,
-        db: &Arc<db::Database<C>>,
+        camera_id: i32,
+        camera_uuid: String,
+        db: Arc<db::Database<C>>,
     ) {
-        let (camera_id, camera_uuid) = {
-            let l = db.lock();
-            let cam_id = stream.inner.lock().camera_id;
-            let uuid = l
-                .cameras_by_id()
-                .get(&cam_id)
-                .map(|c| c.uuid.to_string())
-                .unwrap_or_default();
-            (cam_id, uuid)
-        };
         for det in detections {
-            let start_t = time_90k; // Start exactly at detection time (removed -5s offset)
-            let end_t = time_90k + 900000; // 10 seconds of video
+            let start_t = time_90k;
+            let end_t = time_90k + 900000;
             let video_link = format!(
                 "/api/cameras/{}/main/view.mp4?startTime90k={}&endTime90k={}",
                 camera_uuid, start_t, end_t
@@ -512,9 +587,21 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                 let h = det.h.min(image.height() as f32 - y as f32) as u32;
                 if w > 0 && h > 0 {
                     let crop = image.crop_imm(x, y, w, h);
-                    let mut det_lock = self.detector.lock().await;
+                    let mut det_lock = detector.lock().await;
                     if let Ok(plate) = det_lock.read_plate(&crop) {
-                        if plate != "UNKNOWN" {
+                        if plate != "UNKNOWN" && is_valid_chilean_format(&plate) {
+                            let timestamp = std::time::SystemTime::now()
+                                .duration_since(std::time::UNIX_EPOCH)
+                                .unwrap_or_default()
+                                .as_secs();
+                            let training_path = "models/training_data/lpr";
+                            let filename = format!("{}/{}_{}.png", training_path, plate, timestamp);
+                            let _ = std::fs::create_dir_all(training_path);
+                            if let Err(e) = crop.save(&filename) {
+                                warn!("--- AI: Failed to save LPR training sample {}: {} ---", filename, e);
+                            } else {
+                                info!("--- AI: Saved LPR training sample: {} ---", filename);
+                            }
                             final_type = "license_plate".to_string();
                             final_payload = format!(
                                 "{{\"type\": \"{}\", \"plate\": \"{}\", \"conf\": {:.2}}}",
@@ -576,5 +663,83 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
         let _ = std::fs::remove_file(&raw_path);
         let _ = std::fs::remove_file(&png_path);
         Ok(img)
+    }
+}
+
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+pub struct TrackedObject {
+    pub last_seen: Instant,
+    pub first_seen: Instant,
+    pub x: f32,
+    pub y: f32,
+    pub class_id: u32,
+}
+
+pub struct SuspiciousHeatmap {
+    width: u32,
+    height: u32,
+    // (x, y) -> dwell_time_energy
+    dwell_map: Vec<f32>,
+    #[allow(dead_code)]
+    tracks: HashMap<u32, TrackedObject>,
+}
+
+impl SuspiciousHeatmap {
+    pub fn new(w: u32, h: u32) -> Self {
+        Self {
+            width: w,
+            height: h,
+            dwell_map: vec![0.0; (w * h) as usize],
+            tracks: HashMap::new(),
+        }
+    }
+
+    pub fn update(&mut self, detections: &[Detection]) {
+        for det in detections {
+            if det.class_id == 0 { // Person
+                let gx = (det.x * self.width as f32) as u32;
+                let gy = (det.y * self.height as f32) as u32;
+                
+                if gx < self.width && gy < self.height {
+                    let idx = (gy * self.width + gx) as usize;
+                    // Increment energy based on presence. 
+                    // In a more complex system, we would decay this over time.
+                    self.dwell_map[idx] += 1.0; 
+                }
+            }
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn get_suspicious_areas(&self, threshold: f32) -> Vec<(u32, u32)> {
+        let mut areas = Vec::new();
+        for (idx, &energy) in self.dwell_map.iter().enumerate() {
+            if energy > threshold {
+                let x = (idx % self.width as usize) as u32;
+                let y = (idx / self.width as usize) as u32;
+                areas.push((x, y));
+            }
+        }
+        areas
+    }
+}
+
+// Face Recognition Extension
+impl Detector {
+    #[allow(dead_code)]
+    pub fn detect_faces(&self, _image: &DynamicImage) -> Result<Vec<Detection>, Error> {
+        if let Some(_model) = &self.face_model {
+            // Similar logic to detect() but with face model
+            // For now, return empty as placeholder for full implementation
+            Ok(Vec::new())
+        } else {
+            Ok(Vec::new())
+        }
+    }
+
+    #[allow(dead_code)]
+    pub fn extract_face_embedding(&self, _face_crop: &DynamicImage) -> Result<Vec<f32>, Error> {
+        Ok(vec![0.0; 128])
     }
 }
