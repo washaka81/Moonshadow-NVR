@@ -138,10 +138,10 @@ else
 fi
 
 # 5. Build Server
-log "Building Moonshadow NVR Server..."
+log "Building Moonshadow NVR Server with bundled UI..."
 if [[ -d "./server" ]]; then
     pushd server > /dev/null
-    cargo build --release
+    cargo build --release --features bundled
     popd > /dev/null
 else
     error "Server directory not found!"

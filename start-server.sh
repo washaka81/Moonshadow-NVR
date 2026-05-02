@@ -60,7 +60,7 @@ BINARY="./server/target/release/moonshadow-nvr"
 if [[ ! -f "$BINARY" ]]; then
     warn "Binary not found at $BINARY. Attempting to build..."
     if [[ -d "./server" ]]; then
-        (cd server && cargo build --release) || error "Failed to build Moonshadow NVR server."
+        (cd server && cargo build --release --features bundled) || error "Failed to build Moonshadow NVR server."
     else
         error "Server directory not found!"
     fi

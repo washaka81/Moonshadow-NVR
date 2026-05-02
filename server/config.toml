@@ -1,8 +1,8 @@
 # Database directory path
 dbDir = "/home/ale/Videos/Moonshadow-NVR/db"
 
-# UI directory (comment out if not built)
-# uiDir = "./ui/dist"
+# UI directory (static files for the web interface)
+uiDir = "./ui/dist"
 
 # Bind settings - listen on all interfaces
 # For open access (no login required), uncomment allowUnauthenticatedPermissions:

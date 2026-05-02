@@ -31,13 +31,13 @@
 
 ---
 
-## 🛠️ Automated Deployment (Arch Linux / CachyOS)
+## 🛠️ Installation and Setup (All Linux Distributions)
 
-Moonshadow NVR provides a professional suite of automation scripts for installation, service management, and pre-flight AI model checks.
+Moonshadow NVR provides a robust installer script that automatically detects your Linux distribution (supports **Arch/CachyOS**, **Debian/Ubuntu**, and **Fedora/RHEL**), installs the required dependencies, builds the server with the bundled UI, downloads the AI models, and configures the systemd services.
 
-### 1. Installation
+### 1. Automated Installation
 
-Our intelligent installer detects your OS (optimized for **Arch Linux** and **CachyOS**), configures hardware acceleration (auto-detects NVIDIA/Intel), builds all components, and sets up a `systemd` service.
+Clone the repository and run the installer script with root privileges. The script will handle everything from dependency installation (Rust, Node.js, system libraries) to building the project and setting up the `moonshadow-nvr` user and `systemd` service.
 
 ```bash
 git clone https://github.com/washaka81/Moonshadow-NVR.git
@@ -55,10 +55,20 @@ Use the built-in Terminal UI to setup your surveillance network in seconds.
 
 ### 3. Run and Monitor
 
-The NVR is managed as a standard Linux service:
+**For Production (Systemd):**
+The installer automatically sets up a systemd service. You can enable and start it:
 
 ```bash
+sudo systemctl daemon-reload
 sudo systemctl enable --now moonshadow-nvr
+```
+
+**For Development / Manual Testing:**
+You can start the server directly using the provided robust start script, which also handles starting the MediaMTX proxy in the background:
+
+```bash
+# Start the server (will build automatically if not found)
+./start-server.sh
 ```
 
 **Access your Dashboard at:** `http://<server-ip>:8080` (Default login: `admin` / `admin`)
