@@ -64,7 +64,8 @@ pub async fn run_dirs_menu_shared(
                                     }
                                     match db.delete_sample_file_dir(id).await {
                                         Ok(_) => {
-                                            state.status_msg = "✅ Directory deleted successfully".to_string();
+                                            state.status_msg =
+                                                "✅ Directory deleted successfully".to_string();
                                         }
                                         Err(e) => {
                                             state.status_msg = format!("❌ Error: {}", e);

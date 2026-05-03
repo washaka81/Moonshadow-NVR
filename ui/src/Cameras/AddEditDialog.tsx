@@ -68,7 +68,7 @@ const Inner = ({ csrf }: { csrf?: string }) => {
     } catch {
       // Not a valid URL, assume it's an IP.
     }
-    
+
     // Fallback to "discovery" if IP is empty
     const targetIp = ip || "discovery";
 
@@ -99,7 +99,7 @@ const Inner = ({ csrf }: { csrf?: string }) => {
           severity: "success",
         });
         if (!onvifBaseUrl && targetIp !== "discovery") {
-           setValue("onvifBaseUrl", `http://${targetIp}`, { shouldDirty: true });
+          setValue("onvifBaseUrl", `http://${targetIp}`, { shouldDirty: true });
         }
         if (resp.response.mainUrl) {
           setValue("streams.0.url", resp.response.mainUrl, {

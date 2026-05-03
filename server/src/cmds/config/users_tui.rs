@@ -100,9 +100,8 @@ pub async fn run_users_menu_shared(
                                 state.menu_input7 = TextInput::new(
                                     if u.view_ai_events { "y" } else { "n" }.to_string(),
                                 );
-                                state.menu_input8 = TextInput::new(
-                                    if u.manage_ai { "y" } else { "n" }.to_string(),
-                                );
+                                state.menu_input8 =
+                                    TextInput::new(if u.manage_ai { "y" } else { "n" }.to_string());
                                 state.edit_user = Some(u);
                             }
                         }
@@ -152,9 +151,9 @@ async fn handle_user_input(
         KeyCode::Enter => {
             let user = state.menu_input.get_content().to_string();
             let pass = state.menu_input2.get_content().to_string();
-            
+
             let parse_yn = |ti: &TextInput| ti.get_content().to_lowercase().starts_with('y');
-            
+
             let can_v = parse_yn(&state.menu_input3);
             let is_a = parse_yn(&state.menu_input4);
             let can_r = parse_yn(&state.menu_input5);
@@ -196,7 +195,7 @@ async fn handle_user_input(
                         ch.permissions.update_signals = can_u;
                         ch.permissions.view_ai_events = can_ae;
                         ch.permissions.manage_ai = can_mai;
-                        
+
                         if let Err(e) = l.apply_user_change(ch) {
                             state.status_msg = format!("❌ Error: {}", e);
                             return Ok(());

@@ -422,10 +422,17 @@ async fn inner(
         let l = db.lock();
         if l.sample_file_dirs_by_id().is_empty() {
             drop(l);
-            let recordings_path = config.db_dir.parent().unwrap_or(Path::new("/")).to_path_buf();
+            let recordings_path = config
+                .db_dir
+                .parent()
+                .unwrap_or(Path::new("/"))
+                .to_path_buf();
             info!("Checking for recordings directory: {:?}", recordings_path);
             if recordings_path.exists() {
-                info!("Attempting to auto-add recording directory: {:?}", recordings_path);
+                info!(
+                    "Attempting to auto-add recording directory: {:?}",
+                    recordings_path
+                );
                 match db.add_sample_file_dir(recordings_path).await {
                     Ok(dir_id) => {
                         info!("Added recording directory with ID: {}", dir_id);

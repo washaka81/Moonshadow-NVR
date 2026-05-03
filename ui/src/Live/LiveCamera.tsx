@@ -136,8 +136,7 @@ class LiveCameraDriver {
     const proto = loc.protocol === "https:" ? "wss" : "ws";
     const url = `${proto}://${loc.host}/api/cameras/${this.camera.uuid}/${streamType}/live.m4s`;
     this.ws = new WebSocket(url);
-    this.ws.addEventListener("open", () => {
-    });
+    this.ws.addEventListener("open", () => {});
     this.ws.addEventListener("close", (e) => {
       this.error(`Connection closed (${e.code})`);
     });
@@ -440,32 +439,76 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
             border: "1px solid rgba(255,255,255,0.1)",
           }}
         >
-          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.5 }}>
+          <Box
+            sx={{
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr 1fr",
+              gap: 0.5,
+            }}
+          >
             <Box />
-            <IconButton size="small" onMouseDown={() => onPtz(0, 1, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(0, 1, 0)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ArrowUpwardIcon fontSize="small" />
             </IconButton>
             <Box />
-            
-            <IconButton size="small" onMouseDown={() => onPtz(-1, 0, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(-1, 0, 0)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ArrowBackIcon fontSize="small" />
             </IconButton>
             <Box sx={{ width: 32, height: 32 }} />
-            <IconButton size="small" onMouseDown={() => onPtz(1, 0, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(1, 0, 0)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ArrowForwardIcon fontSize="small" />
             </IconButton>
-            
+
             <Box />
-            <IconButton size="small" onMouseDown={() => onPtz(0, -1, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(0, -1, 0)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ArrowDownwardIcon fontSize="small" />
             </IconButton>
             <Box />
           </Box>
-          <Box sx={{ display: "flex", justifyContent: "space-around", mt: 1, pt: 1, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
-            <IconButton size="small" onMouseDown={() => onPtz(0, 0, 1)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+          <Box
+            sx={{
+              display: "flex",
+              justifyContent: "space-around",
+              mt: 1,
+              pt: 1,
+              borderTop: "1px solid rgba(255,255,255,0.1)",
+            }}
+          >
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(0, 0, 1)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ZoomInIcon fontSize="small" />
             </IconButton>
-            <IconButton size="small" onMouseDown={() => onPtz(0, 0, -1)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+            <IconButton
+              size="small"
+              onMouseDown={() => onPtz(0, 0, -1)}
+              onMouseUp={() => onPtz(0, 0, 0, true)}
+              sx={{ color: "white" }}
+            >
               <ZoomOutIcon fontSize="small" />
             </IconButton>
           </Box>

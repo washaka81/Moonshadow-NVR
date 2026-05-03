@@ -540,10 +540,17 @@ impl Service {
                 .as_ref()
                 .ok_or_else(|| err!(InvalidArgument, msg("camera has no onvif_base_url")))?
                 .clone();
-            (u, camera.config.username.clone(), camera.config.password.clone())
+            (
+                u,
+                camera.config.username.clone(),
+                camera.config.password.clone(),
+            )
         };
 
-        crate::onvif::ptz_move(&base_url, &username, &password, req.x, req.y, req.zoom, req.stop).await?;
+        crate::onvif::ptz_move(
+            &base_url, &username, &password, req.x, req.y, req.zoom, req.stop,
+        )
+        .await?;
 
         #[derive(serde::Serialize)]
         struct PtzResponse {

@@ -79,7 +79,7 @@ impl Detector {
 
         let mut builder = Session::builder()
             .map_err(|e| err!(Unknown, msg("fail EP builder"), source(e.to_string())))?;
-        
+
         if hardware_acceleration {
             info!("--- AI LOG: Engaging Multi-Backend Hardware Acceleration ---");
 
@@ -129,14 +129,18 @@ impl Detector {
 
             // Always add CPU as fallback
             let ep_cpu = ort::ep::CPU::default().build();
-            builder = builder.with_execution_providers([ep_cpu]).map_err(|e| {
-                err!(Unknown, msg("fail CPU EP fallback"), source(e.to_string()))
-            })?;
+            builder = builder
+                .with_execution_providers([ep_cpu])
+                .map_err(|e| err!(Unknown, msg("fail CPU EP fallback"), source(e.to_string())))?;
         }
 
-        let detection_model = builder
-            .commit_from_file(model_path)
-            .map_err(|e| err!(Unknown, msg("fail load detection model"), source(e.to_string())))?;
+        let detection_model = builder.commit_from_file(model_path).map_err(|e| {
+            err!(
+                Unknown,
+                msg("fail load detection model"),
+                source(e.to_string())
+            )
+        })?;
         info!("--- AI LOG: YOLOv8 model loaded ---");
 
         let reid_model = if let Some(path) = reid_model_path {
@@ -430,7 +434,7 @@ fn is_valid_chilean_format(plate: &str) -> bool {
     }
 
     let chars: Vec<char> = clean.chars().collect();
-    
+
     // AB1234 (Format 2)
     if chars[0..2].iter().all(|c| c.is_alphabetic()) && chars[2..6].iter().all(|c| c.is_numeric()) {
         return true;
@@ -507,8 +511,10 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
     }
 
     pub async fn run(mut self, db: Arc<db::Database<C>>) {
-        info!("--- AI LOG: Worker Service Online (LPR: {}, Face: {}, Heatmap: {}) ---", 
-            self.enable_lpr, self.enable_face, self.enable_heatmap);
+        info!(
+            "--- AI LOG: Worker Service Online (LPR: {}, Face: {}, Heatmap: {}) ---",
+            self.enable_lpr, self.enable_face, self.enable_heatmap
+        );
         while let Some((data, camera_id, time_90k, stream)) = self.receiver.recv().await {
             if let Ok(image) = self.decode_any_codec_to_image(&data, camera_id) {
                 if self.has_motion(&image) {
@@ -516,12 +522,14 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                         let mut det_lock = self.detector.lock().await;
                         det_lock.detect(&image).unwrap_or_default()
                     };
-                    
+
                     if self.enable_heatmap {
-                        let heatmap = self.heatmaps.entry(camera_id)
+                        let heatmap = self
+                            .heatmaps
+                            .entry(camera_id)
                             .or_insert_with(|| SuspiciousHeatmap::new(32, 24));
                         heatmap.update(&detections);
-                        
+
                         // Periodically store heatmap peaks as "suspicious_behavior" events
                         if heatmap.should_report() {
                             let db_clone = db.clone();
@@ -529,8 +537,17 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                             let time = time_90k;
                             let peaks = heatmap.get_suspicious_areas(10.0); // threshold
                             tokio::task::spawn(async move {
-                                let payload = format!("{{\"type\": \"heatmap_peak\", \"coords\": {:?}}}", peaks);
-                                let _ = db_clone.lock().insert_ai_event(cam_id, time, "suspicious_behavior", &payload, "");
+                                let payload = format!(
+                                    "{{\"type\": \"heatmap_peak\", \"coords\": {:?}}}",
+                                    peaks
+                                );
+                                let _ = db_clone.lock().insert_ai_event(
+                                    cam_id,
+                                    time,
+                                    "suspicious_behavior",
+                                    &payload,
+                                    "",
+                                );
                             });
                             heatmap.reset_report_timer();
                         }
@@ -544,12 +561,25 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                         let (cam_id, cam_uuid) = {
                             let l = db.lock();
                             let cam_id = stream.inner.lock().camera_id;
-                            let uuid = l.cameras_by_id().get(&cam_id).map(|c| c.uuid.to_string()).unwrap_or_default();
+                            let uuid = l
+                                .cameras_by_id()
+                                .get(&cam_id)
+                                .map(|c| c.uuid.to_string())
+                                .unwrap_or_default();
                             (cam_id, uuid)
                         };
-                        
+
                         tokio::task::spawn(async move {
-                            Self::process_detections_static(detector_clone, image_clone, detections_clone, time_90k, cam_id, cam_uuid, db_clone).await;
+                            Self::process_detections_static(
+                                detector_clone,
+                                image_clone,
+                                detections_clone,
+                                time_90k,
+                                cam_id,
+                                cam_uuid,
+                                db_clone,
+                            )
+                            .await;
                         });
                     }
                 }
@@ -611,7 +641,10 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                             let filename = format!("{}/{}_{}.png", training_path, plate, timestamp);
                             let _ = std::fs::create_dir_all(training_path);
                             if let Err(e) = crop.save(&filename) {
-                                warn!("--- AI: Failed to save LPR training sample {}: {} ---", filename, e);
+                                warn!(
+                                    "--- AI: Failed to save LPR training sample {}: {} ---",
+                                    filename, e
+                                );
                             } else {
                                 info!("--- AI: Saved LPR training sample: {} ---", filename);
                             }
@@ -724,15 +757,16 @@ impl SuspiciousHeatmap {
 
     pub fn update(&mut self, detections: &[Detection]) {
         for det in detections {
-            if det.class_id == 0 { // Person
+            if det.class_id == 0 {
+                // Person
                 let gx = (det.x * self.width as f32) as u32;
                 let gy = (det.y * self.height as f32) as u32;
-                
+
                 if gx < self.width && gy < self.height {
                     let idx = (gy * self.width + gx) as usize;
-                    // Increment energy based on presence. 
+                    // Increment energy based on presence.
                     // In a more complex system, we would decay this over time.
-                    self.dwell_map[idx] += 1.0; 
+                    self.dwell_map[idx] += 1.0;
                 }
             }
         }

@@ -243,7 +243,10 @@ async fn perform_factory_reset(db: &Arc<db::Database>, db_dir: &Path) -> String 
         .status()
     {
         Ok(s) if s.success() => "✅ System Reset Successful. Restart NVR.".to_string(),
-        Ok(s) => format!("❌ Reset failed (exit code: {}). Database might be busy.", s),
+        Ok(s) => format!(
+            "❌ Reset failed (exit code: {}). Database might be busy.",
+            s
+        ),
         Err(e) => format!("❌ Reset failed to start: {}", e),
     }
 }
@@ -702,14 +705,16 @@ pub async fn run_cameras_app(
                                                     .unwrap_or_default(),
                                             );
                                             state.menu_input7 = TextInput::new(
-                                                (s_lock.config.retain_bytes
-                                                    / 1024
-                                                    / 1024
-                                                    / 1024)
+                                                (s_lock.config.retain_bytes / 1024 / 1024 / 1024)
                                                     .to_string(),
                                             );
                                             state.menu_input8 = TextInput::new(
-                                                if s_lock.config.mode == "record" { "y" } else { "n" }.to_string()
+                                                if s_lock.config.mode == "record" {
+                                                    "y"
+                                                } else {
+                                                    "n"
+                                                }
+                                                .to_string(),
                                             );
                                         }
                                     }
@@ -783,8 +788,13 @@ fn handle_camera_input(
             }
             let retain_gb: u64 = state.menu_input7.get_content().parse().unwrap_or(0);
             let retain_bytes = (retain_gb * 1024 * 1024 * 1024) as i64;
-            
-            let mode = if state.menu_input8.get_content().to_lowercase().starts_with('y') {
+
+            let mode = if state
+                .menu_input8
+                .get_content()
+                .to_lowercase()
+                .starts_with('y')
+            {
                 "record".to_string()
             } else {
                 String::new()
@@ -872,7 +882,9 @@ fn handle_camera_input(
             state.edit_camera = None;
             state.clear_menu_inputs();
             if has_storage_warning {
-                state.status_msg = "✅ Saved, but NO STORAGE POOL configured. Recordings won't be saved.".to_string();
+                state.status_msg =
+                    "✅ Saved, but NO STORAGE POOL configured. Recordings won't be saved."
+                        .to_string();
             } else {
                 state.status_msg = "✅ Saved successfully".to_string();
             }

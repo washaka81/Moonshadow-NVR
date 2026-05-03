@@ -757,8 +757,8 @@ pub struct StreamSubset {
 pub struct PtzRequest<'a> {
     #[serde(borrow)]
     pub csrf: Option<&'a str>,
-    pub x: f32, // -1.0 to 1.0 (pan)
-    pub y: f32, // -1.0 to 1.0 (tilt)
+    pub x: f32,    // -1.0 to 1.0 (pan)
+    pub y: f32,    // -1.0 to 1.0 (tilt)
     pub zoom: f32, // -1.0 to 1.0
     pub stop: bool,
 }

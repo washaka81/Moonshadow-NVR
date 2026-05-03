@@ -9,12 +9,12 @@ use url::Url;
 
 pub async fn discover_ssdp() -> Result<Vec<String>, Error> {
     info!("Starting SSDP discovery for ONVIF devices...");
-    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
     use socket2::Domain;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
 
     let target = "urn:schemas-xmlsoap-org:device:NetworkVideoTransmitter:1";
-    let marker = b"HTTP/1.1"; 
-    
+    let marker = b"HTTP/1.1";
+
     let ips = ssdp_probe::ssdp_probe(
         marker,
         10,
@@ -28,12 +28,13 @@ pub async fn discover_ssdp() -> Result<Vec<String>, Error> {
         },
         SocketAddr::new(IpAddr::V4(Ipv4Addr::new(239, 255, 255, 250)), 1900),
         Domain::ipv4(),
-    ).map_err(|e| {
+    )
+    .map_err(|e| {
         let b: base::ErrorBuilder = err!(Unknown, msg("ssdp search failed"), source(e.to_string()));
         let e: base::Error = b.into();
         e
     })?;
-    
+
     Ok(ips.into_iter().map(|ip| ip.to_string()).collect())
 }
 
@@ -71,7 +72,7 @@ pub async fn ptz_move(
         e
     })?;
 
-    // Extremely simplified SOAP body for prototype. 
+    // Extremely simplified SOAP body for prototype.
     // Real ONVIF requires Digest/WS-Security auth and correct namespaces.
     let body = if stop {
         format!(
@@ -97,11 +98,13 @@ pub async fn ptz_move(
                         </tptz:Velocity>
                     </tptz:ContinuousMove>
                 </s:Body>
-            </s:Envelope>"#, x, y, zoom
+            </s:Envelope>"#,
+            x, y, zoom
         )
     };
 
-    let mut request = client.post(ptz_url)
+    let mut request = client
+        .post(ptz_url)
         .header("Content-Type", "application/soap+xml; charset=utf-8")
         .header("SOAPAction", soap_action)
         .body(body);
@@ -110,12 +113,11 @@ pub async fn ptz_move(
         request = request.basic_auth(username, Some(password));
     }
 
-    let resp = request.send().await
-        .map_err(|e| {
-            let b: base::ErrorBuilder = err!(Unknown, msg("ptz request failed"), source(e));
-            let e: base::Error = b.into();
-            e
-        })?;
+    let resp = request.send().await.map_err(|e| {
+        let b: base::ErrorBuilder = err!(Unknown, msg("ptz request failed"), source(e));
+        let e: base::Error = b.into();
+        e
+    })?;
 
     if !resp.status().is_success() {
         let err_text = resp.text().await.unwrap_or_default();

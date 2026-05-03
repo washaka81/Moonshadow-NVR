@@ -90,13 +90,10 @@ impl VulkanEngine {
         let library = VulkanLibrary::new().ok()?;
         let instance = Instance::new(library, InstanceCreateInfo::default()).ok()?;
 
-        let physical_device = instance
-            .enumerate_physical_devices()
-            .ok()?
-            .find(|p| {
-                p.properties().device_type == PhysicalDeviceType::IntegratedGpu
-                    || p.properties().device_type == PhysicalDeviceType::DiscreteGpu
-            })?;
+        let physical_device = instance.enumerate_physical_devices().ok()?.find(|p| {
+            p.properties().device_type == PhysicalDeviceType::IntegratedGpu
+                || p.properties().device_type == PhysicalDeviceType::DiscreteGpu
+        })?;
 
         info!(
             "--- VULKAN ENGINE: Using Device: {} ---",
