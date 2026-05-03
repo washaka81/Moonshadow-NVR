@@ -646,3 +646,27 @@ export async function autodetectCamera(
     ...init,
   });
 }
+
+export interface PtzRequest {
+  csrf?: string;
+  x: number;
+  y: number;
+  zoom: number;
+  stop: boolean;
+}
+
+/** Controls camera PTZ via ONVIF. */
+export async function ptzMove(
+  uuid: string,
+  req: PtzRequest,
+  init: RequestInit,
+) {
+  return await json<{ status: string }>(`/api/cameras/${uuid}/ptz`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(req),
+    ...init,
+  });
+}

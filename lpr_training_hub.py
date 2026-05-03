@@ -107,6 +107,21 @@ def main():
     if args.action == "schedule":
         schedule_training(args.days)
 
+    elif args.action == "generate":
+        print(f"[*] Generando {args.count} patentes sintéticas para {active_country}...")
+        os.makedirs("models/training_data/synthetic", exist_ok=True)
+        if active_country == "chile":
+            subprocess.run(["python3", "models/platesGenerator/gen_chile.py"])
+            # Mover de output/chile a models/training_data/synthetic
+            if os.path.exists("output/chile"):
+                subprocess.run("mv output/chile/* models/training_data/synthetic/", shell=True)
+                print(f"[+] Patentes generadas en models/training_data/synthetic/")
+        else:
+            print(f"[!] Generador para {active_country} no implementado aún.")
+
+    elif args.action == "download-fonts":
+        download_fonts(country_config)
+
     elif args.action == "status":
         captured = len(os.listdir("models/training_data/lpr")) if os.path.exists("models/training_data/lpr") else 0
         history = load_history()

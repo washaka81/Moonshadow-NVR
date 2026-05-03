@@ -309,6 +309,13 @@ impl Service {
                 CacheControl::PrivateDynamic,
                 self.stream_probe(req, caller).await?,
             ),
+            Path::CameraPtz(uuid) => match *req.method() {
+                http::Method::POST => (
+                    CacheControl::PrivateDynamic,
+                    self.camera_ptz(req, caller, uuid).await?,
+                ),
+                _ => bail!(InvalidArgument, msg("method not allowed")),
+            },
             Path::Login => (
                 CacheControl::PrivateDynamic,
                 self.login(req, authreq).await?,
@@ -509,6 +516,47 @@ impl Service {
         serve_json(&http::Request::new(()), &resp)
     }
 
+    async fn camera_ptz(
+        &self,
+        req: Request<::hyper::body::Incoming>,
+        caller: Caller,
+        uuid: Uuid,
+    ) -> ResponseResult {
+        if !caller.permissions.view_video {
+            bail!(PermissionDenied, msg("view_video required"));
+        }
+        let (_, body) = into_json_body(req).await?;
+        let req: json::PtzRequest = parse_json_body(&body)?;
+        require_csrf_if_session(&caller, req.csrf)?;
+
+        let (base_url, username, password) = {
+            let l = self.db.lock();
+            let camera = l
+                .get_camera(uuid)
+                .ok_or_else(|| err!(NotFound, msg("no such camera {uuid}")))?;
+            let u = camera
+                .config
+                .onvif_base_url
+                .as_ref()
+                .ok_or_else(|| err!(InvalidArgument, msg("camera has no onvif_base_url")))?
+                .clone();
+            (u, camera.config.username.clone(), camera.config.password.clone())
+        };
+
+        crate::onvif::ptz_move(&base_url, &username, &password, req.x, req.y, req.zoom, req.stop).await?;
+
+        #[derive(serde::Serialize)]
+        struct PtzResponse {
+            status: String,
+        }
+        serve_json(
+            &http::Request::new(()),
+            &PtzResponse {
+                status: "OK".to_string(),
+            },
+        )
+    }
+
     fn camera(&self, req: &Request<::hyper::body::Incoming>, uuid: Uuid) -> ResponseResult {
         let db = self.db.lock();
         let camera = db
@@ -621,6 +669,18 @@ impl Service {
         let req: json::AutodetectRequest = parse_json_body(&body)?;
         require_csrf_if_session(&caller, req.csrf)?;
 
+        let mut ip = req.ip.clone();
+
+        // If IP is "discovery", run SSDP
+        if ip == "discovery" {
+            let found = crate::onvif::discover_ssdp().await?;
+            if let Some(first) = found.first() {
+                ip = first.clone();
+            } else {
+                bail!(NotFound, msg("no ONVIF devices found via SSDP"));
+            }
+        }
+
         let mut main_url = None;
         let mut main_codec = None;
         let mut sub_url = None;
@@ -632,7 +692,7 @@ impl Service {
         };
 
         // First check if port 554 is open
-        let addr = format!("{}:554", req.ip);
+        let addr = format!("{}:554", ip);
         let port_open = matches!(
             tokio::time::timeout(
                 std::time::Duration::from_secs(2),
@@ -660,7 +720,7 @@ impl Service {
             ];
 
             for path in paths_main {
-                let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
+                let url_str = format!("rtsp://{}{}:554{}", auth_str, ip, path);
                 if let Ok(url) = url::Url::parse(&url_str) {
                     if let Ok(Ok(session)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
@@ -683,7 +743,7 @@ impl Service {
             }
 
             for path in paths_sub {
-                let url_str = format!("rtsp://{}{}:554{}", auth_str, req.ip, path);
+                let url_str = format!("rtsp://{}{}:554{}", auth_str, ip, path);
                 if let Ok(url) = url::Url::parse(&url_str) {
                     if let Ok(Ok(session)) = tokio::time::timeout(
                         std::time::Duration::from_secs(1),
@@ -708,10 +768,10 @@ impl Service {
 
         // Fallbacks if nothing detected or port closed
         if main_url.is_none() {
-            main_url = Some(format!("rtsp://{}:554/stream1", req.ip));
+            main_url = Some(format!("rtsp://{}:554/stream1", ip));
         }
         if sub_url.is_none() {
-            sub_url = Some(format!("rtsp://{}:554/stream2", req.ip));
+            sub_url = Some(format!("rtsp://{}:554/stream2", ip));
         }
 
         let resp = json::AutodetectResponse {

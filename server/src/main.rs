@@ -16,6 +16,7 @@ mod cmds;
 mod detector;
 mod json;
 mod mp4;
+mod onvif;
 mod slices;
 mod stream;
 mod streamer;

@@ -30,6 +30,7 @@ pub(super) enum Path {
     AiEvents,
     SysInfo,
     StreamProbe,
+    CameraPtz(Uuid),
     NotFound,
 }
 
@@ -84,6 +85,10 @@ impl Path {
 
             if path.is_empty() {
                 return Path::Camera(uuid);
+            }
+
+            if path == "ptz" {
+                return Path::CameraPtz(uuid);
             }
 
             let (type_, path) = match path.split_once('/') {

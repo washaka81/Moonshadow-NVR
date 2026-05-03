@@ -12,6 +12,13 @@ import Alert from "@mui/material/Alert";
 import Typography from "@mui/material/Typography";
 import useResizeObserver from "@react-hook/resize-observer";
 import { fillAspect } from "../aspect";
+import IconButton from "@mui/material/IconButton";
+import ArrowUpwardIcon from "@mui/icons-material/ArrowUpward";
+import ArrowDownwardIcon from "@mui/icons-material/ArrowDownward";
+import ArrowBackIcon from "@mui/icons-material/ArrowBack";
+import ArrowForwardIcon from "@mui/icons-material/ArrowForward";
+import ZoomInIcon from "@mui/icons-material/ZoomIn";
+import ZoomOutIcon from "@mui/icons-material/ZoomOut";
 
 export const MediaSourceApi: typeof MediaSource | undefined =
   (self as any).ManagedMediaSource ?? self.MediaSource;
@@ -373,6 +380,17 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
     }
   }, [camera]);
 
+  const onPtz = async (x: number, y: number, zoom: number, stop = false) => {
+    if (!camera) return;
+    try {
+      await api.ptzMove(camera.uuid, { x, y, zoom, stop }, {});
+    } catch (e) {
+      console.error("PTZ failed:", e);
+    }
+  };
+
+  const hasOnvif = !!camera?.config?.onvifBaseUrl;
+
   return (
     <Box
       ref={boxRef}
@@ -385,6 +403,7 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
         justifyContent: "center",
         bgcolor: "#000",
         overflow: "hidden",
+        "&:hover .ptz-controls": { opacity: 1 },
       }}
     >
       <video
@@ -399,6 +418,59 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
           zIndex: 1,
         }}
       />
+
+      {/* PTZ Overlay Controls */}
+      {hasOnvif && (
+        <Box
+          className="ptz-controls"
+          sx={{
+            position: "absolute",
+            right: 15,
+            top: "50%",
+            transform: "translateY(-50%)",
+            display: "flex",
+            flexDirection: "column",
+            gap: 1,
+            zIndex: 10,
+            opacity: 0,
+            transition: "opacity 0.3s ease",
+            bgcolor: "rgba(0,0,0,0.4)",
+            p: 1,
+            borderRadius: 2,
+            border: "1px solid rgba(255,255,255,0.1)",
+          }}
+        >
+          <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 0.5 }}>
+            <Box />
+            <IconButton size="small" onMouseDown={() => onPtz(0, 1, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ArrowUpwardIcon fontSize="small" />
+            </IconButton>
+            <Box />
+            
+            <IconButton size="small" onMouseDown={() => onPtz(-1, 0, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ArrowBackIcon fontSize="small" />
+            </IconButton>
+            <Box sx={{ width: 32, height: 32 }} />
+            <IconButton size="small" onMouseDown={() => onPtz(1, 0, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ArrowForwardIcon fontSize="small" />
+            </IconButton>
+            
+            <Box />
+            <IconButton size="small" onMouseDown={() => onPtz(0, -1, 0)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ArrowDownwardIcon fontSize="small" />
+            </IconButton>
+            <Box />
+          </Box>
+          <Box sx={{ display: "flex", justifyContent: "space-around", mt: 1, pt: 1, borderTop: "1px solid rgba(255,255,255,0.1)" }}>
+            <IconButton size="small" onMouseDown={() => onPtz(0, 0, 1)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ZoomInIcon fontSize="small" />
+            </IconButton>
+            <IconButton size="small" onMouseDown={() => onPtz(0, 0, -1)} onMouseUp={() => onPtz(0, 0, 0, true)} sx={{ color: "white" }}>
+              <ZoomOutIcon fontSize="small" />
+            </IconButton>
+          </Box>
+        </Box>
+      )}
 
       {/* HUD: Camera Name + REC Indicator (Top Left) */}
       <Box

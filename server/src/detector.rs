@@ -521,6 +521,19 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                         let heatmap = self.heatmaps.entry(camera_id)
                             .or_insert_with(|| SuspiciousHeatmap::new(32, 24));
                         heatmap.update(&detections);
+                        
+                        // Periodically store heatmap peaks as "suspicious_behavior" events
+                        if heatmap.should_report() {
+                            let db_clone = db.clone();
+                            let cam_id = camera_id;
+                            let time = time_90k;
+                            let peaks = heatmap.get_suspicious_areas(10.0); // threshold
+                            tokio::task::spawn(async move {
+                                let payload = format!("{{\"type\": \"heatmap_peak\", \"coords\": {:?}}}", peaks);
+                                let _ = db_clone.lock().insert_ai_event(cam_id, time, "suspicious_behavior", &payload, "");
+                            });
+                            heatmap.reset_report_timer();
+                        }
                     }
 
                     if !detections.is_empty() {
@@ -683,6 +696,7 @@ pub struct SuspiciousHeatmap {
     dwell_map: Vec<f32>,
     #[allow(dead_code)]
     tracks: HashMap<u32, TrackedObject>,
+    last_report: Instant,
 }
 
 impl SuspiciousHeatmap {
@@ -692,6 +706,19 @@ impl SuspiciousHeatmap {
             height: h,
             dwell_map: vec![0.0; (w * h) as usize],
             tracks: HashMap::new(),
+            last_report: Instant::now(),
+        }
+    }
+
+    pub fn should_report(&self) -> bool {
+        self.last_report.elapsed().as_secs() > 30 // Report every 30s if peaks exist
+    }
+
+    pub fn reset_report_timer(&mut self) {
+        self.last_report = Instant::now();
+        // Slowly decay heatmap energy
+        for val in self.dwell_map.iter_mut() {
+            *val *= 0.5;
         }
     }
 

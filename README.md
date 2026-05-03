@@ -13,12 +13,29 @@
 ## ✨ Key Features
 
 - **🚀 High-Performance Rust Core:** Optimized direct-to-disk recording (H.264/H.265) and efficient memory management, ensuring minimal CPU overhead even with multiple high-bitrate 4K streams.
-- **🧠 Integrated AI Acceleration:** Native, multi-backend support for **ONNX Runtime**, **OpenVINO (NPU/GPU/CPU)**, **ARM ACL (Compute Library)**, **Vulkan Compute**, and **NVIDIA CUDA**. Powering real-time YOLOv8 object detection, Chilean/Universal LPR, Face ID, and Suspicious Behavior Heatmaps.
+- **🧠 Integrated AI Acceleration:** Native, multi-backend support for **ONNX Runtime**, **OpenVINO (NPU/GPU/CPU)**, **ARM ACL (Compute Library)**, **Vulkan Compute**, and **NVIDIA CUDA**. Powering real-time YOLOv8 object detection, Chilean/Universal LPR, Face ID, and **Suspicious Behavior Heatmaps (Experimental)**.
 - **📡 Low-Latency Streaming:** Seamless multi-camera live viewing with sub-second latency via **WebRTC** and **MediaMTX** proxy integration.
+- **🎮 ONVIF & PTZ Control:** Native support for ONVIF device discovery (SSDP) and real-time PTZ (Pan-Tilt-Zoom) controls directly from the live view interface.
 - **📊 Real-Time System Monitor:** Detailed hardware telemetry (CPU Cores, RAM/Swap, Disk IO, GPU/NPU/VRAM load, and Temperatures) accessible directly from your web dashboard.
 - **💻 Interactive TUI Configuration:** A robust **Terminal User Interface** to manage cameras, users, storage pools, and granular AI settings (Individual feature toggles, NPU/TPU preference).
 - **🌐 Modern Web Dashboard:** Sleek, responsive React-based interface with intelligent timeline playback, AI event filtering (Person, Vehicle, Plate, Face), and real-time behavior heatmaps.
-- **🔄 Dynamic LPR Training:** Automated feedback loop that uses real captures and synthetic data (with real fonts) to continuously improve license plate recognition accuracy.
+- **🔄 Dynamic LPR Training:** Automated feedback loop that uses real captures and **Synthetic Plate Generation** (specifically optimized for Chilean formats) to continuously improve recognition accuracy.
+
+---
+
+## 🚀 Advanced AI Features
+
+### 🔍 Suspicious Behavior Heatmap (Experimental)
+The system now includes a real-time occupancy heatmap. By tracking person presence over time, it identifies "hotspots" of activity. If a person stays in a specific area longer than a predefined threshold, the system generates a `suspicious_behavior` event. *Note: This feature is currently in experimental stage.*
+
+### 🇨🇱 Chilean LPR Synthetic Training
+Retraining your LPR model is now easier with the integrated synthetic data generator. 
+```bash
+# Generate 500 synthetic Chilean license plates for training
+source models/venv/bin/activate
+python3 lpr_training_hub.py generate --count 500
+```
+This tool creates realistic variations of Chilean plates (ABCD-12, AB-1234, ABC-123) to harden the model against different lighting and angles.
 
 ---
 

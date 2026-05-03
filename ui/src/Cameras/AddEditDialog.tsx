@@ -68,20 +68,16 @@ const Inner = ({ csrf }: { csrf?: string }) => {
     } catch {
       // Not a valid URL, assume it's an IP.
     }
-    if (!ip) {
-      snackbars.enqueue({
-        message: "Please enter an ONVIF Base URL or IP address first.",
-        severity: "warning",
-      });
-      return;
-    }
+    
+    // Fallback to "discovery" if IP is empty
+    const targetIp = ip || "discovery";
 
     setAutodetecting(true);
     const { username, password } = getValues();
     const resp = await api.autodetectCamera(
       {
         csrf,
-        ip,
+        ip: targetIp,
         username,
         password,
       },
@@ -102,6 +98,9 @@ const Inner = ({ csrf }: { csrf?: string }) => {
           message: `Autodetect successful! Found: ${resp.response.mainCodec || "Unknown"} / ${resp.response.subCodec || "Unknown"}`,
           severity: "success",
         });
+        if (!onvifBaseUrl && targetIp !== "discovery") {
+           setValue("onvifBaseUrl", `http://${targetIp}`, { shouldDirty: true });
+        }
         if (resp.response.mainUrl) {
           setValue("streams.0.url", resp.response.mainUrl, {
             shouldDirty: true,

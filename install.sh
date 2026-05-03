@@ -275,6 +275,17 @@ fi
 
 # 14. Initialize database and start services
 log "Finalizing installation..."
+
+# 14.1 Firewall Setup
+if command -v ufw >/dev/null 2>&1; then
+    log "Configuring UFW firewall to allow port 8080..."
+    ufw allow 8080/tcp || warn "Failed to configure UFW."
+elif command -v firewall-cmd >/dev/null 2>&1; then
+    log "Configuring firewalld to allow port 8080..."
+    firewall-cmd --permanent --add-port=8080/tcp || warn "Failed to configure firewalld."
+    firewall-cmd --reload || true
+fi
+
 sudo -u moonshadow "$INSTALL_ROOT/moonshadow-nvr" init --db-dir "$DATA_DIR/db" || warn "Database already initialized or initialization skipped."
 
 if command -v systemctl >/dev/null 2>&1; then
@@ -294,5 +305,9 @@ echo -e "2. Check status:       ${YELLOW}sudo systemctl status moonshadow-nvr${N
 echo -e "3. View logs:          ${YELLOW}sudo journalctl -u moonshadow-nvr -f${NC}"
 echo ""
 echo -e "Web Interface: ${BLUE}http://localhost:8080${NC}"
+LOCAL_IP=$(ip addr show | grep -w "inet" | grep -v "127.0.0.1" | awk '{print $2}' | cut -d/ -f1 | head -n 1 || echo "unknown")
+if [[ "$LOCAL_IP" != "unknown" ]]; then
+    echo -e "Remote Access: ${BLUE}http://$LOCAL_IP:8080${NC}"
+fi
 echo "============================================"
 echo ""
