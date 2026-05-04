@@ -59,6 +59,7 @@ def schedule_training(interval_days):
     timer_path = "/etc/systemd/system/moonshadow-lpr-train.timer"
     
     abs_path = os.path.abspath(__file__)
+    SCRIPT_DIR = os.path.dirname(abs_path)
     user = os.getlogin()
     
     service_content = f"""[Unit]
@@ -69,7 +70,7 @@ After=network.target
 Type=oneshot
 User={user}
 WorkingDirectory={os.getcwd()}
-ExecStart=/usr/bin/python3 {abs_path} train
+ExecStart={SCRIPT_DIR}/lpr-hub.sh train
 """
     
     timer_content = f"""[Unit]
@@ -115,7 +116,7 @@ def main():
         print(f"[*] Generando {args.count} patentes sintéticas para {active_country}...")
         os.makedirs("models/training_data/synthetic", exist_ok=True)
         if active_country == "chile":
-            subprocess.run(["python3", "models/platesGenerator/gen_chile.py"])
+            subprocess.run([sys.executable, "models/platesGenerator/gen_chile.py", str(args.count)])
             # Mover de output/chile a models/training_data/synthetic
             if os.path.exists("output/chile"):
                 subprocess.run("mv output/chile/* models/training_data/synthetic/", shell=True)
@@ -142,7 +143,7 @@ def main():
         print(f"[*] Iniciando entrenamiento dinámico para {active_country}...")
         # Simular acierto por ahora, en una integración real leeríamos el output de test_LPRNet.py
         start_t = time.time()
-        subprocess.run(["python3", "models/LPRNet_Pytorch/train_LPRNet.py"])
+        subprocess.run([sys.executable, "models/LPRNet_Pytorch/train_LPRNet.py"])
         
         # Evaluar
         print("[*] Evaluando nuevo modelo...")

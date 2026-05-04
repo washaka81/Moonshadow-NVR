@@ -29,12 +29,21 @@
 The system now includes a real-time occupancy heatmap. By tracking person presence over time, it identifies "hotspots" of activity. If a person stays in a specific area longer than a predefined threshold, the system generates a `suspicious_behavior` event. *Note: This feature is currently in experimental stage.*
 
 ### 🇨🇱 Chilean LPR Synthetic Training
-Retraining your LPR model is now easier with the integrated synthetic data generator. 
+Retraining your LPR model is now easier with the integrated training hub and synthetic data generator. 
+
+Use the provided wrapper to ensure the correct virtual environment is used regardless of your shell (Bash, Fish, Zsh):
+
 ```bash
 # Generate 500 synthetic Chilean license plates for training
-source models/venv/bin/activate
-python3 lpr_training_hub.py generate --count 500
+./lpr-hub.sh generate --count 500
+
+# Start training the model
+./lpr-hub.sh train
+
+# View status and last accuracy
+./lpr-hub.sh status
 ```
+
 This tool creates realistic variations of Chilean plates (ABCD-12, AB-1234, ABC-123) to harden the model against different lighting and angles.
 
 ---
