@@ -65,11 +65,24 @@ mod shaders {
                     return;
                 }
 
-                // Simple sampling (nearest neighbor)
-                float srcX = float(tx) * float(pcs.width) / float(pcs.targetWidth);
-                float srcY = float(ty) * float(pcs.height) / float(pcs.targetHeight);
+                // Bilinear interpolation
+                float srcX = (float(tx) + 0.5) * float(pcs.width) / float(pcs.targetWidth) - 0.5;
+                float srcY = (float(ty) + 0.5) * float(pcs.height) / float(pcs.targetHeight) - 0.5;
 
-                vec4 color = imageLoad(inputImage, ivec2(int(srcX), int(srcY)));
+                int x0 = int(max(floor(srcX), 0.0));
+                int y0 = int(max(floor(srcY), 0.0));
+                int x1 = int(min(float(x0 + 1), float(pcs.width - 1)));
+                int y1 = int(min(float(y0 + 1), float(pcs.height - 1)));
+
+                float fx = fract(max(srcX, 0.0));
+                float fy = fract(max(srcY, 0.0));
+
+                vec4 c00 = imageLoad(inputImage, ivec2(x0, y0));
+                vec4 c10 = imageLoad(inputImage, ivec2(x1, y0));
+                vec4 c01 = imageLoad(inputImage, ivec2(x0, y1));
+                vec4 c11 = imageLoad(inputImage, ivec2(x1, y1));
+
+                vec4 color = mix(mix(c00, c10, fx), mix(c01, c11, fx), fy);
 
                 // Output is NCHW
                 uint baseIdx = ty * pcs.targetWidth + tx;

@@ -151,7 +151,7 @@ impl UserChange {
         let params = params();
         let hash = scrypt::Scrypt
             .hash_password_customized(pwd.as_bytes(), None, None, params.actual, &salt)
-            .unwrap();
+            .expect("scrypt parameters are valid and hardcoded");
         self.set_password_hash = Some(Some(hash.to_string()));
     }
 
@@ -565,10 +565,12 @@ impl State {
             }
         }
         tx.commit()?;
-        let name = self.users_by_id.remove(&id).unwrap().username;
-        self.users_by_name
-            .remove(&name)
-            .expect("users_by_name should be consistent with users_by_id");
+        if let Some(user) = self.users_by_id.remove(&id) {
+            let name = user.username;
+            self.users_by_name
+                .remove(&name)
+                .expect("users_by_name should be consistent with users_by_id");
+        }
         self.sessions.retain(|_k, ref mut v| v.user_id != id);
         Ok(())
     }
@@ -661,9 +663,11 @@ impl State {
         permissions: Permissions,
     ) -> Result<(RawSessionId, &'s Session), base::Error> {
         let mut session_id = RawSessionId([0u8; 48]);
-        rand.fill(&mut session_id.0).unwrap();
+        rand.fill(&mut session_id.0)
+            .map_err(|_| err!(Unknown, msg("failed to generate random session id")))?;
         let mut seed = [0u8; 32];
-        rand.fill(&mut seed).unwrap();
+        rand.fill(&mut seed)
+            .map_err(|_| err!(Unknown, msg("failed to generate random seed")))?;
         let hash = session_id.hash();
         let mut stmt = conn.prepare_cached(
             r#"
@@ -823,7 +827,7 @@ impl State {
             }
             info!(
                 "flushing user with hash: {}",
-                u.password_hash.as_ref().unwrap()
+                u.password_hash.as_deref().unwrap_or("none")
             );
             u_stmt.execute(named_params! {
                 ":password_failure_count": &u.password_failure_count,

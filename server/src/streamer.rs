@@ -5,7 +5,7 @@
 use crate::stream;
 use base::clock::{Clocks, TimerGuard};
 use base::{bail, err, Error};
-use db::{recording, stream::StreamType, writer, Camera};
+use db::{recording, writer, Camera};
 use std::str::FromStr;
 use std::sync::Arc;
 use tracing::{debug, info, warn};
@@ -43,6 +43,7 @@ pub struct Streamer<'a, C: Clocks + Clone> {
     username: String,
     password: String,
     camera_id: i32,
+    is_ai_stream: bool,
 }
 
 impl<'a, C: Clocks + Clone> Streamer<'a, C> {
@@ -54,6 +55,7 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
         session_group: Arc<retina::client::SessionGroup>,
         rotate_offset_sec: i64,
         rotate_interval_sec: i64,
+        is_ai_stream: bool,
     ) -> Result<Self, Error> {
         let url = locked
             .config
@@ -92,6 +94,7 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
             username: c.config.username.clone(),
             password: c.config.password.clone(),
             camera_id: c.id,
+            is_ai_stream,
         })
     }
 
@@ -259,12 +262,10 @@ impl<'a, C: Clocks + Clone> Streamer<'a, C> {
                     self.rotate_interval_sec
                 }
             };
-            // Only send frames to AI detector from the secondary (sub) stream
-            // If sub stream is not available, AI detection stays in standby
+            // Only send frames to AI detector from the designated AI stream (typically Sub, fallback to Main)
             if frame.is_key {
                 if let Some(tx) = &self.env.detection_tx {
-                    let stream_type = self.stream.inner.lock().type_;
-                    if stream_type == StreamType::Sub {
+                    if self.is_ai_stream {
                         let _ = tx.try_send((
                             frame.data.clone(),
                             self.camera_id,
@@ -480,6 +481,7 @@ mod tests {
                 Arc::new(retina::client::SessionGroup::default()),
                 0,
                 3,
+                true,
             )
             .unwrap();
             pool = db

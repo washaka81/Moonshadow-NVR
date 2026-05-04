@@ -561,6 +561,23 @@ async fn inner(
                                 Arc::new(SessionGroup::default().named(camera.short_name.clone()))
                             })
                             .clone();
+                        let is_ai_stream = {
+                            // Sub stream is preferred for AI. If the camera doesn't have an active Sub stream,
+                            // we fallback to the Main stream.
+                            let has_active_sub = camera.streams[db::StreamType::Sub as usize]
+                                .and_then(|id| l.streams_by_id().get(&id))
+                                .map_or(false, |s| {
+                                    let c = &s.inner.lock().config.mode;
+                                    !c.is_empty() && c != "off"
+                                });
+                            
+                            if has_active_sub {
+                                locked.type_ == db::StreamType::Sub
+                            } else {
+                                locked.type_ == db::StreamType::Main
+                            }
+                        };
+
                         match streamer::Streamer::new(
                             env,
                             camera,
@@ -569,6 +586,7 @@ async fn inner(
                             session_group,
                             rotate_offset_sec,
                             streamer::ROTATE_INTERVAL_SEC,
+                            is_ai_stream,
                         ) {
                             Ok(mut streamer) => {
                                 let span =

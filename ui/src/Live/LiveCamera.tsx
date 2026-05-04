@@ -267,7 +267,8 @@ class LiveCameraDriver {
       return;
     const sb = this.buf.srcBuf;
     const firstTs = sb.buffered.start(0);
-    if (firstTs < this.video.currentTime - 5) {
+    // Only trim when there's at least 10 seconds of old buffer
+    if (firstTs < this.video.currentTime - 10) {
       try {
         sb.remove(firstTs, this.video.currentTime - 5);
         this.buf.busy = true;

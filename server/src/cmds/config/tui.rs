@@ -158,13 +158,13 @@ async fn run_main_menu_app(
                     match key.code {
                         KeyCode::Char('q') | KeyCode::Esc => break,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            state.selected = (state.selected + 1) % 8
+                            state.selected = (state.selected + 1) % 9
                         }
                         KeyCode::Up | KeyCode::Char('k') => {
                             state.selected = if state.selected > 0 {
                                 state.selected - 1
                             } else {
-                                7
+                                8
                             }
                         }
                         KeyCode::Enter => match state.selected {
@@ -187,17 +187,20 @@ async fn run_main_menu_app(
                                 let _ = run_hardware_app(terminal, db).await;
                             }
                             4 => {
+                                let _ = run_logs_app(terminal).await;
+                            }
+                            5 => {
                                 state.input = TextInput::new("backup.sql".to_string());
                                 state.show_export = true;
                             }
-                            5 => {
+                            6 => {
                                 state.input = TextInput::new(String::new());
                                 state.show_import = true;
                             }
-                            6 => {
+                            7 => {
                                 state.confirm_reset = true;
                             }
-                            7 => break,
+                            8 => break,
                             _ => {}
                         },
                         _ => {}
@@ -563,6 +566,7 @@ fn render_main_menu_screen(frame: &mut Frame, state: &mut MainMenuState) {
         "📂 Manage Directories",
         "👥 Manage Users",
         "⚡ Hardware & AI",
+        "📜 Troubleshooting Logs",
         "📤 Export Database",
         "📥 Import Database",
         "🔥 Factory Reset",
@@ -1149,4 +1153,112 @@ fn centered_rect(x: u16, y: u16, r: Rect) -> Rect {
             Constraint::Percentage((100 - x) / 2),
         ])
         .split(p_v[1])[1]
+}
+
+async fn run_logs_app(
+    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
+) -> io::Result<()> {
+    let mut scroll = 0;
+    // Fetch logs (journalctl for systemd, or just a placeholder)
+    let output = std::process::Command::new("journalctl")
+        .args(["-u", "moonshadow-nvr.service", "-n", "100", "--no-pager"])
+        .output();
+        
+    let mut logs = if let Ok(out) = output {
+        if out.status.success() {
+            String::from_utf8_lossy(&out.stdout).to_string()
+        } else {
+            format!(
+                "Failed to fetch journalctl logs: {}\nAre you running under systemd?",
+                String::from_utf8_lossy(&out.stderr)
+            )
+        }
+    } else {
+        "Command 'journalctl' not found or failed to execute.".to_string()
+    };
+
+    if logs.trim().is_empty() {
+        logs = "No logs found for moonshadow-nvr.service.\nIf you are running manually, check stdout.".to_string();
+    }
+
+    loop {
+        terminal.draw(|f| render_logs_screen(f, &logs, scroll))?;
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                if key.kind == KeyEventKind::Press {
+                    match key.code {
+                        KeyCode::Char('q') | KeyCode::Esc => break,
+                        KeyCode::Up | KeyCode::Char('k') => {
+                            if scroll > 0 {
+                                scroll -= 1;
+                            }
+                        }
+                        KeyCode::Down | KeyCode::Char('j') => {
+                            scroll += 1;
+                        }
+                        KeyCode::PageUp => {
+                            if scroll > 20 {
+                                scroll -= 20;
+                            } else {
+                                scroll = 0;
+                            }
+                        }
+                        KeyCode::PageDown => {
+                            scroll += 20;
+                        }
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn render_logs_screen(frame: &mut Frame, logs: &str, scroll: u16) {
+    let chunks = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([
+            Constraint::Length(3),
+            Constraint::Min(0),
+            Constraint::Length(3),
+        ])
+        .split(frame.area());
+
+    frame.render_widget(
+        Block::default()
+            .borders(Borders::ALL)
+            .title(" Troubleshooting Logs ")
+            .border_style(Style::default().fg(Color::Cyan)),
+        chunks[0],
+    );
+
+    let lines: Vec<&str> = logs.lines().collect();
+    let total_lines = lines.len() as u16;
+    let visible_lines = chunks[1].height;
+    
+    // Prevent scrolling past the end
+    let max_scroll = if total_lines > visible_lines {
+        total_lines - visible_lines
+    } else {
+        0
+    };
+    let actual_scroll = scroll.min(max_scroll);
+
+    let paragraph = Paragraph::new(logs)
+        .block(Block::default().borders(Borders::ALL))
+        .scroll((actual_scroll, 0));
+
+    frame.render_widget(paragraph, chunks[1]);
+
+    frame.render_widget(
+        Paragraph::new("↑↓ / PageUp/PageDown Navigate | q/Esc Back")
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .border_style(Style::default().fg(Color::DarkGray)),
+            )
+            .style(Style::default().fg(Color::DarkGray)),
+        chunks[2],
+    );
 }

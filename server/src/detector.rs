@@ -421,7 +421,7 @@ impl Detector {
     }
     #[allow(dead_code)]
     pub fn reid(&self, _crop: &DynamicImage) -> Result<Vec<f32>, Error> {
-        Ok(vec![0.0; 128])
+        Err(err!(Unknown, msg("ReID is not yet implemented")).into())
     }
 }
 
@@ -671,11 +671,8 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
     fn decode_any_codec_to_image(
         &self,
         data: &[u8],
-        camera_id: i32,
+        _camera_id: i32,
     ) -> Result<DynamicImage, Error> {
-        let raw_path = format!("/tmp/nvr_{}.h264", camera_id);
-        let png_path = format!("/tmp/nvr_{}.png", camera_id);
-
         // Convert length-prefixed (AVCC/MP4) to Annex-B (Start Codes)
         let mut bitstream = Vec::with_capacity(data.len() + 32);
         let mut i = 0;
@@ -689,25 +686,38 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
             i += 4 + len;
         }
 
-        let _ = std::fs::write(&raw_path, &bitstream);
+        use std::process::{Command, Stdio};
+        use std::io::Write;
 
-        let output = std::process::Command::new("ffmpeg")
-            .args(["-i", &raw_path, "-frames:v", "1", "-y", &png_path])
-            .output();
+        let mut child = Command::new("ffmpeg")
+            .args([
+                "-i", "pipe:0",
+                "-frames:v", "1",
+                "-f", "image2pipe",
+                "-vcodec", "png",
+                "pipe:1"
+            ])
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|e| err!(Unknown, msg("failed to spawn ffmpeg"), source(e)))?;
 
-        if let Ok(out) = output {
-            if !out.status.success() {
-                warn!(
-                    "--- AI DEBUG: ffmpeg failed: {} ---",
-                    String::from_utf8_lossy(&out.stderr)
-                );
-            }
+        if let Some(mut stdin) = child.stdin.take() {
+            let _ = stdin.write_all(&bitstream);
         }
 
-        let img =
-            image::open(&png_path).map_err(|e| err!(Unknown, msg("decode error"), source(e)))?;
-        let _ = std::fs::remove_file(&raw_path);
-        let _ = std::fs::remove_file(&png_path);
+        let output = child
+            .wait_with_output()
+            .map_err(|e| err!(Unknown, msg("failed to read ffmpeg output"), source(e)))?;
+
+        if !output.status.success() {
+            return Err(err!(Unknown, msg("ffmpeg returned error")).into());
+        }
+
+        let img = image::load_from_memory(&output.stdout)
+            .map_err(|e| err!(Unknown, msg("decode error"), source(e)))?;
+            
         Ok(img)
     }
 }
@@ -790,17 +800,11 @@ impl SuspiciousHeatmap {
 impl Detector {
     #[allow(dead_code)]
     pub fn detect_faces(&self, _image: &DynamicImage) -> Result<Vec<Detection>, Error> {
-        if let Some(_model) = &self.face_model {
-            // Similar logic to detect() but with face model
-            // For now, return empty as placeholder for full implementation
-            Ok(Vec::new())
-        } else {
-            Ok(Vec::new())
-        }
+        Err(err!(Unknown, msg("Face detection is not yet implemented")).into())
     }
 
     #[allow(dead_code)]
     pub fn extract_face_embedding(&self, _face_crop: &DynamicImage) -> Result<Vec<f32>, Error> {
-        Ok(vec![0.0; 128])
+        Err(err!(Unknown, msg("Face embedding extraction is not yet implemented")).into())
     }
 }
