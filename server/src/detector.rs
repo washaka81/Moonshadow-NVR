@@ -572,10 +572,8 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                             let time = time_90k;
                             let peaks = heatmap.get_suspicious_areas(15.0); // Higher threshold for loitering
                             tokio::task::spawn(async move {
-                                let payload = format!(
-                                    "{{\"type\": \"loitering\", \"coords\": {:?}}}",
-                                    peaks
-                                );
+                                let payload =
+                                    format!("{{\"type\": \"loitering\", \"coords\": {:?}}}", peaks);
                                 let _ = db_clone.lock().insert_ai_event(
                                     cam_id,
                                     time,
@@ -747,16 +745,20 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
             i += 4 + len;
         }
 
-        use std::process::{Command, Stdio};
         use std::io::Write;
+        use std::process::{Command, Stdio};
 
         let mut child = Command::new("ffmpeg")
             .args([
-                "-i", "pipe:0",
-                "-frames:v", "1",
-                "-f", "image2pipe",
-                "-vcodec", "png",
-                "pipe:1"
+                "-i",
+                "pipe:0",
+                "-frames:v",
+                "1",
+                "-f",
+                "image2pipe",
+                "-vcodec",
+                "png",
+                "pipe:1",
             ])
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -778,7 +780,7 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
 
         let img = image::load_from_memory(&output.stdout)
             .map_err(|e| err!(Unknown, msg("decode error"), source(e)))?;
-            
+
         Ok(img)
     }
 }
@@ -866,6 +868,10 @@ impl Detector {
 
     #[allow(dead_code)]
     pub fn extract_face_embedding(&self, _face_crop: &DynamicImage) -> Result<Vec<f32>, Error> {
-        Err(err!(Unknown, msg("Face embedding extraction is not yet implemented")).into())
+        Err(err!(
+            Unknown,
+            msg("Face embedding extraction is not yet implemented")
+        )
+        .into())
     }
 }

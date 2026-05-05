@@ -74,25 +74,35 @@ fn edit_stream_interactive(
         .and_then(|c| c.url.as_ref())
         .map(|u| u.to_string())
         .unwrap_or_default();
-    
+
     let url_str: String = Input::with_theme(theme)
-        .with_prompt(format!("RTSP URL (excluding credentials) [{}]", default_url))
+        .with_prompt(format!(
+            "RTSP URL (excluding credentials) [{}]",
+            default_url
+        ))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-        
-    let final_url_str = if url_str.is_empty() { default_url } else { url_str };
+
+    let final_url_str = if url_str.is_empty() {
+        default_url
+    } else {
+        url_str
+    };
     let url = if final_url_str.is_empty() {
         None
     } else {
-        Some(Url::parse(&final_url_str).map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?)
+        Some(
+            Url::parse(&final_url_str)
+                .map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?,
+        )
     };
 
     let transport_options = vec!["tcp", "udp"];
     let default_transport_idx = default_config
         .map(|c| if c.rtsp_transport == "udp" { 1 } else { 0 })
         .unwrap_or(0);
-        
+
     let transport_idx = Select::with_theme(theme)
         .with_prompt("Transport Protocol")
         .items(&transport_options)
@@ -103,7 +113,7 @@ fn edit_stream_interactive(
     let default_retain_gb = default_config
         .map(|c| c.retain_bytes / (1024 * 1024 * 1024))
         .unwrap_or(10);
-        
+
     let retain_gb_str: String = Input::with_theme(theme)
         .with_prompt(format!("Retention in GB [{}]", default_retain_gb))
         .allow_empty(true)
@@ -113,7 +123,9 @@ fn edit_stream_interactive(
     let retain_gb = if retain_gb_str.is_empty() {
         default_retain_gb
     } else {
-        retain_gb_str.parse::<i64>().map_err(|_| err!(InvalidArgument, msg("Invalid number")))?
+        retain_gb_str
+            .parse::<i64>()
+            .map_err(|_| err!(InvalidArgument, msg("Invalid number")))?
     };
 
     Ok(Some(db::json::StreamConfig {
@@ -574,28 +586,42 @@ fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
     let theme = ColorfulTheme::default();
 
     let mut change = db.lock().null_camera_change(camera_id).unwrap();
-    
-    let (short_name_default, description_default, onvif_default, username_default, password_default, stream_configs) = {
+
+    let (
+        short_name_default,
+        description_default,
+        onvif_default,
+        username_default,
+        password_default,
+        stream_configs,
+    ) = {
         let l = db.lock();
         let camera = match l.cameras_by_id().get(&camera_id) {
             Some(cam) => cam,
             None => return Ok(()),
         };
-        
+
         let mut stream_configs = [None, None, None];
         for (i, stream_id_opt) in camera.streams.iter().enumerate() {
-            if i >= 3 { break; }
+            if i >= 3 {
+                break;
+            }
             if let Some(stream_id) = stream_id_opt {
                 if let Some(s) = l.streams_by_id().get(stream_id) {
                     stream_configs[i] = Some(s.inner.lock().config.clone());
                 }
             }
         }
-        
+
         (
-            camera.short_name.clone(), 
+            camera.short_name.clone(),
             camera.config.description.clone(),
-            camera.config.onvif_base_url.as_ref().map(|u| u.to_string()).unwrap_or_default(),
+            camera
+                .config
+                .onvif_base_url
+                .as_ref()
+                .map(|u| u.to_string())
+                .unwrap_or_default(),
             camera.config.username.clone(),
             camera.config.password.clone(),
             stream_configs,
@@ -610,36 +636,91 @@ fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-    change.short_name = if short_name.is_empty() { short_name_default } else { short_name };
+    change.short_name = if short_name.is_empty() {
+        short_name_default
+    } else {
+        short_name
+    };
 
     let desc_input: String = Input::with_theme(&theme)
-        .with_prompt(format!("Description [{}]: ", if description_default.is_empty() { "(empty)" } else { &description_default }))
+        .with_prompt(format!(
+            "Description [{}]: ",
+            if description_default.is_empty() {
+                "(empty)"
+            } else {
+                &description_default
+            }
+        ))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-    change.config.description = if desc_input.is_empty() { description_default } else { desc_input };
+    change.config.description = if desc_input.is_empty() {
+        description_default
+    } else {
+        desc_input
+    };
 
     let onvif_input: String = Input::with_theme(&theme)
-        .with_prompt(format!("ONVIF Base URL [{}]: ", if onvif_default.is_empty() { "(empty)" } else { &onvif_default }))
+        .with_prompt(format!(
+            "ONVIF Base URL [{}]: ",
+            if onvif_default.is_empty() {
+                "(empty)"
+            } else {
+                &onvif_default
+            }
+        ))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-    let onvif_final = if onvif_input.is_empty() { onvif_default } else { onvif_input };
-    change.config.onvif_base_url = if onvif_final.is_empty() { None } else { Some(Url::parse(&onvif_final).map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?) };
+    let onvif_final = if onvif_input.is_empty() {
+        onvif_default
+    } else {
+        onvif_input
+    };
+    change.config.onvif_base_url = if onvif_final.is_empty() {
+        None
+    } else {
+        Some(
+            Url::parse(&onvif_final)
+                .map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?,
+        )
+    };
 
     let user_input: String = Input::with_theme(&theme)
-        .with_prompt(format!("Username [{}]: ", if username_default.is_empty() { "(empty)" } else { &username_default }))
+        .with_prompt(format!(
+            "Username [{}]: ",
+            if username_default.is_empty() {
+                "(empty)"
+            } else {
+                &username_default
+            }
+        ))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-    change.config.username = if user_input.is_empty() { username_default } else { user_input };
+    change.config.username = if user_input.is_empty() {
+        username_default
+    } else {
+        user_input
+    };
 
     let pass_input: String = Input::with_theme(&theme)
-        .with_prompt(format!("Password [{}]: ", if password_default.is_empty() { "(empty)" } else { "***" }))
+        .with_prompt(format!(
+            "Password [{}]: ",
+            if password_default.is_empty() {
+                "(empty)"
+            } else {
+                "***"
+            }
+        ))
         .allow_empty(true)
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
-    change.config.password = if pass_input.is_empty() { password_default } else { pass_input };
+    change.config.password = if pass_input.is_empty() {
+        password_default
+    } else {
+        pass_input
+    };
 
     let stream_names = ["Main", "Sub", "Ext"];
     for (i, name) in stream_names.iter().enumerate() {
@@ -648,7 +729,11 @@ fn edit_camera(db: &Arc<db::Database>, camera_id: i32) -> Result<(), Error> {
             // The frontend assigns `sample_file_dir_id` on stream creation. We default to the first available dir.
             let dir_id = {
                 let l = db.lock();
-                l.sample_file_dirs_by_id().keys().next().copied().unwrap_or(1)
+                l.sample_file_dirs_by_id()
+                    .keys()
+                    .next()
+                    .copied()
+                    .unwrap_or(1)
             };
             change.streams[i].sample_file_dir_id = Some(dir_id);
         }
@@ -694,7 +779,10 @@ fn add_camera_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
     let onvif_base_url = if onvif_input.is_empty() {
         None
     } else {
-        Some(Url::parse(&onvif_input).map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?)
+        Some(
+            Url::parse(&onvif_input)
+                .map_err(|e| err!(InvalidArgument, msg("Invalid URL: {}", e)))?,
+        )
     };
 
     let username: String = Input::with_theme(&theme)
@@ -709,14 +797,19 @@ fn add_camera_interactive(db: &Arc<db::Database>) -> Result<(), Error> {
         .interact_text()
         .map_err(|e| err!(InvalidArgument, msg("Input error: {}", e)))?;
 
-    let mut streams: [db::StreamChange; 3] = [Default::default(), Default::default(), Default::default()];
+    let mut streams: [db::StreamChange; 3] =
+        [Default::default(), Default::default(), Default::default()];
     let stream_names = ["Main", "Sub", "Ext"];
     for (i, name) in stream_names.iter().enumerate() {
         if let Some(config) = edit_stream_interactive(&theme, name, None)? {
             streams[i].config = config;
             let dir_id = {
                 let l = db.lock();
-                l.sample_file_dirs_by_id().keys().next().copied().unwrap_or(1)
+                l.sample_file_dirs_by_id()
+                    .keys()
+                    .next()
+                    .copied()
+                    .unwrap_or(1)
             };
             streams[i].sample_file_dir_id = Some(dir_id);
         }

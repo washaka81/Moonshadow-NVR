@@ -345,7 +345,10 @@ async fn run_hardware_app(
                                     .arg(cmd)
                                     .status()
                                 {
-                                    Ok(s) if s.success() => "✅ Schedule files generated. Check logs/terminal.".to_string(),
+                                    Ok(s) if s.success() => {
+                                        "✅ Schedule files generated. Check logs/terminal."
+                                            .to_string()
+                                    }
                                     _ => "❌ Failed to generate schedule files.".to_string(),
                                 };
                             }
@@ -365,7 +368,11 @@ async fn run_hardware_app(
                                 cfg.model_path = hw_state.model.get_content().to_string();
                                 cfg.ai_training_schedule = hw_state.training_schedule;
                                 cfg.ai_training_use_cron = hw_state.use_cron;
-                                cfg.ai_training_interval_days = hw_state.training_interval.get_content().parse().unwrap_or(7);
+                                cfg.ai_training_interval_days = hw_state
+                                    .training_interval
+                                    .get_content()
+                                    .parse()
+                                    .unwrap_or(7);
                                 if let Err(e) = l.set_global_config(cfg) {
                                     hw_state.status_msg = format!("❌ Error: {}", e);
                                 } else if let Err(e) = l.flush("TUI config save") {
@@ -1207,15 +1214,13 @@ fn centered_rect(x: u16, y: u16, r: Rect) -> Rect {
         .split(p_v[1])[1]
 }
 
-async fn run_logs_app(
-    terminal: &mut Terminal<CrosstermBackend<io::Stdout>>,
-) -> io::Result<()> {
+async fn run_logs_app(terminal: &mut Terminal<CrosstermBackend<io::Stdout>>) -> io::Result<()> {
     let mut scroll = 0;
     // Fetch logs (journalctl for systemd, or just a placeholder)
     let output = std::process::Command::new("journalctl")
         .args(["-u", "moonshadow-nvr.service", "-n", "100", "--no-pager"])
         .output();
-        
+
     let mut logs = if let Ok(out) = output {
         if out.status.success() {
             String::from_utf8_lossy(&out.stdout).to_string()
@@ -1230,7 +1235,9 @@ async fn run_logs_app(
     };
 
     if logs.trim().is_empty() {
-        logs = "No logs found for moonshadow-nvr.service.\nIf you are running manually, check stdout.".to_string();
+        logs =
+            "No logs found for moonshadow-nvr.service.\nIf you are running manually, check stdout."
+                .to_string();
     }
 
     loop {
@@ -1288,7 +1295,7 @@ fn render_logs_screen(frame: &mut Frame, logs: &str, scroll: u16) {
     let lines: Vec<&str> = logs.lines().collect();
     let total_lines = lines.len() as u16;
     let visible_lines = chunks[1].height;
-    
+
     // Prevent scrolling past the end
     let max_scroll = if total_lines > visible_lines {
         total_lines - visible_lines

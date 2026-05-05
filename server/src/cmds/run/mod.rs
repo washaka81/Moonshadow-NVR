@@ -570,7 +570,7 @@ async fn inner(
                                     let c = &s.inner.lock().config.mode;
                                     !c.is_empty() && c != "off"
                                 });
-                            
+
                             if has_active_sub {
                                 locked.type_ == db::StreamType::Sub
                             } else {
