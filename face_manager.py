@@ -22,18 +22,58 @@ class FaceManager:
                 return json.load(f)
         return {}
 
-    def register_face(self, name, image_path):
-        # En una implementación real, aquí se extraería el embedding
-        # y se guardaría junto con la identidad
-        identity_id = len(self.identities) + 1
+    def register_face(self, name, image_path, embedding=None):
+        identity_id = str(len(self.identities) + 1)
         self.identities[identity_id] = {
             "name": name,
-            "samples": [image_path]
+            "samples": [image_path],
+            "embeddings": [embedding] if embedding is not None else []
         }
-        with open(os.path.join(self.registered_dir, "identities.json"), "w") as f:
-            json.dump(self.identities, f, indent=2)
+        self.save_identities()
         print(f"[*] Rostro registrado: {name} (ID: {identity_id})")
+        return identity_id
 
+    def update_identity(self, identity_id, image_path, embedding=None):
+        if identity_id in self.identities:
+            self.identities[identity_id]["samples"].append(image_path)
+            if embedding is not None:
+                self.identities[identity_id].setdefault("embeddings", []).append(embedding)
+            
+            # Limitar a los últimos 10 samples para evitar crecimiento infinito
+            if len(self.identities[identity_id]["samples"]) > 10:
+                self.identities[identity_id]["samples"].pop(0)
+                if "embeddings" in self.identities[identity_id] and self.identities[identity_id]["embeddings"]:
+                    self.identities[identity_id]["embeddings"].pop(0)
+            
+            self.save_identities()
+            print(f"[*] Identidad {identity_id} actualizada con nuevo sample.")
+            return True
+        return False
+
+    def identify_face(self, embedding, threshold=0.6):
+        if not embedding:
+            return None
+        
+        best_match = None
+        min_dist = float("inf")
+        
+        for id_val, data in self.identities.items():
+            for stored_emb in data.get("embeddings", []):
+                if not stored_emb: continue
+                # Distancia euclídea simple (suponiendo embeddings normalizados)
+                dist = np.linalg.norm(np.array(embedding) - np.array(stored_emb))
+                if dist < min_dist:
+                    min_dist = dist
+                    best_match = id_val
+        
+        if min_dist < threshold:
+            return best_match
+        return None
+
+    def save_identities(self):
+        id_file = os.path.join(self.registered_dir, "identities.json")
+        with open(id_file, "w") as f:
+            json.dump(self.identities, f, indent=2)
     def generate_heatmap(self, coordinates, frame_size):
         # Generar un mapa térmico visual
         heatmap = np.zeros((frame_size[1], frame_size[0]), dtype=np.float32)

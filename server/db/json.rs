@@ -119,6 +119,14 @@ pub struct GlobalConfig {
     #[serde(default)]
     pub specific_gpu_id: Option<String>,
 
+    // AI Training Scheduling
+    #[serde(default)]
+    pub ai_training_schedule: bool,
+    #[serde(default)]
+    pub ai_training_interval_days: u32,
+    #[serde(default)]
+    pub ai_training_use_cron: bool,
+
     #[serde(flatten)]
     pub unknown: BTreeMap<String, Value>,
 }

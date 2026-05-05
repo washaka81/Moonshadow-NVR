@@ -6,5 +6,61 @@
     "samples_real": 0,
     "samples_synthetic": 0,
     "event": "Initial setup"
+  },
+  {
+    "timestamp": 1777932417,
+    "country": "chile",
+    "hit_rate": 0.9198186841113212,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777940196,
+    "country": "chile",
+    "hit_rate": 0.8607661690809821,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777940490,
+    "country": "chile",
+    "hit_rate": 0.8897887196638515,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777940574,
+    "country": "chile",
+    "hit_rate": 0.9058571305372599,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777940717,
+    "country": "chile",
+    "hit_rate": 0.8951747384168907,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777951325,
+    "country": "chile",
+    "hit_rate": 0.860600897321331,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
+  },
+  {
+    "timestamp": 1777953295,
+    "country": "chile",
+    "hit_rate": 0.904443975934503,
+    "samples_real": 0,
+    "samples_synthetic": 1000,
+    "event": "Scheduled Training"
   }
 ]

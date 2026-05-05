@@ -6,4 +6,4 @@ After=network.target
 Type=oneshot
 User=ale
 WorkingDirectory=/home/ale/proyectos/moonshadow-nvr
-ExecStart=/usr/bin/python3 /home/ale/proyectos/moonshadow-nvr/lpr_training_hub.py train
+ExecStart=/home/ale/proyectos/moonshadow-nvr/lpr-hub.sh train

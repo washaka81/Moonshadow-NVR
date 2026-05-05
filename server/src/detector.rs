@@ -419,9 +419,44 @@ impl Detector {
             Ok(formatted)
         }
     }
-    #[allow(dead_code)]
-    pub fn reid(&self, _crop: &DynamicImage) -> Result<Vec<f32>, Error> {
-        Err(err!(Unknown, msg("ReID is not yet implemented")).into())
+    pub fn reid(&mut self, crop: &DynamicImage) -> Result<Vec<f32>, Error> {
+        let model = match &mut self.reid_model {
+            Some(m) => m,
+            None => return Err(err!(Unknown, msg("ReID model not loaded")).into()),
+        };
+
+        // OSNet usually expects 128x256 (WxH)
+        let resized = crop.resize_exact(128, 256, image::imageops::FilterType::Triangle);
+        let mut input = Array4::<f32>::zeros((1, 3, 256, 128));
+
+        // Mean and Std for ImageNet (used by OSNet)
+        let mean = [0.485, 0.456, 0.406];
+        let std = [0.229, 0.224, 0.225];
+
+        for (x, y, pixel) in resized.pixels() {
+            let rgb = pixel.to_rgb();
+            input[[0, 0, y as usize, x as usize]] = ((rgb[0] as f32 / 255.0) - mean[0]) / std[0];
+            input[[0, 1, y as usize, x as usize]] = ((rgb[1] as f32 / 255.0) - mean[1]) / std[1];
+            input[[0, 2, y as usize, x as usize]] = ((rgb[2] as f32 / 255.0) - mean[2]) / std[2];
+        }
+
+        let input_tensor = ort::value::Value::from_array(input).map_err(|e| {
+            err!(
+                Unknown,
+                msg("fail create reid tensor"),
+                source(e.to_string())
+            )
+        })?;
+
+        let outputs = model
+            .run(ort::inputs![input_tensor])
+            .map_err(|e| err!(Unknown, msg("fail reid infer"), source(e.to_string())))?;
+
+        let (_shape, data) = outputs[0]
+            .try_extract_tensor::<f32>()
+            .map_err(|e| err!(Unknown, msg("fail reid extract"), source(e.to_string())))?;
+
+        Ok(data.to_vec())
     }
 }
 
@@ -535,16 +570,16 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                             let db_clone = db.clone();
                             let cam_id = camera_id;
                             let time = time_90k;
-                            let peaks = heatmap.get_suspicious_areas(10.0); // threshold
+                            let peaks = heatmap.get_suspicious_areas(15.0); // Higher threshold for loitering
                             tokio::task::spawn(async move {
                                 let payload = format!(
-                                    "{{\"type\": \"heatmap_peak\", \"coords\": {:?}}}",
+                                    "{{\"type\": \"loitering\", \"coords\": {:?}}}",
                                     peaks
                                 );
                                 let _ = db_clone.lock().insert_ai_event(
                                     cam_id,
                                     time,
-                                    "suspicious_behavior",
+                                    "loitering",
                                     &payload,
                                     "",
                                 );
@@ -623,7 +658,33 @@ impl<C: Clocks + Clone> DetectionWorker<C> {
                 type_str, det.confidence
             );
 
-            if matches!(det.class_id, 2 | 3 | 5 | 7) {
+            if det.class_id == 0 {
+                // Person detected, attempt ReID
+                let x = (det.x - det.w / 2.0).max(0.0) as u32;
+                let y = (det.y - det.h / 2.0).max(0.0) as u32;
+                let w = det.w.min(image.width() as f32 - x as f32) as u32;
+                let h = det.h.min(image.height() as f32 - y as f32) as u32;
+                if w > 0 && h > 0 {
+                    let crop = image.crop_imm(x, y, w, h);
+                    let mut det_lock = detector.lock().await;
+                    if let Ok(embedding) = det_lock.reid(&crop) {
+                        let timestamp = std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_secs();
+                        let captures_path = "models/face_data/captures";
+                        let filename = format!("{}/person_{}.png", captures_path, timestamp);
+                        let _ = std::fs::create_dir_all(captures_path);
+                        let _ = crop.save(&filename);
+
+                        final_type = "person_reid".to_string();
+                        final_payload = format!(
+                            "{{\"type\": \"person\", \"embedding\": {:?}, \"capture\": \"{}\", \"conf\": {:.2}}}",
+                            embedding, filename, det.confidence
+                        );
+                    }
+                }
+            } else if matches!(det.class_id, 2 | 3 | 5 | 7) {
                 let x = (det.x - det.w / 2.0).max(0.0) as u32;
                 let y = (det.y - det.h / 2.0).max(0.0) as u32;
                 let w = det.w.min(image.width() as f32 - x as f32) as u32;

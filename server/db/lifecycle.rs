@@ -256,7 +256,8 @@ impl<C: Clocks + Clone> Flusher<C> {
             streams_needing_delete.push(stream_id);
         }
         for &stream_id in &streams_needing_delete {
-            if let Err(err) = enqueue_delete_recordings(&mut db, stream_id, 0) {
+            let emergency_extra = get_emergency_extra_bytes(&db, stream_id);
+            if let Err(err) = enqueue_delete_recordings(&mut db, stream_id, emergency_extra) {
                 error!(err = %err.chain(), stream_id, "enqueue_delete_recordings failed");
             }
         }
@@ -286,6 +287,36 @@ impl<C: Clocks + Clone> Flusher<C> {
             });
         }
     }
+}
+
+/// Checks if disk space is critical and returns extra bytes needed to reach 10% free.
+fn get_emergency_extra_bytes(db: &db::LockedDatabase, stream_id: i32) -> i64 {
+    let Some(stream) = db.streams_by_id().get(&stream_id) else {
+        return 0;
+    };
+    let stream_lock = stream.inner.lock();
+    let Some(dir) = stream_lock.sample_file_dir.as_ref() else {
+        return 0;
+    };
+
+    if let Ok(stat) = nix::sys::statvfs::statvfs(dir.pool().path()) {
+        let total = stat.blocks() as i64 * stat.fragment_size() as i64;
+        let available = stat.blocks_available() as i64 * stat.fragment_size() as i64;
+
+        if total > 0 && (available as f64 / total as f64) < 0.05 {
+            let target_available = total / 10;
+            let needed = target_available - available;
+            warn!(
+                stream_id,
+                available = base::strutil::encode_size(available),
+                total = base::strutil::encode_size(total),
+                needed = base::strutil::encode_size(needed),
+                "CRITICAL: Disk space below 5%. Triggering emergency recovery."
+            );
+            return needed;
+        }
+    }
+    0
 }
 
 /// Enqueues deletion of recordings to bring a stream's disk usage within bounds.

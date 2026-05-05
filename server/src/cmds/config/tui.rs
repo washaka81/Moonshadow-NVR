@@ -305,13 +305,13 @@ async fn run_hardware_app(
                     match key.code {
                         KeyCode::Esc | KeyCode::Char('q') => break,
                         KeyCode::Down | KeyCode::Char('j') => {
-                            hw_state.selected = (hw_state.selected + 1) % 12
+                            hw_state.selected = (hw_state.selected + 1) % 16
                         }
                         KeyCode::Up | KeyCode::Char('k') => {
                             hw_state.selected = if hw_state.selected > 0 {
                                 hw_state.selected - 1
                             } else {
-                                11
+                                15
                             }
                         }
                         KeyCode::Char(' ') | KeyCode::Enter => match hw_state.selected {
@@ -332,7 +332,24 @@ async fn run_hardware_app(
                             7 => hw_state.enable_heatmap = !hw_state.enable_heatmap,
                             8 => hw_state.prefer_npu = !hw_state.prefer_npu,
                             9 => hw_state.prefer_tpu = !hw_state.prefer_tpu,
-                            11 => {
+                            11 => hw_state.training_schedule = !hw_state.training_schedule,
+                            12 => hw_state.use_cron = !hw_state.use_cron,
+                            14 => {
+                                let interval = hw_state.training_interval.get_content();
+                                let mut cmd = format!("./lpr-hub.sh schedule --days {}", interval);
+                                if hw_state.use_cron {
+                                    cmd.push_str(" --cron");
+                                }
+                                hw_state.status_msg = match std::process::Command::new("sh")
+                                    .arg("-c")
+                                    .arg(cmd)
+                                    .status()
+                                {
+                                    Ok(s) if s.success() => "✅ Schedule files generated. Check logs/terminal.".to_string(),
+                                    _ => "❌ Failed to generate schedule files.".to_string(),
+                                };
+                            }
+                            15 => {
                                 let mut l = db.lock();
                                 let mut cfg = l.global_config().clone();
                                 cfg.hardware_acceleration = hw_state.accel;
@@ -346,6 +363,9 @@ async fn run_hardware_app(
                                 cfg.prefer_npu = hw_state.prefer_npu;
                                 cfg.prefer_tpu = hw_state.prefer_tpu;
                                 cfg.model_path = hw_state.model.get_content().to_string();
+                                cfg.ai_training_schedule = hw_state.training_schedule;
+                                cfg.ai_training_use_cron = hw_state.use_cron;
+                                cfg.ai_training_interval_days = hw_state.training_interval.get_content().parse().unwrap_or(7);
                                 if let Err(e) = l.set_global_config(cfg) {
                                     hw_state.status_msg = format!("❌ Error: {}", e);
                                 } else if let Err(e) = l.flush("TUI config save") {
@@ -362,6 +382,14 @@ async fn run_hardware_app(
                         }
                         KeyCode::Backspace if hw_state.selected == 10 => {
                             hw_state.model.backspace();
+                        }
+                        KeyCode::Char(c) if hw_state.selected == 13 => {
+                            if c.is_digit(10) {
+                                hw_state.training_interval.insert_char(c);
+                            }
+                        }
+                        KeyCode::Backspace if hw_state.selected == 13 => {
+                            hw_state.training_interval.backspace();
                         }
                         _ => {}
                     }
@@ -387,6 +415,10 @@ struct HardwareState {
     // Advanced Hardware
     prefer_npu: bool,
     prefer_tpu: bool,
+    // AI Training
+    training_schedule: bool,
+    use_cron: bool,
+    training_interval: TextInput,
     status_msg: String,
 }
 impl HardwareState {
@@ -414,6 +446,13 @@ impl HardwareState {
             enable_heatmap: cfg.enable_heatmap,
             prefer_npu: cfg.prefer_npu,
             prefer_tpu: cfg.prefer_tpu,
+            training_schedule: cfg.ai_training_schedule,
+            use_cron: cfg.ai_training_use_cron,
+            training_interval: TextInput::new(if cfg.ai_training_interval_days == 0 {
+                "7".to_string()
+            } else {
+                cfg.ai_training_interval_days.to_string()
+            }),
             status_msg: String::new(),
         }
     }
@@ -475,6 +514,19 @@ fn render_hardware_screen(frame: &mut Frame, state: &mut HardwareState) {
             if state.prefer_tpu { "X" } else { " " }
         ),
         format!("  [Model] Path: {}", state.model.get_content()),
+        format!(
+            "  [Train] Scheduled AI Training: [{}]",
+            if state.training_schedule { "X" } else { " " }
+        ),
+        format!(
+            "  [Cron] Use Cron instead of Systemd: [{}]",
+            if state.use_cron { "X" } else { " " }
+        ),
+        format!(
+            "  [Interval] Training Every (Days): {}",
+            state.training_interval.get_content()
+        ),
+        "  [Sync] Apply/Generate Training Schedule".to_string(),
         "  💾 Save and Back".to_string(),
     ];
 

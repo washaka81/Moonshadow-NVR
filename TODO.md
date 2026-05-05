@@ -1,11 +1,11 @@
 # Moonshadow NVR - Pending Tasks
 
-## Next Session / Upcoming Features
-- [ ] **Scheduled AI Training**: Add scheduled/cron functionality to automate the AI training loops.
-- [ ] **Live Mosaic Overhaul (Professional NVR Aesthetic)**:
-  - [ ] **Cleaner HUD**: Only display a minimal date-time box on the live camera view.
-  - [ ] **UI Polish**: Add slight transparency to HUD backgrounds and improve the overall design for a professional look.
-  - [ ] **Grid Expansions**: Add more screen layout options to increase the number of cameras that can be visualized simultaneously.
+## Next Session / Upcoming Features (Completed)
+- [x] **Scheduled AI Training**: Add scheduled/cron functionality to automate the AI training loops.
+- [x] **Live Mosaic Overhaul (Professional NVR Aesthetic)**:
+  - [x] **Cleaner HUD**: Only display a minimal date-time box on the live camera view.
+  - [x] **UI Polish**: Add slight transparency to HUD backgrounds and improve the overall design for a professional look.
+  - [x] **Grid Expansions**: Add more screen layout options to increase the number of cameras that can be visualized simultaneously.
 
 ## AI/ML Training
 
@@ -20,8 +20,9 @@
 - [ ] **Continuous Face Re-ID improvement**
   - [ ] Implement incremental learning for registered identities
   - [ ] Optimize facial landmarks detection for low-light conditions
-- [ ] **Behavioral Analytics**
-  - [ ] Add "Loitering" alert based on Heatmap Dwell-Time
+- [x] **Behavioral Analytics**
+  - [x] Add "Loitering" alert based on Heatmap Dwell-Time
+- [ ] **Pose Estimation Features**
   - [ ] Detect "Falling" or "Fighting" using Pose Estimation
 - [ ] **Multi-Backend Expansion**
   - [ ] Optimize for Hailo-8 NPU and Google Coral TPU
@@ -38,7 +39,7 @@
 - [x] Multi-backend verification (NPU/GPU/CPU)
 - [ ] Multi-camera stress test (>10 streams)
 - [ ] Long-term stability test (7+ days)
-- [ ] Disk space exhaustion recovery
+- [x] Disk space exhaustion recovery
 
 ## Security, Stability & Optimization (Completed)
 - [x] **Optimization**: In-process video decoding for AI (removed disk I/O dependency and fixed command injection vulnerability).
@@ -59,4 +60,4 @@
 - [x] **Automate Deployment Scripts** (Instalador con detección de OS y orquestación de MediaMTX)
 
 ---
-*Last updated: 2026-05-04*
+*Last updated: 2026-05-05*

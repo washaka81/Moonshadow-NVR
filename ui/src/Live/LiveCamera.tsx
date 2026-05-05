@@ -520,224 +520,116 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
       <Box
         sx={{
           position: "absolute",
-          top: 12,
-          left: 15,
+          top: 10,
+          left: 10,
           zIndex: 10,
           pointerEvents: "none",
           display: "flex",
+          alignItems: "center",
           gap: 1,
+          bgcolor: "rgba(0,0,0,0.4)",
+          px: 1.5,
+          py: 0.5,
+          borderRadius: 1,
+          backdropFilter: "blur(4px)",
         }}
       >
-        {/* Camera Name Badge */}
-        <Box
+        <Typography
+          variant="caption"
           sx={{
-            bgcolor: "rgba(0,0,0,0.85)",
-            px: 2,
-            py: 1,
-            borderRadius: 1.5,
-            border: "1px solid rgba(255,255,255,0.12)",
-            backdropFilter: "blur(8px)",
-            boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
+            fontWeight: 600,
+            color: "rgba(255,255,255,0.9)",
+            fontSize: "0.75rem",
+            letterSpacing: 0.5,
           }}
         >
-          <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
-            <Box
-              sx={{
-                width: 8,
-                height: 8,
-                borderRadius: "50%",
-                bgcolor: camera ? "#4caf50" : "#757575",
-                boxShadow: camera ? "0 0 8px rgba(76, 175, 80, 0.6)" : "none",
-                animation: camera ? "pulse 2s infinite" : "none",
-                "@keyframes pulse": {
-                  "0%": { opacity: 1 },
-                  "50%": { opacity: 0.5 },
-                  "100%": { opacity: 1 },
-                },
-              }}
-            />
-            <Typography
-              variant="caption"
-              sx={{
-                fontWeight: 700,
-                color: "#fff",
-                fontFamily: "'Inter', 'system-ui', sans-serif",
-                fontSize: "0.9rem",
-                letterSpacing: 0.7,
-                textTransform: "uppercase",
-                whiteSpace: "nowrap",
-              }}
-            >
-              {camera?.shortName || "NO CAMERA"}
-            </Typography>
-          </Box>
-        </Box>
-        {/* REC Indicator */}
+          {camera?.shortName || "NO CAMERA"}
+        </Typography>
         {isRecording && (
           <Box
             sx={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              bgcolor: "rgba(244, 67, 54, 0.9)",
-              px: 1.5,
-              py: 1,
-              borderRadius: 1.5,
-              border: "1px solid rgba(255,255,255,0.2)",
-              backdropFilter: "blur(8px)",
-              boxShadow: "0 2px 8px rgba(244, 67, 54, 0.4)",
+              width: 8,
+              height: 8,
+              borderRadius: "50%",
+              bgcolor: "#f44336",
+              boxShadow: "0 0 5px rgba(244, 67, 54, 0.8)",
               animation: "recPulse 1.5s infinite",
               "@keyframes recPulse": {
                 "0%": { opacity: 1 },
-                "50%": { opacity: 0.6 },
+                "50%": { opacity: 0.4 },
                 "100%": { opacity: 1 },
               },
             }}
-          >
-            <Box
-              sx={{
-                width: 10,
-                height: 10,
-                borderRadius: "50%",
-                bgcolor: "#fff",
-                boxShadow: "0 0 6px rgba(255,255,255,0.8)",
-              }}
-            />
-          </Box>
+          />
         )}
       </Box>
 
-      {/* HUD: Date/Time & Resolution (Top Right) */}
+      {/* HUD: Minimal Date/Time (Top Right) */}
       <Box
         sx={{
           position: "absolute",
-          top: 12,
-          right: 15,
+          top: 10,
+          right: 10,
           zIndex: 10,
           pointerEvents: "none",
-          bgcolor: "rgba(0,0,0,0.85)",
-          px: 2,
-          py: 1,
-          borderRadius: 1.5,
-          border: "1px solid rgba(255,255,255,0.12)",
-          backdropFilter: "blur(8px)",
-          boxShadow: "0 4px 12px rgba(0,0,0,0.4)",
-          minWidth: "160px",
+          bgcolor: "rgba(0,0,0,0.4)",
+          px: 1.5,
+          py: 0.5,
+          borderRadius: 1,
+          backdropFilter: "blur(4px)",
+          display: "flex",
+          alignItems: "center",
+          gap: 1.5,
         }}
       >
-        {/* Date */}
-        <Box
+        <Typography
           sx={{
-            color: "#bdbdbd",
+            color: "rgba(255,255,255,0.7)",
             fontSize: "0.7rem",
-            fontWeight: 600,
-            fontFamily: "'Inter Mono', 'Monaco', monospace",
-            letterSpacing: 0.5,
-            mb: 0.5,
+            fontWeight: 500,
+            fontFamily: "monospace",
           }}
         >
-          {currentTime
-            .toLocaleDateString("es-ES", {
-              weekday: "short",
-              day: "2-digit",
-              month: "2-digit",
-              year: "numeric",
-            })
-            .toUpperCase()}
-        </Box>
-        {/* Time */}
-        <Box
+          {currentTime.toLocaleDateString("es-ES", {
+            day: "2-digit",
+            month: "2-digit",
+            year: "numeric",
+          })}
+        </Typography>
+        <Typography
           sx={{
             color: "#4caf50",
-            fontSize: "1rem",
+            fontSize: "0.75rem",
             fontWeight: 700,
-            fontFamily: "'Inter Mono', 'Monaco', monospace",
-            letterSpacing: 1,
-            mb: 1,
-            textShadow: "0 0 10px rgba(76, 175, 80, 0.3)",
+            fontFamily: "monospace",
           }}
         >
           {currentTime.toLocaleTimeString("es-ES", { hour12: false })}
-        </Box>
-        {/* Stream & Resolution */}
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            pt: 0.75,
-            borderTop: "1px solid rgba(255,255,255,0.15)",
-          }}
-        >
-          <Box
-            sx={{
-              display: "flex",
-              alignItems: "center",
-              gap: 0.5,
-            }}
-          >
-            <Box
-              sx={{
-                width: 6,
-                height: 6,
-                borderRadius: "50%",
-                bgcolor:
-                  streamType === "SUB"
-                    ? "#2196f3"
-                    : streamType === "MAIN"
-                      ? "#ff9800"
-                      : "#757575",
-              }}
-            />
-            <Box
-              sx={{
-                color:
-                  streamType === "SUB"
-                    ? "#2196f3"
-                    : streamType === "MAIN"
-                      ? "#ff9800"
-                      : "#757575",
-                fontSize: "0.65rem",
-                fontWeight: 700,
-                fontFamily: "monospace",
-                letterSpacing: 0.5,
-              }}
-            >
-              {streamType || "N/A"}
-            </Box>
-          </Box>
-          <Box
-            sx={{
-              color: "#9e9e9e",
-              fontSize: "0.65rem",
-              fontWeight: 600,
-              fontFamily: "monospace",
-              letterSpacing: 0.5,
-            }}
-          >
-            {resolution || (camera ? "LOAD" : "N/A")}
-          </Box>
-        </Box>
+        </Typography>
       </Box>
 
-      {/* Connection Status (Bottom Left) */}
+      {/* Connection & Stream Info (Bottom Left - Minimal) */}
       {camera && (
         <Box
           sx={{
             position: "absolute",
-            bottom: 15,
-            left: 15,
+            bottom: 10,
+            left: 10,
             zIndex: 10,
             pointerEvents: "none",
             display: "flex",
             alignItems: "center",
-            gap: 0.75,
+            gap: 1,
+            bgcolor: "rgba(0,0,0,0.3)",
+            px: 1,
+            py: 0.25,
+            borderRadius: 0.5,
           }}
         >
           <Box
             sx={{
-              width: 6,
-              height: 6,
+              width: 5,
+              height: 5,
               borderRadius: "50%",
               bgcolor:
                 playbackState.state === "normal"
@@ -745,30 +637,17 @@ const LiveCamera = ({ mediaSourceApi, camera, chooser }: LiveCameraProps) => {
                   : playbackState.state === "waiting"
                     ? "#ff9800"
                     : "#f44336",
-              boxShadow: "0 0 6px currentColor",
             }}
           />
           <Typography
-            variant="caption"
             sx={{
-              color:
-                playbackState.state === "normal"
-                  ? "#4caf50"
-                  : playbackState.state === "waiting"
-                    ? "#ff9800"
-                    : "#f44336",
-              fontSize: "0.65rem",
-              fontWeight: 700,
+              color: "rgba(255,255,255,0.5)",
+              fontSize: "0.6rem",
+              fontWeight: 600,
               fontFamily: "monospace",
-              letterSpacing: 0.5,
-              textTransform: "uppercase",
             }}
           >
-            {playbackState.state === "normal"
-              ? "LIVE"
-              : playbackState.state === "waiting"
-                ? "BUFFER"
-                : "ERROR"}
+            {streamType} {resolution}
           </Typography>
         </Box>
       )}

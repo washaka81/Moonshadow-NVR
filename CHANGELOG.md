@@ -8,6 +8,15 @@ upgrades, e.g. `v0.6.x` -> `v0.7.x`. The config file format and
 [API](ref/api.md) currently have no stability guarantees, so they may change
 even on minor releases, e.g. `v0.7.5` -> `v0.7.6`.
 
+## v0.0.3 (2026-05-05)
+
+*   **Scheduled AI Training**: Integrated systemd/cron scheduling for LPR training loops, manageable via TUI.
+*   **Live Mosaic Overhaul**: Simplified HUD with glassmorphism aesthetics (transparency/blur) and minimal info.
+*   **Grid Expansions**: Added 4x4 and 5x5 viewing layouts, supporting up to 25 simultaneous streams.
+*   **Behavioral Analytics**: Improved loitering detection with tuned thresholds and descriptive events.
+*   **Disk Space Recovery**: Implemented emergency cleanup mechanism that triggers when free space < 5%.
+*   **Re-ID Integration**: Added OSNet-based person re-identification embedding extraction in the AI pipeline.
+
 ## v0.0.2 (2026-05-01)
 
 *   **Integrated Multi-Backend AI Acceleration**: Added support for NPU (Intel Core Ultra), ARM ACL (Raspberry Pi), and NVIDIA CUDA alongside OpenVINO and Vulkan.

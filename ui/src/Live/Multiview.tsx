@@ -22,6 +22,8 @@ export const LAYOUTS: Layout[] = [
   { className: "two-by-three", cameras: 6, name: "2x3" },
   { className: "three-by-two", cameras: 6, name: "3x2" },
   { className: "three-by-three", cameras: 9, name: "3x3" },
+  { className: "four-by-four", cameras: 16, name: "4x4" },
+  { className: "five-by-five", cameras: 25, name: "5x5" },
 ];
 
 export interface MultiviewProps {
@@ -64,7 +66,7 @@ export const MultiviewChooser = (props: MultiviewChooserProps) => {
   );
 };
 
-export const MAX_CAMERAS = 9;
+export const MAX_CAMERAS = 25;
 export type SelectedCameras = Array<number | null>;
 export interface SelectOp {
   selectedIndex: number;
@@ -203,6 +205,14 @@ const Multiview = ({
             "&.main-plus-five, &.three-by-three": {
               gridTemplateColumns: "repeat(3, 33.33%)",
               gridTemplateRows: "repeat(3, 33.33%)",
+            },
+            "&.four-by-four": {
+              gridTemplateColumns: "repeat(4, 25%)",
+              gridTemplateRows: "repeat(4, 25%)",
+            },
+            "&.five-by-five": {
+              gridTemplateColumns: "repeat(5, 20%)",
+              gridTemplateRows: "repeat(5, 20%)",
             },
             "&.main-plus-five > div:nth-of-type(1)": {
               gridColumn: "span 2",
